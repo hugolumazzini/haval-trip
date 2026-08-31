@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fundo nativo igual ao do Compose, senão pisca uma tela clara ao abrir. -->
+    <style name="Theme.HavalTrip" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF0A0A0C</item>
+        <item name="android:statusBarColor">#FF0D0E12</item>
+        <item name="android:navigationBarColor">#FF0A0A0C</item>
+    </style>
+</resources>

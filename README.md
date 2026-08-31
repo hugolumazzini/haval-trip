@@ -150,6 +150,14 @@ desligada. Um fallback automático para o simulador transformaria "o carro está
 parado" em números inventados, que é o pior erro possível num aparelho que serve
 para medir; então a troca é um botão, e o simulador se anuncia enquanto está no ar.
 
+**O relatório vai por commit num repositório privado, e o token nunca entra no
+código.** O caminho principal é a API do GitHub: o repositório é fechado, então
+hábito de direção não fica exposto num link que qualquer um abre. O token é
+digitado uma vez, dentro do carro, e mora só no aparelho — se viajasse junto com
+o código, que é público, qualquer pessoa escreveria no repositório. Quando o
+GitHub não responde e a viagem já foi feita, um botão manda para um site de
+texto aberto; ele diz que é público, porque é.
+
 **A tela de Diagnóstico mostra o valor cru, sem conversão.** É ferramenta de
 campo, não produto: guarda o último valor de cada chave e uma fita dos últimos
 eventos, porque é o movimento do número enquanto o carro anda que revela a

@@ -10,6 +10,7 @@ import br.com.hugolumazzini.havaltrip.engine.TripState
 import br.com.hugolumazzini.havaltrip.services.TripComparison
 import br.com.hugolumazzini.havaltrip.services.TripComparisonResult
 import br.com.hugolumazzini.havaltrip.storage.FileTripStorage
+import br.com.hugolumazzini.havaltrip.telemetry.Cofre
 import br.com.hugolumazzini.havaltrip.telemetry.DiarioDeCampo
 import br.com.hugolumazzini.havaltrip.telemetry.HavalTelemetrySource
 import br.com.hugolumazzini.havaltrip.telemetry.Interpretacao
@@ -87,6 +88,9 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
     private var escuta: Job? = null
 
     val state: StateFlow<TripState> = manager.state
+
+    private val cofre = Cofre(app)
+    private val _temToken = MutableStateFlow(cofre.temToken)
 
     private val _envio = MutableStateFlow<Envio>(Envio.Parado)
     val envio: StateFlow<Envio> = _envio.asStateFlow()
@@ -194,14 +198,26 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
 
     fun interpretarConsumoComo(valor: Interpretacao) = diario.interpretarComo(valor)
 
+    /** `true` quando o token do GitHub já foi configurado nesta central. */
+    val temToken: StateFlow<Boolean> = _temToken.asStateFlow()
+
+    fun guardarToken(valor: String) {
+        cofre.token = valor
+        _temToken.value = cofre.temToken
+    }
+
     /**
-     * Grava o relatório e sobe para um endereço público de leitura.
+     * Grava o relatório e manda para o repositório privado.
      *
      * A gravação vem primeiro de propósito: dentro do carro pode não haver
      * internet, e perder a coleta de uma viagem inteira porque o Wi-Fi não
      * pegou seria o pior desfecho possível para um teste que exige dirigir.
+     *
+     * [publico] é a saída de emergência — sobe para um site de texto aberto, em
+     * vez do repositório fechado. Só existe porque a alternativa, num teste que
+     * exige dirigir, seria refazer a viagem.
      */
-    fun enviarRelatorio() {
+    fun enviarRelatorio(publico: Boolean = false) {
         if (_envio.value is Envio.Enviando) return
         _envio.value = Envio.Enviando
         viewModelScope.launch {
@@ -212,7 +228,12 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
                 shisuku = shisukuInstalado,
             )
             val arquivo = runCatching { Relatorio.salvar(getApplication(), texto) }.getOrNull()
-            _envio.value = Relatorio.enviar(texto).fold(
+            val token = cofre.token
+            val resultado = when {
+                publico || token == null -> Relatorio.enviar(texto)
+                else -> Relatorio.enviarPorGit(token, texto)
+            }
+            _envio.value = resultado.fold(
                 onSuccess = { Envio.Pronto(it) },
                 onFailure = {
                     Envio.Falhou(

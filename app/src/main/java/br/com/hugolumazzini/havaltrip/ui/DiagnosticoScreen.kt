@@ -15,11 +15,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -29,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.Envio
 import br.com.hugolumazzini.havaltrip.TripViewModel
 import br.com.hugolumazzini.havaltrip.telemetry.Interpretacao
+import br.com.hugolumazzini.havaltrip.telemetry.Relatorio
 import br.com.hugolumazzini.havaltrip.ui.theme.Cores
 import br.com.hugolumazzini.havaltrip.ui.theme.EstiloRotulo
 import java.text.SimpleDateFormat
@@ -52,6 +59,8 @@ fun DiagnosticoScreen(vm: TripViewModel) {
     val interpretacao by vm.diario.interpretacao.collectAsStateWithLifecycle()
     val envio by vm.envio.collectAsStateWithLifecycle()
     val fonteReal by vm.fonteReal.collectAsStateWithLifecycle()
+    val temToken by vm.temToken.collectAsStateWithLifecycle()
+    var pedindoToken by remember { mutableStateOf(false) }
     val contexto = LocalContext.current
 
     Column(Modifier.fillMaxSize()) {
@@ -91,10 +100,16 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                     is Envio.Enviando -> "Enviando…"
                     else -> "Gerar e enviar relatório"
                 },
-                onClick = vm::enviarRelatorio,
+                onClick = { vm.enviarRelatorio() },
                 habilitado = envio !is Envio.Enviando,
                 cor = Cores.SuperficieSelecionada,
                 corTexto = Cores.Destaque,
+            )
+            BotaoAcao(
+                texto = if (temToken) "Token guardado" else "Configurar token",
+                onClick = { pedindoToken = true },
+                cor = if (temToken) Cores.Campo else Cores.SuperficieSelecionada,
+                corTexto = if (temToken) Cores.TextoApoio else Cores.Atencao,
             )
             // A conversão do consumo é a única incógnita que muda os números na
             // hora: dá para virar a chave dentro do carro e ver qual das duas
@@ -115,7 +130,7 @@ fun DiagnosticoScreen(vm: TripViewModel) {
 
         if (envio !is Envio.Parado) {
             Spacer(Modifier.height(10.dp))
-            ResultadoDoEnvio(envio, contexto)
+            ResultadoDoEnvio(envio, contexto, onPublico = { vm.enviarRelatorio(publico = true) })
         }
 
         Spacer(Modifier.height(12.dp))
@@ -172,6 +187,52 @@ fun DiagnosticoScreen(vm: TripViewModel) {
             }
         }
     }
+
+    if (pedindoToken) {
+        DialogoToken(onSalvar = vm::guardarToken, onFechar = { pedindoToken = false })
+    }
+}
+
+/**
+ * Onde o token é digitado — uma vez, dentro do carro.
+ *
+ * O campo aceita colar, que é como isso vai acontecer na prática: o token tem
+ * quase cem caracteres e ninguém o digita à mão numa tela de central.
+ */
+@Composable
+private fun DialogoToken(onSalvar: (String) -> Unit, onFechar: () -> Unit) {
+    var texto by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onFechar,
+        containerColor = Cores.Superficie,
+        title = { Text("Token do GitHub", color = Cores.Texto) },
+        text = {
+            Column {
+                Text(
+                    "Cole aqui o token de acesso ao repositório ${Relatorio.REPOSITORIO}. " +
+                        "Ele fica guardado só nesta central e nunca vai junto com o relatório.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Cores.TextoApoio,
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = texto,
+                    onValueChange = { texto = it },
+                    singleLine = true,
+                    placeholder = { Text("github_pat_…") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSalvar(texto); onFechar() }, enabled = texto.isNotBlank()) {
+                Text("Guardar", color = Cores.Destaque)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onFechar) { Text("Cancelar", color = Cores.TextoApoio) }
+        },
+    )
 }
 
 /**
@@ -181,7 +242,7 @@ fun DiagnosticoScreen(vm: TripViewModel) {
  * tamanho e o botão de copiar, em vez de um texto pequeno de status.
  */
 @Composable
-private fun ResultadoDoEnvio(envio: Envio, contexto: Context) {
+private fun ResultadoDoEnvio(envio: Envio, contexto: Context, onPublico: () -> Unit) {
     when (envio) {
         is Envio.Pronto -> Cartao(Modifier.fillMaxWidth()) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -203,16 +264,21 @@ private fun ResultadoDoEnvio(envio: Envio, contexto: Context) {
         }
 
         is Envio.Falhou -> Cartao(Modifier.fillMaxWidth()) {
-            Column {
-                Text("NÃO DEU PARA ENVIAR", style = EstiloRotulo)
-                Text(envio.motivo, color = Cores.Atencao)
-                // O arquivo local é a rede de segurança: sem internet no carro,
-                // a coleta não se perde — sai depois, por adb.
-                Text(
-                    "O relatório ficou gravado em ${envio.arquivo}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Cores.TextoApoio,
-                )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("NÃO DEU PARA ENVIAR", style = EstiloRotulo)
+                    Text(envio.motivo, color = Cores.Atencao)
+                    // O arquivo local é a rede de segurança: sem internet no
+                    // carro, a coleta não se perde — sai depois, por cabo.
+                    Text(
+                        "O relatório ficou gravado em ${envio.arquivo}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Cores.TextoApoio,
+                    )
+                }
+                // Última tentativa antes de desistir da viagem: um site aberto,
+                // que não pede token. É público, e o botão diz isso.
+                BotaoAcao("Tentar link público", onPublico)
             }
         }
 

@@ -150,13 +150,13 @@ desligada. Um fallback automático para o simulador transformaria "o carro está
 parado" em números inventados, que é o pior erro possível num aparelho que serve
 para medir; então a troca é um botão, e o simulador se anuncia enquanto está no ar.
 
-**O relatório vai por commit num repositório privado, e o token nunca entra no
-código.** O caminho principal é a API do GitHub: o repositório é fechado, então
-hábito de direção não fica exposto num link que qualquer um abre. O token é
-digitado uma vez, dentro do carro, e mora só no aparelho — se viajasse junto com
-o código, que é público, qualquer pessoa escreveria no repositório. Quando o
-GitHub não responde e a viagem já foi feita, um botão manda para um site de
-texto aberto; ele diz que é público, porque é.
+**O relatório sai por um link curto, e não por uma conta com credencial.** A
+tentação era commitar direto num repositório privado, mas isso exige um token —
+e a única forma de pôr um token numa central é digitar quase cem caracteres na
+tela do carro, o que ninguém faz, ou embutir no APK, onde ele fica extraível. O
+link curto de um site de texto (`dpaste.com/XXXXXXXXX`, nove caracteres) resolve
+sem nenhuma credencial: dá para ler em voz alta. O custo é ele ser público por
+30 dias, e a tela diz isso.
 
 **A tela de Diagnóstico mostra o valor cru, sem conversão.** É ferramenta de
 campo, não produto: guarda o último valor de cada chave e uma fita dos últimos

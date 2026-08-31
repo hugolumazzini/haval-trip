@@ -2,11 +2,9 @@ package br.com.hugolumazzini.havaltrip.telemetry
 
 import android.content.Context
 import android.os.Build
-import android.util.Base64
 import br.com.hugolumazzini.havaltrip.engine.TripState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -27,9 +25,6 @@ object Relatorio {
 
     private val hora = SimpleDateFormat("HH:mm:ss", Locale.forLanguageTag("pt-BR"))
     private val carimbo = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.forLanguageTag("pt-BR"))
-
-    /** Nome do arquivo no repositório: ordena sozinho por data. */
-    private val arquivo = SimpleDateFormat("yyyy-MM-dd-HHmm", Locale.US)
 
     fun montar(diario: DiarioDeCampo, estado: TripState, fonteReal: Boolean, shisuku: Boolean): String {
         val sb = StringBuilder()
@@ -82,44 +77,10 @@ object Relatorio {
         return arquivo
     }
 
-    /** Repositório privado, do próprio Hugo, onde os relatórios são commitados. */
-    const val REPOSITORIO = "hugolumazzini/haval-trip-relatorios"
-
-    /**
-     * Faz commit do relatório no repositório privado, pela API do GitHub.
-     *
-     * É o caminho principal por ser o único em que o arquivo chega fechado: o
-     * repositório é privado, então o hábito de direção não fica exposto num
-     * link que qualquer um abre. Em troca, exige o token configurado no
-     * [Cofre] — sem ele não há como escrever.
-     */
-    suspend fun enviarPorGit(token: String, texto: String): Result<String> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val nome = "relatorios/${arquivo.format(Date())}.txt"
-                val corpo = JSONObject()
-                    .put("message", "Coleta de ${carimbo.format(Date())}")
-                    .put("content", Base64.encodeToString(texto.toByteArray(), Base64.NO_WRAP))
-                    .toString()
-
-                val resposta = postar(
-                    endereco = "https://api.github.com/repos/$REPOSITORIO/contents/$nome",
-                    corpo = corpo,
-                    tipo = "application/json",
-                    metodo = "PUT",
-                    // O token vai no cabeçalho, nunca na URL: endereço entra em
-                    // log de servidor, cabeçalho de autorização não.
-                    autorizacao = "Bearer $token",
-                )
-                JSONObject(resposta).getJSONObject("content").getString("html_url")
-            }
-        }
-
     /**
      * Sobe para um site público de texto e devolve o endereço para copiar.
      *
-     * Reserva para quando o GitHub não responde ou o token não está
-     * configurado, e o teste já foi feito: se o primeiro
+     * Dois serviços porque o teste acontece dentro do carro: se o primeiro
      * estiver fora do ar, não dá para voltar para casa, corrigir e sair de novo.
      * Nenhum dos dois pede cadastro — e nada de identificável vai no texto: o
      * chassi nunca é lido ([HavalTelemetrySource.CHAVES]).
@@ -144,34 +105,25 @@ object Relatorio {
     private fun viaPasteRs(texto: String): String =
         postar("https://paste.rs/", texto, "text/plain")
 
-    private fun postar(
-        endereco: String,
-        corpo: String,
-        tipo: String,
-        metodo: String = "POST",
-        autorizacao: String? = null,
-    ): String {
+    private fun postar(endereco: String, corpo: String, tipo: String): String {
         val conexao = (URL(endereco).openConnection() as HttpURLConnection).apply {
-            requestMethod = metodo
+            requestMethod = "POST"
             doOutput = true
             connectTimeout = 20_000
             readTimeout = 20_000
             setRequestProperty("Content-Type", tipo)
             setRequestProperty("User-Agent", "HavalTrip/1.0")
-            autorizacao?.let { setRequestProperty("Authorization", it) }
         }
         conexao.outputStream.use { it.write(corpo.toByteArray()) }
         val codigo = conexao.responseCode
         if (codigo !in 200..299) {
             val erro = conexao.errorStream?.bufferedReader()?.readText().orEmpty()
             // A mensagem é lida dentro do carro, por quem quer terminar o teste
-            // e ir embora. "Bad credentials" em JSON não diz o que fazer;
-            // "o token foi recusado" diz.
+            // e ir embora: precisa dizer o que fazer, não devolver o corpo do
+            // erro do servidor.
             throw IllegalStateException(
                 when (codigo) {
-                    401 -> "O token foi recusado. Confira se copiou ele inteiro."
-                    403 -> "O token não tem permissão de escrita neste repositório."
-                    404 -> "Repositório não encontrado — ou o token não enxerga ele."
+                    in 500..599 -> "O site de envio está fora do ar. Tente de novo."
                     else -> "Erro $codigo do servidor — ${erro.take(90)}"
                 }
             )

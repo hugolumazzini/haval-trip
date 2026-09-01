@@ -151,10 +151,48 @@ class HavalTelemetrySource(
             "car.basic.avg_vehicle_speed_since_startup",
         )
 
+        /**
+         * As chaves que o Shisuku monitora sem ninguém pedir.
+         *
+         * Ele só reemite o que está na lista de monitoramento, e essa lista sai
+         * de fábrica com um punhado fixo (`DEFAULT_KEYS`) mais o que o dono
+         * marcar à mão em "Configurar". Distinguir as duas metades importa
+         * porque as ausências têm causas diferentes: falta de chave nesta lista
+         * é problema de configuração do Shisuku, enquanto uma chave desta lista
+         * que não chega significa que a ponte com o carro nem está de pé.
+         */
+        val CHAVES_PADRAO = setOf(
+            CHAVE_VELOCIDADE,
+            CHAVE_HODOMETRO,
+            CHAVE_CONSUMO_INSTANTANEO,
+            CHAVE_MOTOR,
+            "car.basic.gear_status",
+            "car.basic.driving_ready_state",
+            "car.basic.accumulated_drivetime",
+        )
+
+        /** As que só chegam depois de marcadas no "Configurar" do Shisuku. */
+        val CHAVES_A_HABILITAR = CHAVES.filterNot { it in CHAVES_PADRAO }
+
         /** `true` se o HavalShisuku está instalado nesta central. */
         fun shisukuInstalado(context: Context): Boolean = runCatching {
             context.packageManager.getPackageInfo(PACOTE_SHISUKU, 0)
         }.isSuccess
+
+        /**
+         * Abre o HavalShisuku, que é onde todo problema de dado se resolve.
+         *
+         * Sem ele de pé — com o Shizuku autorizado e os serviços da GWM
+         * conectados — não existe broadcast nenhum para escutar. Estando dentro
+         * do carro, procurar o ícone na gaveta de apps custa mais que um botão.
+         */
+        fun abrirShisuku(context: Context) {
+            runCatching {
+                context.packageManager.getLaunchIntentForPackage(PACOTE_SHISUKU)
+                    ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    ?.let(context::startActivity)
+            }
+        }
 
         fun pedirTudo(context: Context) {
             runCatching {

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Versão para Android 7 (o `minSdk` é 24), que não conhece ícone adaptativo e
+  precisa dos dois planos já achatados num desenho só. A central do H6 está bem
+  acima disso e nunca vai cair aqui, mas sem este arquivo o app não compila para
+  as versões que a gente declara suportar.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/ic_launcher_background" />
+    <item android:drawable="@drawable/ic_launcher_foreground" />
+</layer-list>

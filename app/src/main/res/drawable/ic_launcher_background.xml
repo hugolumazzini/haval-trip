@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Fundo do ícone. Ocupa os 108x108 inteiros de propósito: o launcher recorta a
+  forma que quiser (círculo, quadrado arredondado) e não pode encontrar canto
+  vazio em nenhuma delas.
+
+  O grafite quase preto é o mesmo da tela do app. O leve clareamento na diagonal
+  evita que o ícone vire uma mancha chapada sobre um papel de parede escuro.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt" name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0"
+                android:startY="0"
+                android:endX="108"
+                android:endY="108"
+                android:startColor="#1E222D"
+                android:endColor="#0A0A0C" />
+        </aapt:attr>
+    </path>
+</vector>

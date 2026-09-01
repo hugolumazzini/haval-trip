@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.Envio
 import br.com.hugolumazzini.havaltrip.TripViewModel
+import br.com.hugolumazzini.havaltrip.telemetry.HavalTelemetrySource
 import br.com.hugolumazzini.havaltrip.telemetry.Interpretacao
 import br.com.hugolumazzini.havaltrip.ui.theme.Cores
 import br.com.hugolumazzini.havaltrip.ui.theme.EstiloRotulo
@@ -80,6 +81,10 @@ fun DiagnosticoScreen(vm: TripViewModel) {
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             BotaoAcao("Pedir tudo ao carro", vm::pedirTudoAoCarro)
+            // Nada aqui se resolve dentro do Haval Trip: quem precisa de Shizuku
+            // e de serviço conectado é o Shisuku. O botão encurta o caminho até
+            // lá, que dentro do carro é procurar ícone na gaveta de apps.
+            if (vm.shisukuInstalado) BotaoAcao("Abrir HavalShisuku", vm::abrirShisuku)
             BotaoAcao(
                 texto = if (fonteReal) "Fonte: carro" else "Fonte: simulador",
                 onClick = { vm.usarFonteReal(!fonteReal) },
@@ -126,9 +131,17 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                     Text("VALOR ATUAL DE CADA CHAVE", style = EstiloRotulo)
                     Spacer(Modifier.height(6.dp))
                     if (leituras.isEmpty()) {
+                        // Silêncio total não é chave faltando na configuração: é
+                        // a ponte inteira fora do ar. Mesmo zerado, o Shisuku
+                        // publicaria as chaves padrão assim que se conectasse.
                         Text(
-                            "Nada recebido.\n\nSe o HavalShisuku estiver instalado, confira se ele " +
-                                "está rodando; ele é quem publica os dados do carro.",
+                            "Nada recebido — a ponte não está de pé.\n\n" +
+                                "Abra o HavalShisuku e confira, nesta ordem:\n" +
+                                "1. o Shizuku está rodando e autorizou o Shisuku;\n" +
+                                "2. a tela de valores do Shisuku mostra números mexendo.\n\n" +
+                                "Se lá também estiver vazio, o problema é dele, não daqui: " +
+                                "o Haval Trip só escuta o que o Shisuku publica, e não pede " +
+                                "permissão nenhuma por conta própria.",
                             color = Cores.TextoApoio,
                             style = MaterialTheme.typography.bodyMedium,
                         )
@@ -142,6 +155,13 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                                     apoio = "${leitura.vezes}x · ${hora.format(Date(leitura.emMs))}",
                                 )
                             }
+                            // As que faltam não são defeito nem ausência no
+                            // carro: o Shisuku só monitora a lista de fábrica
+                            // mais o que estiver marcado no "Configurar" dele —
+                            // e tanque, autonomia e consumo médio ficam de fora
+                            // dessa lista de fábrica.
+                            val faltando = HavalTelemetrySource.CHAVES.filterNot { it in leituras }
+                            if (faltando.isNotEmpty()) item { AindaFaltam(faltando) }
                         }
                     }
                 }
@@ -228,6 +248,34 @@ private fun ResultadoDoEnvio(envio: Envio, contexto: Context, onTentarDeNovo: ()
 private fun copiar(contexto: Context, texto: String) {
     val area = contexto.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
     area?.setPrimaryClip(ClipData.newPlainText("Haval Trip", texto))
+}
+
+/**
+ * O que ainda não chegou, e o que fazer a respeito.
+ *
+ * Vale mais que a ausência silenciosa: dentro do carro, "o tanque está vazio na
+ * tela" precisa distinguir carro que não publica de chave que ninguém marcou no
+ * Shisuku — e só a segunda tem conserto ali mesmo, em trinta segundos.
+ */
+@Composable
+private fun AindaFaltam(chaves: List<String>) {
+    Spacer(Modifier.height(12.dp))
+    Text("AINDA NÃO CHEGARAM", style = EstiloRotulo, color = Cores.Atencao)
+    Text(
+        "Marque estas em Configurar, dentro do HavalShisuku (o botão só aparece " +
+            "com o \"uso avançado\" ligado nas opções dele):",
+        style = MaterialTheme.typography.bodySmall,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(4.dp))
+    chaves.forEach {
+        Text(
+            it,
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace,
+            color = Cores.TextoCorrido,
+        )
+    }
 }
 
 @Composable

@@ -47,6 +47,21 @@ object Relatorio {
         }
         sb.appendLine()
 
+        // Sem isto, uma chave ausente no relatório é ambígua: pode ser o carro
+        // que não publica, ou o Shisuku que não monitora. A distinção decide se
+        // o próximo passo é código nosso ou uma caixinha marcada lá.
+        sb.appendLine("--- AINDA NÃO CHEGARAM ---")
+        val faltando = HavalTelemetrySource.CHAVES.filterNot { it in atual }
+        if (faltando.isEmpty()) {
+            sb.appendLine("(nenhuma — chegou tudo que o app escuta)")
+        } else {
+            faltando.forEach {
+                val padrao = it in HavalTelemetrySource.CHAVES_PADRAO
+                sb.appendLine("$it   [${if (padrao) "padrão do Shisuku" else "precisa marcar em Configurar"}]")
+            }
+        }
+        sb.appendLine()
+
         sb.appendLine("--- O QUE O APP ENTENDEU ---")
         val live = estado.live
         sb.appendLine("velocidade      = ${live.speedKmh} km/h")

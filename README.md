@@ -144,6 +144,14 @@ nosso. O chassi (`car.basic.vin_code`) também é publicado e é a única chave 
 o app se recusa a escutar — é o documento do carro, e o que não entra na memória
 não escapa num relatório.
 
+**O Shisuku só reemite o que está monitorando, e a lista de fábrica é curta.**
+Ele publica as chaves do `DEFAULT_KEYS` dele mais o que o dono marcar à mão em
+"Configurar" — e tanque, autonomia, consumo médio e modo de energia **não estão
+na lista de fábrica**. Por isso o diagnóstico lista nominalmente o que ainda não
+chegou, separando "é padrão dele, então a ponte está fora do ar" de "é chave que
+ninguém marcou". A diferença decide se o próximo passo é código aqui ou uma
+caixinha marcada lá, e dentro do carro essa é a única pergunta que importa.
+
 **A fonte é escolhível, e nunca troca sozinha.** A central pode ter o Shisuku
 instalado sem haver carro dizendo nada — numa bancada, ou com a ignição
 desligada. Um fallback automático para o simulador transformaria "o carro está

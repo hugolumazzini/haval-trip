@@ -192,6 +192,9 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
 
     fun pedirTudoAoCarro() = HavalTelemetrySource.pedirTudo(getApplication())
 
+    /** Todo problema de dado se resolve lá, não aqui. */
+    fun abrirShisuku() = HavalTelemetrySource.abrirShisuku(getApplication())
+
     fun interpretarConsumoComo(valor: Interpretacao) = diario.interpretarComo(valor)
 
     /**

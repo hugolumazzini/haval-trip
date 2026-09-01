@@ -58,6 +58,7 @@ class HavalTelemetrySource(
         launch {
             while (isActive) {
                 delay(intervaloMs)
+                estado.publicarFita()
                 trySend(estado.montarAmostra())
             }
         }
@@ -84,6 +85,24 @@ class HavalTelemetrySource(
         const val CHAVE_MODO_ENERGIA = "car.basic.power_mode"
 
         /**
+         * A metade híbrida do H6, que `car.basic.*` sozinho não enxerga.
+         *
+         * Num HEV o carro alterna entre motor elétrico e a combustão, e as
+         * grandezas que descrevem essa troca vivem noutro domínio. A mais
+         * importante é a autonomia: `car.basic.remain_odometer` chega zerada
+         * porque num híbrido "quanto ainda dá para andar" se parte em duas.
+         */
+        const val CHAVE_AUTONOMIA_COMBUSTIVEL = "car.ev_info.fuel_mode_remain_odometer"
+        const val CHAVE_AUTONOMIA_ELETRICA = "car.ev_info.electric_mode_remain_odometer"
+        const val CHAVE_BATERIA = "car.ev_info.cur_battery_power_percentage"
+
+        /** Positivo puxa da bateria; negativo é frenagem regenerativa. */
+        const val CHAVE_FLUXO_DE_ENERGIA = "car.ev_info.energy_output_percentage"
+
+        /** Qual motor está tocando o carro neste instante. */
+        const val CHAVE_TREM_DE_FORCA = "car.ev_info.hcu_power_train_state"
+
+        /**
          * O que escutamos. A lista é fechada de propósito: `car.basic.vin_code`
          * também é publicado, e o chassi é o documento do carro — não entra na
          * memória do app para não haver como ele escapar num relatório.
@@ -106,6 +125,13 @@ class HavalTelemetrySource(
             "car.basic.accumulated_drivetime",
             "car.basic.vehicle_speed_since_reset",
             "car.basic.avg_vehicle_speed_since_startup",
+            CHAVE_AUTONOMIA_COMBUSTIVEL,
+            CHAVE_AUTONOMIA_ELETRICA,
+            CHAVE_BATERIA,
+            CHAVE_FLUXO_DE_ENERGIA,
+            CHAVE_TREM_DE_FORCA,
+            "car.ev_info.fuel_consume_info",
+            "car.ev_info.cycle_fuel_consume_info",
         )
 
         /**
@@ -126,6 +152,12 @@ class HavalTelemetrySource(
             "car.basic.gear_status",
             "car.basic.driving_ready_state",
             "car.basic.accumulated_drivetime",
+            // Estas o Impulse já monitora de fábrica (o `DEFAULT_KEYS` dele),
+            // então chegam pela ponte sem ninguém marcar caixinha nenhuma.
+            CHAVE_BATERIA,
+            CHAVE_FLUXO_DE_ENERGIA,
+            "car.ev_info.fuel_consume_info",
+            "car.ev_info.cycle_fuel_consume_info",
         )
 
         /** As que só chegam depois de marcadas no "Configurar" do Shisuku. */
@@ -160,55 +192,6 @@ class HavalTelemetrySource(
 }
 
 /**
- * Como transformar o que o carro publica no que o motor de cálculo espera.
- *
- * Está tudo aqui, isolado e nomeado, porque **nenhuma destas conversões foi
- * confirmada no carro ainda**. Quando o primeiro teste disser as unidades de
- * verdade, é só este objeto que muda.
- */
-object Unidades {
-
-    /** Capacidade do tanque do H6, em litros. Usada para virar % em litros. */
-    const val TANQUE_L = 61.0
-
-    /**
-     * Litros por hora, que é o que o motor de cálculo integra.
-     *
-     * O carro pode publicar o consumo instantâneo de duas maneiras, e as duas
-     * existem no mercado. Enquanto não soubermos qual é a do H6, a conversão
-     * fica escolhível na tela de diagnóstico.
-     */
-    fun litrosPorHora(bruto: Double?, velocidadeKmh: Double, como: Interpretacao): Double {
-        if (bruto == null || bruto <= 0.0) return 0.0
-        return when (como) {
-            Interpretacao.LITROS_POR_HORA -> bruto
-            // L/100 km × km/h ÷ 100 = L/h. Parado dá zero, e é correto: sem
-            // andar não há "por quilômetro" nenhum. O gasto da marcha lenta se
-            // perde nessa conversão — é a maior suspeita a confirmar no carro.
-            Interpretacao.LITROS_POR_100KM -> bruto * velocidadeKmh / 100.0
-        }
-    }
-
-    /**
-     * Litros no tanque a partir do percentual.
-     *
-     * É aproximação e não tem como não ser: a bóia não é linear e o carro só
-     * publica a porcentagem. Serve para a autonomia ter uma base; não serve
-     * para dizer quantos litros cabem ainda no abastecimento.
-     */
-    fun litrosNoTanque(percentual: Double?): Double {
-        if (percentual == null) return 0.0
-        return (percentual.coerceIn(0.0, 100.0) / 100.0) * TANQUE_L
-    }
-}
-
-/** Como ler o consumo instantâneo que o carro publica. */
-enum class Interpretacao(val rotulo: String) {
-    LITROS_POR_100KM("por distância"),
-    LITROS_POR_HORA("por hora"),
-}
-
-/**
  * O que chegou do carro, cru, para a tela de diagnóstico e para o relatório.
  *
  * Guarda duas coisas diferentes de propósito: o **último valor de cada chave**,
@@ -216,18 +199,30 @@ enum class Interpretacao(val rotulo: String) {
  * que responde "como esse número se comportou enquanto eu andava" — e é a fita
  * que revela a unidade de uma grandeza, não a foto parada.
  */
-class DiarioDeCampo(private val limiteDaFita: Int = 400) {
+class DiarioDeCampo(private val limiteDaFita: Int = LIMITE_PADRAO_DA_FITA) {
 
     private val _atual = MutableStateFlow<Map<String, Leitura>>(emptyMap())
     val atual: StateFlow<Map<String, Leitura>> = _atual.asStateFlow()
 
+    /**
+     * A fita viva, onde os eventos entram um a um.
+     *
+     * É uma fila e não uma lista imutável por causa do volume: o carro publica
+     * ~26 eventos por segundo, e recopiar dez mil elementos a cada um deles
+     * daria um quarto de milhão de cópias por segundo na central — que é um
+     * aparelho modesto. Aqui entra e sai pelas pontas, sem copiar nada.
+     *
+     * Fica sob trava porque quem escreve é o callback do carro, numa thread do
+     * Binder, e quem lê é a interface.
+     */
+    private val fitaViva = ArrayDeque<Evento>()
+
     private val _fita = MutableStateFlow<List<Evento>>(emptyList())
+
+    /** A fita como a tela e o relatório a enxergam: uma cópia estável. */
     val fita: StateFlow<List<Evento>> = _fita.asStateFlow()
 
-    private val _interpretacao = MutableStateFlow(Interpretacao.LITROS_POR_100KM)
-    val interpretacao: StateFlow<Interpretacao> = _interpretacao.asStateFlow()
-
-    fun interpretarComo(valor: Interpretacao) { _interpretacao.value = valor }
+    private var ultimaPublicacaoMs = 0L
 
     fun registrar(chave: String, valor: String) {
         val agora = System.currentTimeMillis()
@@ -237,11 +232,48 @@ class DiarioDeCampo(private val limiteDaFita: Int = 400) {
             emMs = agora,
             vezes = (anterior?.vezes ?: 0) + 1,
         ))
-        // A fita tem teto: uma viagem de uma hora renderia milhares de eventos
-        // e o relatório viraria grande demais para subir de dentro do carro.
-        _fita.value = (_fita.value + Evento(agora, chave, valor)).takeLast(limiteDaFita)
+
+        val publicar = synchronized(fitaViva) {
+            fitaViva.addLast(Evento(agora, chave, valor))
+            // A fita tem teto porque a memória tem: sem ele, uma viagem longa
+            // encheria o app.
+            while (fitaViva.size > limiteDaFita) fitaViva.removeFirst()
+            // A cópia para a tela custa caro e ninguém lê dez mil linhas por
+            // segundo. Publicar de tempos em tempos mantém o diagnóstico vivo
+            // aos olhos sem transformar a rolagem numa fábrica de lixo.
+            (agora - ultimaPublicacaoMs >= INTERVALO_DE_PUBLICACAO_MS).also {
+                if (it) ultimaPublicacaoMs = agora
+            }
+        }
+        if (publicar) publicarFita()
+    }
+
+    /**
+     * Força a fita publicada a alcançar a viva.
+     *
+     * O relatório chama isto antes de montar: sem ele, os últimos instantes
+     * antes do toque no botão ficariam de fora por até meio segundo — e é
+     * justamente o fim da coleta que costuma interessar.
+     */
+    fun publicarFita() {
+        _fita.value = synchronized(fitaViva) { fitaViva.toList() }
     }
 
     data class Leitura(val valor: String, val emMs: Long, val vezes: Int)
     data class Evento(val emMs: Long, val chave: String, val valor: String)
+
+    companion object {
+        /**
+         * Teto da fita, em eventos. A ~26 eventos por segundo, 10 mil dão uns
+         * seis minutos de histórico — o bastante para pegar um trecho inteiro
+         * de trânsito, com paradas e arrancadas, e não só o instante do envio.
+         *
+         * Quem recorta para caber no envio é o [Relatorio]; aqui o critério é
+         * só quanto vale a pena manter em memória.
+         */
+        const val LIMITE_PADRAO_DA_FITA = 10_000
+
+        /** De quanto em quanto tempo a fita da tela alcança a fita viva. */
+        private const val INTERVALO_DE_PUBLICACAO_MS = 500L
+    }
 }

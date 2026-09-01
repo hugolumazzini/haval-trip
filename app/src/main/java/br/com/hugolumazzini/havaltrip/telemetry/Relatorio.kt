@@ -27,7 +27,26 @@ object Relatorio {
     private val hora = SimpleDateFormat("HH:mm:ss", Locale.forLanguageTag("pt-BR"))
     private val carimbo = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.forLanguageTag("pt-BR"))
 
-    fun montar(diario: DiarioDeCampo, estado: TripState, fonte: Fonte, shisuku: Boolean): String {
+    /**
+     * Quantos eventos da fita cabem no relatório que sobe para a internet.
+     *
+     * A ~55 bytes por linha, 6 mil eventos dão uns 330 KB — abaixo do limite
+     * dos dois serviços de paste, com folga para o resto do relatório. A cópia
+     * gravada no aparelho não usa este teto: lá cabe a fita inteira.
+     */
+    const val MAX_EVENTOS_ENVIADOS = 6_000
+
+    fun montar(
+        diario: DiarioDeCampo,
+        estado: TripState,
+        fonte: Fonte,
+        shisuku: Boolean,
+        maxEventos: Int = Int.MAX_VALUE,
+    ): String {
+        // Sem isto, os últimos instantes antes do toque no botão ficariam de
+        // fora: a fita da tela só alcança a viva de meio em meio segundo.
+        diario.publicarFita()
+
         val sb = StringBuilder()
         sb.appendLine("=== HAVAL TRIP — diagnóstico de telemetria ===")
         sb.appendLine("Gerado em: ${carimbo.format(Date())}")
@@ -35,7 +54,6 @@ object Relatorio {
         sb.appendLine("HavalShisuku instalado: ${if (shisuku) "sim" else "NÃO"}")
         sb.appendLine("Fonte em uso: ${fonte.rotulo}")
         sb.appendLine("Shizuku: ${if (ShizukuTelemetrySource.disponivel()) "rodando" else "ausente"}, autorizado: ${if (ShizukuTelemetrySource.autorizado()) "sim" else "NÃO"}")
-        sb.appendLine("Consumo interpretado como: ${diario.interpretacao.value.rotulo}")
         sb.appendLine()
 
         sb.appendLine("--- VALOR ATUAL DE CADA CHAVE ---")
@@ -75,16 +93,44 @@ object Relatorio {
         sb.appendLine("tanque          = ${live.fuelLevelL} L (convertido do percentual)")
         sb.appendLine("ignição         = ${live.ignition}")
         sb.appendLine("consumo agora   = ${live.instantFuelConsumptionKml} km/L")
+        // O par cru vem logo abaixo porque num híbrido "zero" é resposta
+        // legítima — rodando em elétrico não se queima nada — e sem a unidade
+        // ao lado não dá para distinguir isso de leitura que falhou.
+        val consumo = Unidades.lerConsumoInstantaneo(
+            atual[HavalTelemetrySource.CHAVE_CONSUMO_INSTANTANEO]?.valor
+        )
+        sb.appendLine(
+            "consumo (cru)   = " + when (consumo?.unidade) {
+                Unidades.ConsumoInstantaneo.POR_DISTANCIA -> "${consumo.valor} L/100km (andando)"
+                Unidades.ConsumoInstantaneo.EM_MARCHA_LENTA -> "${consumo.valor} L/h (marcha lenta)"
+                null -> "não decodificado"
+                else -> "unidade ${consumo.unidade} DESCONHECIDA, valor ${consumo.valor}"
+            }
+        )
         sb.appendLine("autonomia (app) = ${live.autonomyDteKm} km")
-        sb.appendLine("autonomia (carro, cru) = ${atual[HavalTelemetrySource.CHAVE_AUTONOMIA_DO_CARRO]?.valor}")
+        sb.appendLine("autonomia combustível (carro) = ${atual[HavalTelemetrySource.CHAVE_AUTONOMIA_COMBUSTIVEL]?.valor}")
+        sb.appendLine("autonomia elétrica (carro)    = ${atual[HavalTelemetrySource.CHAVE_AUTONOMIA_ELETRICA]?.valor}")
+        sb.appendLine("autonomia genérica (car.basic) = ${atual[HavalTelemetrySource.CHAVE_AUTONOMIA_DO_CARRO]?.valor}")
+        sb.appendLine("bateria híbrida = ${atual[HavalTelemetrySource.CHAVE_BATERIA]?.valor}")
+        sb.appendLine("fluxo de energia = ${atual[HavalTelemetrySource.CHAVE_FLUXO_DE_ENERGIA]?.valor} (negativo = regeneração)")
         estado.trips.forEach {
             sb.appendLine("trip ${it.id} (${it.label}): ${it.metrics.distanceKm} km, ${it.metrics.fuelLitres} L, ${it.status}")
         }
         sb.appendLine()
 
+        // A fita guarda 10 mil eventos, que em texto passam de meio megabyte —
+        // mais do que os sites de paste aceitam. Cortam-se os mais antigos, e
+        // não os recentes, porque o que interessa é o trecho que acabou de ser
+        // dirigido. O corte é dito em voz alta: um relatório que some com
+        // dados calado faria procurar defeito onde só houve limite de tamanho.
+        val fita = diario.fita.value
+        val cabem = fita.takeLast(maxEventos)
         sb.appendLine("--- FITA DOS ÚLTIMOS EVENTOS (hora | chave | valor cru) ---")
         sb.appendLine("(é aqui que a unidade aparece: como o número se move enquanto o carro anda)")
-        diario.fita.value.forEach {
+        if (cabem.size < fita.size) {
+            sb.appendLine("(mostrando os ${cabem.size} mais recentes de ${fita.size}; o arquivo salvo no aparelho tem todos)")
+        }
+        cabem.forEach {
             sb.appendLine("${hora.format(Date(it.emMs))} | ${it.chave} | ${it.valor}")
         }
         return sb.toString()

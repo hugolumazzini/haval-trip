@@ -16,8 +16,16 @@ android {
         // central do H6 roda Android bem acima disso.
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        // O `versionName` é o que a pessoa lê; o `versionCode` é o que decide
+        // se a loja oferece atualização, e por isso só pode subir. Os dois
+        // andam juntos de propósito — o code acompanha a minor — porque já
+        // aconteceu de o release ser `v0.3.0` com o APK dizendo `1.0.0` por
+        // dentro, e aí o catálogo da loja não tinha como comparar nada.
+        //
+        // A numeração é 0.x: a `v1.0.0` de 31/08/2026 foi a primeira tentativa,
+        // e a contagem recomeçou em 0.2.0 no dia seguinte.
+        versionCode = 4
+        versionName = "0.4.0"
     }
 
     buildTypes {

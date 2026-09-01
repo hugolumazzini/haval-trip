@@ -11,15 +11,20 @@ import br.com.hugolumazzini.havaltrip.services.TripComparison
 import br.com.hugolumazzini.havaltrip.services.TripComparisonResult
 import br.com.hugolumazzini.havaltrip.storage.FileTripStorage
 import br.com.hugolumazzini.havaltrip.telemetry.DiarioDeCampo
+import br.com.hugolumazzini.havaltrip.telemetry.EstadoDoCarro
 import br.com.hugolumazzini.havaltrip.telemetry.HavalTelemetrySource
 import br.com.hugolumazzini.havaltrip.telemetry.Interpretacao
 import br.com.hugolumazzini.havaltrip.telemetry.Relatorio
+import br.com.hugolumazzini.havaltrip.telemetry.ShizukuTelemetrySource
 import br.com.hugolumazzini.havaltrip.telemetry.SimulatedTelemetrySource
 import br.com.hugolumazzini.havaltrip.telemetry.TelemetrySource
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -29,6 +34,21 @@ sealed interface Tela {
     data class Detalhes(val tripId: String) : Tela
     data object Historico : Tela
     data object Diagnostico : Tela
+}
+
+/**
+ * De onde vêm os números.
+ *
+ * São três porque as três falham por motivos diferentes, e o motorista precisa
+ * poder trocar sem sair do carro. A [SHIZUKU] é a linha direta com o serviço da
+ * central e a única em que **nós** escolhemos as chaves; a [SHISUKU] depende de
+ * um app intermediário e da lista que ele resolve monitorar; o [SIMULADOR]
+ * inventa tudo, e existe para a bancada.
+ */
+enum class Fonte(val rotulo: String) {
+    SHIZUKU("carro (direto)"),
+    SHISUKU("carro (via Shisuku)"),
+    SIMULADOR("simulador"),
 }
 
 /** Em que pé está o envio do relatório de diagnóstico. */
@@ -77,12 +97,33 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
         odometroKm = manager.state.value.live.odometerTotalKm.takeIf { it > 0.0 } ?: 48_213.4,
     )
 
-    private val carro = HavalTelemetrySource(context = app, diario = diario)
+    /** O último valor de cada chave, compartilhado pelas duas fontes reais. */
+    private val estadoDoCarro = EstadoDoCarro(diario)
 
-    private val _fonteReal = MutableStateFlow(shisukuInstalado)
+    private val carro = HavalTelemetrySource(context = app, estado = estadoDoCarro)
+
+    private val linhaDireta = ShizukuTelemetrySource(estado = estadoDoCarro)
+
+    /** Como está a linha direta, para a tela dizer o que falta fazer. */
+    val situacaoShizuku: StateFlow<ShizukuTelemetrySource.Situacao> = linhaDireta.situacao
+
+    // A preferida é a linha direta, e não por elegância: é a única em que a
+    // lista de chaves é nossa. Pela ponte do Shisuku, tanque, autonomia e
+    // consumo médio só chegam se alguém marcar caixinhas lá dentro.
+    private val _fonte = MutableStateFlow(
+        when {
+            ShizukuTelemetrySource.disponivel() -> Fonte.SHIZUKU
+            shisukuInstalado -> Fonte.SHISUKU
+            else -> Fonte.SIMULADOR
+        }
+    )
+
+    val fonte: StateFlow<Fonte> = _fonte.asStateFlow()
 
     /** `true` quando os números vêm do carro, e não do simulador. */
-    val fonteReal: StateFlow<Boolean> = _fonteReal.asStateFlow()
+    val fonteReal: StateFlow<Boolean> = _fonte
+        .map { it != Fonte.SIMULADOR }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, _fonte.value != Fonte.SIMULADOR)
 
     private var escuta: Job? = null
 
@@ -108,7 +149,11 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun escutar() {
         escuta?.cancel()
-        val fonte: TelemetrySource = if (_fonteReal.value) carro else simulador
+        val fonte: TelemetrySource = when (_fonte.value) {
+            Fonte.SHIZUKU -> linhaDireta
+            Fonte.SHISUKU -> carro
+            Fonte.SIMULADOR -> simulador
+        }
         escuta = viewModelScope.launch {
             var anterior = manager.state.value.live.ignition
             fonte.samples().collect { amostra ->
@@ -133,18 +178,26 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
      * "o carro está parado" em números inventados, que é o pior erro possível
      * num aparelho que serve para medir.
      */
-    fun usarFonteReal(real: Boolean) {
-        if (_fonteReal.value == real) return
-        _fonteReal.value = real
-        if (!real) simulador.ignicao = state.value.live.ignition
+    fun usarFonte(nova: Fonte) {
+        if (_fonte.value == nova) return
+        _fonte.value = nova
+        // Entrando no simulador, ele parte da ignição que está valendo. Sem
+        // isso o módulo veria um corte de chave que nunca houve.
+        if (nova == Fonte.SIMULADOR) simulador.ignicao = state.value.live.ignition
         escutar()
+    }
+
+    /** Passa para a próxima fonte. Um botão só, porque a barra é estreita. */
+    fun proximaFonte() {
+        val todas = Fonte.entries
+        usarFonte(todas[(todas.indexOf(_fonte.value) + 1) % todas.size])
     }
 
     // ------------------------------------------------------------- ignição
 
     /** Só faz sentido no simulador; no carro quem gira a chave é a chave. */
     fun alternarIgnicao() {
-        if (_fonteReal.value) return
+        if (_fonte.value != Fonte.SIMULADOR) return
         val novo = if (state.value.live.ignition == IgnitionState.ON) IgnitionState.OFF else IgnitionState.ON
         simulador.ignicao = novo
         manager.handleIgnitionChange(novo)
@@ -190,7 +243,16 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
 
     // ------------------------------------------------------------- diagnóstico
 
-    fun pedirTudoAoCarro() = HavalTelemetrySource.pedirTudo(getApplication())
+    /**
+     * Reemite tudo, seja qual for a fonte.
+     *
+     * Na linha direta isso também é o gatilho do pedido de autorização do
+     * Shizuku, que é o que destrava a leitura na primeira vez.
+     */
+    fun pedirTudoAoCarro() {
+        HavalTelemetrySource.pedirTudo(getApplication())
+        if (_fonte.value == Fonte.SHIZUKU) escutar()
+    }
 
     /** Todo problema de dado se resolve lá, não aqui. */
     fun abrirShisuku() = HavalTelemetrySource.abrirShisuku(getApplication())
@@ -211,7 +273,7 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
             val texto = Relatorio.montar(
                 diario = diario,
                 estado = state.value,
-                fonteReal = _fonteReal.value,
+                fonte = _fonte.value,
                 shisuku = shisukuInstalado,
             )
             val arquivo = runCatching { Relatorio.salvar(getApplication(), texto) }.getOrNull()

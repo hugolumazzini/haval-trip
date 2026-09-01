@@ -12,7 +12,9 @@ android {
 
     defaultConfig {
         applicationId = "br.com.hugolumazzini.havaltrip"
-        minSdk = 23
+        // 24 e não 23 porque a biblioteca do Shizuku exige. Não custa nada: a
+        // central do H6 roda Android bem acima disso.
+        minSdk = 24
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
@@ -29,6 +31,10 @@ android {
 
     buildFeatures {
         compose = true
+        // As duas interfaces do serviço de veículo da GWM. Não são código
+        // nosso: descrevem os comandos que a central já expõe, e existem aqui
+        // porque o Android precisa gerar o intermediário para chamá-los.
+        aidl = true
     }
 
     compileOptions {
@@ -64,4 +70,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.core)
     debugImplementation(libs.androidx.compose.ui.tooling)
+
+    implementation(libs.shizuku.api)
+    implementation(libs.shizuku.provider)
 }

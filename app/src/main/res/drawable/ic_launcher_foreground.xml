@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Três viagens correndo em paralelo: mesma linha de largada, cada uma num ponto
+  diferente do percurso. É o que o app faz de único, e é o motivo de o ícone não
+  ser mais um mostrador de painel como o de tanto outro app de carro.
+
+  As pontas são setas, e não barras arredondadas, por um motivo prático: sem
+  direção o desenho lia como "lista" ou "alinhar texto à esquerda", que é o
+  vocabulário de menu. A seta resolve isso de longe.
+
+  Tudo vive entre x=25 e x=83, y=34 e y=74. Num ícone adaptativo o launcher pode
+  recortar até 18dp de cada borda, então só os 72dp centrais são garantidos —
+  o que passar disso arrisca ser cortado em alguma máscara.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- A largada comum. Sem ela as três seriam só setas soltas. -->
+    <path
+        android:pathData="M27,35 L27,73"
+        android:strokeColor="#8A93A3"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round" />
+
+    <!-- Corpo de cada trilha. A ponta redonda do traço fica escondida atrás da
+         seta, que começa antes de o traço acabar. -->
+    <path
+        android:pathData="M34,40 L64,40"
+        android:strokeColor="#4A9EFF"
+        android:strokeWidth="11"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M34,54 L50,54"
+        android:strokeColor="#34C759"
+        android:strokeWidth="11"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M34,68 L70,68"
+        android:strokeColor="#FFB020"
+        android:strokeWidth="11"
+        android:strokeLineCap="round" />
+
+    <path android:pathData="M62,33 L77,40 L62,47 Z" android:fillColor="#4A9EFF" />
+    <path android:pathData="M48,47 L63,54 L48,61 Z" android:fillColor="#34C759" />
+    <path android:pathData="M68,61 L83,68 L68,75 Z" android:fillColor="#FFB020" />
+</vector>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Ícone adaptativo (Android 8+). Entregar fundo e frente separados deixa o
+  launcher aplicar a máscara que ele usa — círculo, quadrado arredondado,
+  squircle. Sem isso o app apareceria como um quadrado de cantos vivos no meio
+  de ícones redondos, que é metade da sensação de "genérico".
+
+  O `monochrome` é a versão de uma cor só, para o tema dinâmico do Android 13+
+  tingir com a cor do papel de parede.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
+</adaptive-icon>

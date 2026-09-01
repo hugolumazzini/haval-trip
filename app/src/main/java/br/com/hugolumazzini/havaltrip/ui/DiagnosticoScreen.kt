@@ -30,7 +30,6 @@ import br.com.hugolumazzini.havaltrip.Envio
 import br.com.hugolumazzini.havaltrip.Fonte
 import br.com.hugolumazzini.havaltrip.TripViewModel
 import br.com.hugolumazzini.havaltrip.telemetry.HavalTelemetrySource
-import br.com.hugolumazzini.havaltrip.telemetry.Interpretacao
 import br.com.hugolumazzini.havaltrip.telemetry.ShizukuTelemetrySource
 import br.com.hugolumazzini.havaltrip.ui.theme.Cores
 import br.com.hugolumazzini.havaltrip.ui.theme.EstiloRotulo
@@ -52,7 +51,6 @@ private val hora = SimpleDateFormat("HH:mm:ss", Locale.forLanguageTag("pt-BR"))
 fun DiagnosticoScreen(vm: TripViewModel) {
     val leituras by vm.diario.atual.collectAsStateWithLifecycle()
     val fita by vm.diario.fita.collectAsStateWithLifecycle()
-    val interpretacao by vm.diario.interpretacao.collectAsStateWithLifecycle()
     val envio by vm.envio.collectAsStateWithLifecycle()
     val fonte by vm.fonte.collectAsStateWithLifecycle()
     val situacao by vm.situacaoShizuku.collectAsStateWithLifecycle()
@@ -115,21 +113,6 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                 habilitado = envio !is Envio.Enviando,
                 cor = Cores.SuperficieSelecionada,
                 corTexto = Cores.Destaque,
-            )
-            // A conversão do consumo é a única incógnita que muda os números na
-            // hora: dá para virar a chave dentro do carro e ver qual das duas
-            // leituras bate com o painel de fábrica.
-            BotaoAcao(
-                texto = "Consumo: ${interpretacao.rotulo}",
-                onClick = {
-                    vm.interpretarConsumoComo(
-                        if (interpretacao == Interpretacao.LITROS_POR_100KM) {
-                            Interpretacao.LITROS_POR_HORA
-                        } else {
-                            Interpretacao.LITROS_POR_100KM
-                        }
-                    )
-                },
             )
         }
 

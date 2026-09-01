@@ -13,7 +13,6 @@ import br.com.hugolumazzini.havaltrip.storage.FileTripStorage
 import br.com.hugolumazzini.havaltrip.telemetry.DiarioDeCampo
 import br.com.hugolumazzini.havaltrip.telemetry.EstadoDoCarro
 import br.com.hugolumazzini.havaltrip.telemetry.HavalTelemetrySource
-import br.com.hugolumazzini.havaltrip.telemetry.Interpretacao
 import br.com.hugolumazzini.havaltrip.telemetry.Relatorio
 import br.com.hugolumazzini.havaltrip.telemetry.ShizukuTelemetrySource
 import br.com.hugolumazzini.havaltrip.telemetry.SimulatedTelemetrySource
@@ -257,7 +256,6 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
     /** Todo problema de dado se resolve lá, não aqui. */
     fun abrirShisuku() = HavalTelemetrySource.abrirShisuku(getApplication())
 
-    fun interpretarConsumoComo(valor: Interpretacao) = diario.interpretarComo(valor)
 
     /**
      * Grava o relatório e sobe para um endereço público de leitura.
@@ -270,14 +268,20 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
         if (_envio.value is Envio.Enviando) return
         _envio.value = Envio.Enviando
         viewModelScope.launch {
-            val texto = Relatorio.montar(
+            // Duas versões do mesmo relatório: a gravada leva a fita inteira,
+            // porque no aparelho não há limite de tamanho, e a enviada leva só
+            // o que os sites de paste aceitam. Se o envio falhar, o arquivo
+            // completo continua no carro para ser puxado depois.
+            fun montar(maxEventos: Int) = Relatorio.montar(
                 diario = diario,
                 estado = state.value,
                 fonte = _fonte.value,
                 shisuku = shisukuInstalado,
+                maxEventos = maxEventos,
             )
-            val arquivo = runCatching { Relatorio.salvar(getApplication(), texto) }.getOrNull()
-            _envio.value = Relatorio.enviar(texto).fold(
+            val completo = montar(Int.MAX_VALUE)
+            val arquivo = runCatching { Relatorio.salvar(getApplication(), completo) }.getOrNull()
+            _envio.value = Relatorio.enviar(montar(Relatorio.MAX_EVENTOS_ENVIADOS)).fold(
                 onSuccess = { Envio.Pronto(it) },
                 onFailure = {
                     Envio.Falhou(

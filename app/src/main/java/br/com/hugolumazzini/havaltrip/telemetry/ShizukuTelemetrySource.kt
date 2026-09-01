@@ -118,6 +118,7 @@ class ShizukuTelemetrySource(
                 // avisar. Sai barato e evita um painel congelado numa chave
                 // solitária que não dispara callback.
                 servico?.let { s -> if (_situacao.value is Situacao.Conectado) lerTudoAgora(s) }
+                estado.publicarFita()
                 trySend(estado.montarAmostra())
             }
         }

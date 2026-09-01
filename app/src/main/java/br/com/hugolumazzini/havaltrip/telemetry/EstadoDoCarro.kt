@@ -25,15 +25,31 @@ class EstadoDoCarro(private val diario: DiarioDeCampo) {
         diario.registrar(chave, valor)
     }
 
+    /**
+     * O consumo instantâneo já decodificado, para quem precisa saber em que
+     * unidade o carro está falando — a tela de diagnóstico, principalmente.
+     */
+    fun consumoInstantaneo(): Unidades.ConsumoInstantaneo? =
+        Unidades.lerConsumoInstantaneo(cache[HavalTelemetrySource.CHAVE_CONSUMO_INSTANTANEO])
+
+    /**
+     * Deixa a fita da tela em dia.
+     *
+     * As fontes chamam isto a cada volta do laço porque a publicação da fita é
+     * espaçada para não pesar: sem uma batida de fora, um carro parado — que
+     * publica pouco — deixaria a tela congelada no último evento até alguém
+     * acelerar, e o diagnóstico pareceria travado sem estar.
+     */
+    fun publicarFita() = diario.publicarFita()
+
     fun montarAmostra(): TelemetrySample {
         val velocidade = numero(HavalTelemetrySource.CHAVE_VELOCIDADE) ?: 0.0
-        val consumoBruto = numero(HavalTelemetrySource.CHAVE_CONSUMO_INSTANTANEO)
         val percentual = numero(HavalTelemetrySource.CHAVE_TANQUE_PERCENTUAL)
 
         return TelemetrySample(
             timestampMs = System.currentTimeMillis(),
             speedKmh = velocidade,
-            fuelRateLph = Unidades.litrosPorHora(consumoBruto, velocidade, diario.interpretacao.value),
+            fuelRateLph = Unidades.litrosPorHora(consumoInstantaneo(), velocidade),
             odometerTotalKm = numero(HavalTelemetrySource.CHAVE_HODOMETRO) ?: 0.0,
             fuelLevelL = Unidades.litrosNoTanque(percentual),
             ignition = ignicao(),

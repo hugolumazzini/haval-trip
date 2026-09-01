@@ -133,7 +133,18 @@ virar a base faria a autonomia nascer pela metade e só subir, parecendo defeito
 **O hodômetro vitalício é lido, nunca escrito.** Zerar uma Trip não encosta
 nele; a Trip guarda apenas em que quilometragem começou e terminou.
 
-**Os dados do carro chegam pelo HavalShisuku, não do barramento.** O
+**A leitura principal é a linha direta com o serviço da central, pelo Shizuku.**
+A central expõe um serviço interno que sabe todos os valores do carro, mas só
+atende quem tem privilégio de sistema. O [Shizuku](https://shizuku.rikka.app) é
+a ponte para isso: o dono autoriza uma vez e o app passa a falar com o serviço
+direto. O que essa escolha compra não é elegância, é controle da lista: **nós**
+dizemos quais chaves queremos monitorar. Pela ponte do Shisuku quem decide é
+ele, e a lista padrão dele não inclui tanque, autonomia nem consumo médio — que
+é metade do que um computador de bordo precisa. O chassi (`car.basic.vin_code`)
+fica fora da lista de propósito: é o documento do carro, e o que não entra na
+memória não escapa num relatório.
+
+**A ponte pelo HavalShisuku continua, como segunda opção.** O
 [HavalShisuku](https://github.com/bobaoapae/haval-app-tool-multimidia) já
 conversa com os serviços internos da GWM e reemite cada valor como um broadcast
 aberto `android.intent.haval.<chave>`. Escutar isso custa um `BroadcastReceiver`

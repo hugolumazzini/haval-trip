@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import androidx.core.content.ContextCompat
-import br.com.hugolumazzini.havaltrip.domain.IgnitionState
 import br.com.hugolumazzini.havaltrip.domain.TelemetrySample
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
@@ -16,7 +15,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Leitura real do H6, pela ponte que o HavalShisuku já mantém.
@@ -32,14 +30,9 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class HavalTelemetrySource(
     private val context: Context,
-    /** Espelho dos valores crus, para a tela de diagnóstico. */
-    private val diario: DiarioDeCampo = DiarioDeCampo(),
+    private val estado: EstadoDoCarro,
     private val intervaloMs: Long = 1000L,
 ) : TelemetrySource {
-
-    val campo: DiarioDeCampo get() = diario
-
-    private val cache = ConcurrentHashMap<String, String>()
 
     override fun samples(): Flow<TelemetrySample> = callbackFlow {
         val receptor = object : BroadcastReceiver() {
@@ -50,8 +43,7 @@ class HavalTelemetrySource(
                 // em extra e outro com o valor grudado no nome da ação. Só o
                 // primeiro interessa; o segundo chegaria com chave inventada.
                 val valor = intent.getStringExtra("value") ?: return
-                cache[chave] = valor
-                diario.registrar(chave, valor)
+                estado.registrar(chave, valor)
             }
         }
 
@@ -66,47 +58,12 @@ class HavalTelemetrySource(
         launch {
             while (isActive) {
                 delay(intervaloMs)
-                trySend(montarAmostra())
+                trySend(estado.montarAmostra())
             }
         }
 
         awaitClose { runCatching { context.unregisterReceiver(receptor) } }
     }
-
-    private fun montarAmostra(): TelemetrySample {
-        val velocidade = numero(CHAVE_VELOCIDADE) ?: 0.0
-        val consumoBruto = numero(CHAVE_CONSUMO_INSTANTANEO)
-        val percentual = numero(CHAVE_TANQUE_PERCENTUAL)
-
-        return TelemetrySample(
-            timestampMs = System.currentTimeMillis(),
-            speedKmh = velocidade,
-            fuelRateLph = Unidades.litrosPorHora(consumoBruto, velocidade, diario.interpretacao.value),
-            odometerTotalKm = numero(CHAVE_HODOMETRO) ?: 0.0,
-            fuelLevelL = Unidades.litrosNoTanque(percentual),
-            ignition = ignicao(),
-        )
-    }
-
-    /**
-     * Ignição a partir do estado do motor, com o modo de energia como reserva.
-     *
-     * O mapeamento dos valores ainda não foi confirmado no carro — por isso o
-     * critério é "qualquer coisa diferente de 0 é ligado", que erra no máximo
-     * para o lado seguro, e o valor cru vai inteiro para o diagnóstico.
-     */
-    private fun ignicao(): IgnitionState {
-        val motor = cache[CHAVE_MOTOR]
-        val energia = cache[CHAVE_MODO_ENERGIA]
-        val ligado = when {
-            motor != null -> motor != "0"
-            energia != null -> energia != "0"
-            else -> false
-        }
-        return if (ligado) IgnitionState.ON else IgnitionState.OFF
-    }
-
-    private fun numero(chave: String): Double? = cache[chave]?.trim()?.toDoubleOrNull()
 
     companion object {
         const val PREFIXO = "android.intent.haval."

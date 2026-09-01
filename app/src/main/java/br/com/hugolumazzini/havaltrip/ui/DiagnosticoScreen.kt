@@ -27,9 +27,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.Envio
+import br.com.hugolumazzini.havaltrip.Fonte
 import br.com.hugolumazzini.havaltrip.TripViewModel
 import br.com.hugolumazzini.havaltrip.telemetry.HavalTelemetrySource
 import br.com.hugolumazzini.havaltrip.telemetry.Interpretacao
+import br.com.hugolumazzini.havaltrip.telemetry.ShizukuTelemetrySource
 import br.com.hugolumazzini.havaltrip.ui.theme.Cores
 import br.com.hugolumazzini.havaltrip.ui.theme.EstiloRotulo
 import java.text.SimpleDateFormat
@@ -52,7 +54,9 @@ fun DiagnosticoScreen(vm: TripViewModel) {
     val fita by vm.diario.fita.collectAsStateWithLifecycle()
     val interpretacao by vm.diario.interpretacao.collectAsStateWithLifecycle()
     val envio by vm.envio.collectAsStateWithLifecycle()
-    val fonteReal by vm.fonteReal.collectAsStateWithLifecycle()
+    val fonte by vm.fonte.collectAsStateWithLifecycle()
+    val situacao by vm.situacaoShizuku.collectAsStateWithLifecycle()
+    val fonteReal = fonte != Fonte.SIMULADOR
     val contexto = LocalContext.current
 
     Column(Modifier.fillMaxSize()) {
@@ -61,10 +65,21 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                 Text("DIAGNÓSTICO DA TELEMETRIA", style = EstiloRotulo)
                 Text(
                     when {
+                        fonte == Fonte.SIMULADOR ->
+                            "Simulador ligado: os números da tela são inventados"
+                        fonte == Fonte.SHIZUKU -> when (val s = situacao) {
+                            is ShizukuTelemetrySource.Situacao.SemShizuku ->
+                                "Shizuku não está rodando nesta central — inicie-o e volte aqui"
+                            is ShizukuTelemetrySource.Situacao.PrecisaAutorizar ->
+                                "Falta autorizar o Haval Trip no Shizuku. Toque em \"Pedir tudo ao carro\"."
+                            is ShizukuTelemetrySource.Situacao.Falhou -> "Linha direta falhou: ${s.motivo}"
+                            is ShizukuTelemetrySource.Situacao.Verificando -> "Procurando o Shizuku…"
+                            is ShizukuTelemetrySource.Situacao.Conectado ->
+                                if (leituras.isEmpty()) "Conectado ao carro, esperando o primeiro valor."
+                                else "${leituras.size} chaves lidas direto do carro"
+                        }
                         !vm.shisukuInstalado ->
                             "HavalShisuku não encontrado nesta central — sem ele não chega nada do carro"
-                        !fonteReal ->
-                            "Simulador ligado: os números da tela são inventados"
                         leituras.isEmpty() ->
                             "Ponte encontrada, mas nada chegou ainda. Ligue o carro e ande um pouco."
                         else ->
@@ -86,8 +101,8 @@ fun DiagnosticoScreen(vm: TripViewModel) {
             // lá, que dentro do carro é procurar ícone na gaveta de apps.
             if (vm.shisukuInstalado) BotaoAcao("Abrir HavalShisuku", vm::abrirShisuku)
             BotaoAcao(
-                texto = if (fonteReal) "Fonte: carro" else "Fonte: simulador",
-                onClick = { vm.usarFonteReal(!fonteReal) },
+                texto = "Fonte: ${fonte.rotulo}",
+                onClick = vm::proximaFonte,
                 cor = if (fonteReal) Cores.Campo else Cores.SuperficieSelecionada,
                 corTexto = if (fonteReal) Cores.Texto else Cores.Atencao,
             )

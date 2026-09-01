@@ -2,6 +2,7 @@ package br.com.hugolumazzini.havaltrip.telemetry
 
 import android.content.Context
 import android.os.Build
+import br.com.hugolumazzini.havaltrip.Fonte
 import br.com.hugolumazzini.havaltrip.engine.TripState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -26,20 +27,21 @@ object Relatorio {
     private val hora = SimpleDateFormat("HH:mm:ss", Locale.forLanguageTag("pt-BR"))
     private val carimbo = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.forLanguageTag("pt-BR"))
 
-    fun montar(diario: DiarioDeCampo, estado: TripState, fonteReal: Boolean, shisuku: Boolean): String {
+    fun montar(diario: DiarioDeCampo, estado: TripState, fonte: Fonte, shisuku: Boolean): String {
         val sb = StringBuilder()
         sb.appendLine("=== HAVAL TRIP — diagnóstico de telemetria ===")
         sb.appendLine("Gerado em: ${carimbo.format(Date())}")
         sb.appendLine("Central: ${Build.MANUFACTURER} ${Build.MODEL} — Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
         sb.appendLine("HavalShisuku instalado: ${if (shisuku) "sim" else "NÃO"}")
-        sb.appendLine("Fonte em uso: ${if (fonteReal) "carro (broadcasts)" else "simulador"}")
+        sb.appendLine("Fonte em uso: ${fonte.rotulo}")
+        sb.appendLine("Shizuku: ${if (ShizukuTelemetrySource.disponivel()) "rodando" else "ausente"}, autorizado: ${if (ShizukuTelemetrySource.autorizado()) "sim" else "NÃO"}")
         sb.appendLine("Consumo interpretado como: ${diario.interpretacao.value.rotulo}")
         sb.appendLine()
 
         sb.appendLine("--- VALOR ATUAL DE CADA CHAVE ---")
         val atual = diario.atual.value
         if (atual.isEmpty()) {
-            sb.appendLine("(nenhum broadcast recebido — ver se o HavalShisuku está rodando)")
+            sb.appendLine("(nada recebido — a ponte com o carro não chegou a subir)")
         } else {
             atual.toSortedMap().forEach { (chave, leitura) ->
                 sb.appendLine("$chave = ${leitura.valor}   [${leitura.vezes}x, última ${hora.format(Date(leitura.emMs))}]")
@@ -47,13 +49,17 @@ object Relatorio {
         }
         sb.appendLine()
 
-        // Sem isto, uma chave ausente no relatório é ambígua: pode ser o carro
-        // que não publica, ou o Shisuku que não monitora. A distinção decide se
-        // o próximo passo é código nosso ou uma caixinha marcada lá.
+        // Sem isto, uma chave ausente é ambígua. Pela linha direta a lista de
+        // monitoramento é nossa, então ausência significa que o carro não
+        // publica aquilo — resposta de verdade sobre o H6. Pela ponte do
+        // Shisuku pode ser só caixinha desmarcada, que não diz nada do carro.
         sb.appendLine("--- AINDA NÃO CHEGARAM ---")
         val faltando = HavalTelemetrySource.CHAVES.filterNot { it in atual }
         if (faltando.isEmpty()) {
-            sb.appendLine("(nenhuma — chegou tudo que o app escuta)")
+            sb.appendLine("(nenhuma — chegou tudo que o app pede)")
+        } else if (fonte == Fonte.SHIZUKU) {
+            sb.appendLine("(a lista pedida é nossa, então ausência aqui é o carro que não publica)")
+            faltando.forEach { sb.appendLine(it) }
         } else {
             faltando.forEach {
                 val padrao = it in HavalTelemetrySource.CHAVES_PADRAO

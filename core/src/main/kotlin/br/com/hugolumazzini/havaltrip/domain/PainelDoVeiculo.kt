@@ -31,6 +31,34 @@ data class PainelDoVeiculo(
     val vidrosAbertos: List<Vidro> get() = acionados(vidros)
 
     /**
+     * As rodas cuja pressão destoa para baixo das outras.
+     *
+     * A comparação é entre os pneus do próprio carro, e não contra um número
+     * fixo, porque pressão de pneu muda o tempo todo sem nada estar errado: numa
+     * manhã fria os quatro caem juntos, e depois de uma hora de estrada os
+     * quatro sobem juntos. Um limite fixo acusaria os quatro na manhã fria e
+     * nenhum na estrada — justamente ao contrário do que interessa.
+     *
+     * O que interessa é um pneu **fora do grupo**: se três estão em 2,3 bar e um
+     * está em 2,0, esse um está perdendo ar, faça o tempo que fizer.
+     *
+     * A referência é a mediana dos outros três, e não a média, porque a média
+     * seria puxada para baixo pelo próprio pneu vazio quando dois furam ao mesmo
+     * tempo — e aí o segundo furado pareceria normal perto do primeiro.
+     */
+    val pneusMurchos: List<Roda>
+        get() {
+            val lidos = pneus.mapNotNull { pneu -> pneu.pressaoBar?.let { pneu.roda to it } }
+            // Com menos de três leituras não há grupo com que comparar: dois
+            // pneus só dizem que são diferentes, não qual dos dois é o errado.
+            if (lidos.size < 3) return emptyList()
+            return lidos.filter { (roda, pressao) ->
+                val referencia = mediana(lidos.filter { it.first != roda }.map { it.second })
+                pressao < referencia * (1 - TOLERANCIA_DE_PRESSAO)
+            }.map { it.first }
+        }
+
+    /**
      * Tudo que merece uma linha na lateral, já em texto, na ordem de urgência.
      *
      * Os rótulos não dizem "aberta": só entram na lista quando estão, e a
@@ -43,6 +71,7 @@ data class PainelDoVeiculo(
      */
     val avisos: List<String>
         get() = semCinto.map { it.rotulo } +
+            pneusMurchos.map { "Pneu ${it.nome}" } +
             abertas.map { it.rotulo } +
             vidrosAbertos.map { it.rotulo } +
             (if (tetoSolarAberto == true) listOf("Teto solar") else emptyList())
@@ -128,14 +157,32 @@ data class PainelDoVeiculo(
     }
 
     /** Ordem de `car.basic.tpms_status`, igual à das portas: frente, depois trás. */
-    enum class Roda(val rotulo: String) {
-        DIANTEIRA_ESQ("DE"),
-        DIANTEIRA_DIR("DD"),
-        TRASEIRA_ESQ("TE"),
-        TRASEIRA_DIR("TD"),
+    enum class Roda(val rotulo: String, val nome: String) {
+        DIANTEIRA_ESQ("DE", "dianteiro esq."),
+        DIANTEIRA_DIR("DD", "dianteiro dir."),
+        TRASEIRA_ESQ("TE", "traseiro esq."),
+        TRASEIRA_DIR("TD", "traseiro dir."),
     }
 
     companion object {
+
+        /**
+         * Quanto um pneu pode estar abaixo dos outros antes de virar aviso.
+         *
+         * Dez por cento é uma escolha, não uma norma: com os quatro em 2,3 bar,
+         * o aviso acende quando um cai para 2,07 — perto de 30 psi contra os 33
+         * dos outros. Apertar mais faria o aviso piscar com a diferença normal
+         * entre um lado ao sol e outro à sombra.
+         */
+        const val TOLERANCIA_DE_PRESSAO = 0.10
+
+        /** A mediana de uma lista não vazia. Com número par, a média dos dois do meio. */
+        private fun mediana(valores: List<Double>): Double {
+            val ordenados = valores.sorted()
+            val meio = ordenados.size / 2
+            return if (ordenados.size % 2 == 1) ordenados[meio]
+            else (ordenados[meio - 1] + ordenados[meio]) / 2
+        }
 
         /**
          * Monta o painel a partir dos valores crus.

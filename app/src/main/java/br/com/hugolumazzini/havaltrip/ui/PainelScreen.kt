@@ -73,11 +73,13 @@ fun PainelScreen(vm: TripViewModel, estado: TripState) {
 
         Spacer(Modifier.height(18.dp))
 
-        // Os quatro quadrantes, com o estado do carro na lateral. A lateral tem
-        // largura fixa e os quadrantes dividem o que sobra: assim o desenho do
-        // carro não encolhe junto quando um rótulo cresce.
+        // Três colunas de mesma largura: os quadrantes ocupam duas, o estado do
+        // carro ocupa a terceira. Por peso, e não por largura fixa em dp, porque
+        // a central do H6 é bem mais larga que o emulador padrão — em dp fixos a
+        // faixa do carro encolheria proporcionalmente quanto maior fosse a tela,
+        // que é o contrário do que se quer num desenho que só se lê de relance.
         Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Column(Modifier.weight(1f).fillMaxSize()) {
+            Column(Modifier.weight(2f).fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     Quadrante(
                         "DISTÂNCIA",
@@ -108,9 +110,10 @@ fun PainelScreen(vm: TripViewModel, estado: TripState) {
                     )
                 }
             }
-            // Altura cheia, largura própria: com `fillMaxSize` a lateral tomaria
-            // a linha inteira na medição e os quadrantes ficariam com zero.
-            LateralDoVeiculo(veiculo, Modifier.fillMaxHeight())
+            // `fillMaxHeight`, nunca `fillMaxSize`: um filho sem peso que pede a
+            // largura toda tomaria a linha inteira na medição e deixaria zero
+            // para os quadrantes, que têm peso e são medidos depois.
+            LateralDoVeiculo(veiculo, Modifier.weight(1f).fillMaxHeight())
         }
 
         Spacer(Modifier.height(16.dp))

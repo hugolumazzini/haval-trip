@@ -116,4 +116,60 @@ class PainelDoVeiculoTest {
         assertEquals(2, p.aberturas.size)
         assertEquals(listOf(Abertura.PORTA_MOTORISTA), p.abertas)
     }
+
+    // ---- pneu murcho: a comparacao e entre os pneus do proprio carro ----
+
+    /** Quatro pressoes com temperatura, no formato de oito numeros do H6. */
+    private fun comPneus(vararg bar: Double) =
+        PainelDoVeiculo.ler(pneus = bar.joinToString(",", "{", "}") { "$it,25.0" })
+
+    @Test
+    fun `pneu bem abaixo dos outros vira aviso`() {
+        val p = comPneus(2.3, 2.3, 2.0, 2.3)
+        assertEquals(listOf(PainelDoVeiculo.Roda.TRASEIRA_ESQ), p.pneusMurchos)
+        assertTrue(p.avisos.contains("Pneu traseiro esq."))
+        assertFalse(p.tudoCerto)
+    }
+
+    @Test
+    fun `manha fria nao acusa os quatro`() {
+        // Os quatro caem juntos: nenhum esta fora do grupo, entao nao ha o que
+        // avisar. E o caso que um limite fixo erraria.
+        val p = comPneus(1.9, 1.9, 1.9, 1.9)
+        assertTrue(p.pneusMurchos.isEmpty())
+        assertTrue(p.tudoCerto)
+    }
+
+    @Test
+    fun `diferenca pequena entre os pneus nao vira aviso`() {
+        // A variacao real medida no H6: 2,2559 a 2,3657 bar, menos de 5%.
+        val p = comPneus(2.29707, 2.3657, 2.33825, 2.2559)
+        assertTrue(p.pneusMurchos.isEmpty())
+    }
+
+    @Test
+    fun `dois pneus furados nao se escondem um atras do outro`() {
+        // Com a media como referencia, o segundo furado pareceria normal perto
+        // do primeiro. A mediana dos outros tres nao se deixa puxar assim.
+        val p = comPneus(1.9, 2.4, 1.9, 2.4)
+        assertEquals(
+            listOf(PainelDoVeiculo.Roda.DIANTEIRA_ESQ, PainelDoVeiculo.Roda.TRASEIRA_ESQ),
+            p.pneusMurchos,
+        )
+    }
+
+    @Test
+    fun `sensor mudo nao entra na conta e nao inventa aviso`() {
+        // Tres pneus lidos e um em zero: ha grupo suficiente para comparar, e o
+        // mudo nao pode virar "pneu vazio" so por nao ter respondido.
+        val p = comPneus(2.3, 2.3, 2.3, 0.0)
+        assertTrue(p.pneusMurchos.isEmpty())
+    }
+
+    @Test
+    fun `com poucas leituras a comparacao se cala`() {
+        // Dois pneus so dizem que sao diferentes, nao qual dos dois esta errado.
+        val p = PainelDoVeiculo.ler(pneus = "{2.3,1.0}")
+        assertTrue(p.pneusMurchos.isEmpty())
+    }
 }

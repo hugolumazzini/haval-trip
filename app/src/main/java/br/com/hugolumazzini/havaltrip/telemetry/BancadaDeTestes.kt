@@ -26,9 +26,11 @@ import br.com.hugolumazzini.havaltrip.BuildConfig
  * O valor fica **travado**: o simulador para de mexer nessa chave até vir um
  * `BANCADA_LIMPAR`. Sem travar, o próximo segundo apagaria a porta aberta.
  *
- * Só existe em build de debug. Não é um recurso escondido do app publicado: um
- * broadcast aberto que aceita mentir sobre o estado do carro é exatamente o que
- * não pode existir num aparelho dentro do veículo.
+ * Duas travas, e as duas são necessárias. A primeira é o build: em release nada
+ * é registrado. A segunda é a fonte: mesmo em debug, a bancada só aceita valor
+ * enquanto o app está no simulador. É essa que importa de verdade, porque o APK
+ * que vai para a central é justamente o de debug — sem ela, qualquer aplicativo
+ * instalado no carro poderia apagar um aviso de porta aberta.
  */
 object BancadaDeTestes {
 
@@ -41,11 +43,17 @@ object BancadaDeTestes {
      * Devolve o que fazer para desligá-la — `null` em release, onde nada foi
      * registrado.
      */
-    fun ligar(context: Context, estado: EstadoDoCarro): (() -> Unit)? {
+    fun ligar(
+        context: Context,
+        estado: EstadoDoCarro,
+        /** Se o app está no simulador. Falso no carro, e aí a bancada é inerte. */
+        noSimulador: () -> Boolean,
+    ): (() -> Unit)? {
         if (!BuildConfig.DEBUG) return null
 
         val receptor = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context?, intent: Intent?) {
+                if (!noSimulador()) return
                 when (intent?.action) {
                     ACAO -> {
                         val chave = intent.getStringExtra("chave") ?: return

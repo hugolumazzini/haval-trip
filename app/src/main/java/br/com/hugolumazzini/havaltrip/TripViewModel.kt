@@ -164,7 +164,9 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** A entrada de valores à mão pelo `adb`. `null` fora do build de debug. */
-    private val desligarBancada = BancadaDeTestes.ligar(app, estadoDoCarro)
+    private val desligarBancada = BancadaDeTestes.ligar(app, estadoDoCarro) {
+        _fonte.value == Fonte.SIMULADOR
+    }
 
     override fun onCleared() {
         desligarBancada?.invoke()

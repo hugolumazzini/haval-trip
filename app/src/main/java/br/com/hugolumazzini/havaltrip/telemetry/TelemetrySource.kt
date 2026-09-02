@@ -83,10 +83,16 @@ class SimulatedTelemetrySource(
         val alvo = estado ?: return
         val motoristaAberta = if (velocidadeKmh < 0.5 && segundosNoTrecho % 20 < 8) 1 else 0
         alvo.registrar(HavalTelemetrySource.CHAVE_PORTAS, "{$motoristaAberta,0,0,0,0,0}")
-        alvo.registrar(HavalTelemetrySource.CHAVE_CINTOS, "{0,0,0}")
-        alvo.registrar(HavalTelemetrySource.CHAVE_VIDROS, "{0,0,0,0}")
+        alvo.registrar(HavalTelemetrySource.CHAVE_CINTOS, "{0,0,0,0,0}")
+        // Vidro fechado é 1, e não 0: é assim que o H6 publica.
+        alvo.registrar(HavalTelemetrySource.CHAVE_VIDROS, "{1,1,1,1}")
         alvo.registrar(HavalTelemetrySource.CHAVE_TETO_SOLAR, "0")
-        alvo.registrar(HavalTelemetrySource.CHAVE_PNEUS, "{232,230,228,231}")
+        // Quatro pares de pressão em bar e temperatura em grau, no formato do carro.
+        alvo.registrar(
+            HavalTelemetrySource.CHAVE_PNEUS,
+            "{2.29707,26.0,2.3657,25.0,2.33825,25.0,2.2559,25.0}",
+        )
+        alvo.registrar(HavalTelemetrySource.CHAVE_UNIDADE_PNEUS, "1")
     }
 
     private fun avancar(deltaS: Double) {

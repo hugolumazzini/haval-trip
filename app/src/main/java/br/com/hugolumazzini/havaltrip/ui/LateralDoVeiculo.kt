@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo.Abertura
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo.Roda
+import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo.Vidro
 import br.com.hugolumazzini.havaltrip.format.TripFormat
 import br.com.hugolumazzini.havaltrip.ui.theme.Cores
 import br.com.hugolumazzini.havaltrip.ui.theme.EstiloRotulo
@@ -81,61 +82,71 @@ fun LateralDoVeiculo(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
  */
 @Composable
 private fun Diagrama(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
-    val pressoes = painel.pneus.associate { it.roda to it.pressao }
-    val abertas = painel.abertas.toSet()
+    val pneus = painel.pneus.associateBy { it.roda }
 
     Column(modifier.fillMaxWidth()) {
-        LinhaDePneus(
-            painel, pressoes, Roda.DIANTEIRA_ESQ, Roda.DIANTEIRA_DIR,
-        )
-        Box(
-            Modifier.fillMaxWidth().weight(1f).padding(vertical = 6.dp),
-            contentAlignment = Alignment.Center,
-        ) {
+        Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
             // Proporção real do H6: 1,89 m de largura por 4,65 m de
             // comprimento. Manda a altura disponível, não a largura: assim o
             // carro encolhe para caber e nunca invade o espaço dos avisos.
-            Canvas(Modifier.fillMaxHeight().aspectRatio(0.405f)) { desenharCarro(abertas) }
+            Canvas(Modifier.fillMaxHeight().aspectRatio(0.405f)) { desenharCarro(painel) }
+
+            // As pressões por cima, cada uma na altura da sua roda. Ficam ao
+            // lado do pneu desenhado, e não numa lista em cima e outra
+            // embaixo, porque assim não é preciso decorar sigla nenhuma para
+            // saber de que roda é o número.
+            Column(
+                Modifier.fillMaxHeight(0.80f).fillMaxWidth(),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                LinhaDePneus(painel, pneus, Roda.DIANTEIRA_ESQ, Roda.DIANTEIRA_DIR)
+                LinhaDePneus(painel, pneus, Roda.TRASEIRA_ESQ, Roda.TRASEIRA_DIR)
+            }
         }
-        LinhaDePneus(
-            painel, pressoes, Roda.TRASEIRA_ESQ, Roda.TRASEIRA_DIR,
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "pressão em ${painel.unidadeDePressao.rotulo}",
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+            color = Cores.TextoApoio,
+            modifier = Modifier.fillMaxWidth(),
         )
-        val unidade = painel.unidadeDePressao
-        if (unidade != null) {
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "pressão em $unidade",
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                color = Cores.TextoApoio,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
     }
 }
 
 @Composable
 private fun LinhaDePneus(
     painel: PainelDoVeiculo,
-    pressoes: Map<Roda, Double?>,
+    pneus: Map<Roda, PainelDoVeiculo.Pneu>,
     esquerda: Roda,
     direita: Roda,
 ) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        ValorDePneu(painel, pressoes, esquerda)
-        ValorDePneu(painel, pressoes, direita)
+        ValorDePneu(painel, pneus[esquerda])
+        ValorDePneu(painel, pneus[direita])
     }
 }
 
 @Composable
-private fun ValorDePneu(painel: PainelDoVeiculo, pressoes: Map<Roda, Double?>, roda: Roda) {
+private fun ValorDePneu(painel: PainelDoVeiculo, pneu: PainelDoVeiculo.Pneu?) {
     // Traço, e não zero, quando o sensor não respondeu: um pneu que marca zero
     // seria motivo para parar o carro, e essa não é a informação.
-    val valor = pressoes[roda]
-    Text(
-        valor?.let { TripFormat.decimal(it, if (it >= 100.0) 0 else 1) } ?: "—",
-        style = MaterialTheme.typography.titleMedium,
-        color = if (valor == null) Cores.TextoApoio else Cores.Texto,
-    )
+    val pressao = pneu?.pressao(painel.unidadeDePressao)
+    Column {
+        Text(
+            pressao?.let { TripFormat.decimal(it, 1) } ?: "—",
+            style = MaterialTheme.typography.titleMedium,
+            color = if (pressao == null) Cores.TextoApoio else Cores.Texto,
+        )
+        // A temperatura em corpo miúdo: é o que explica a pressão ter subido
+        // sozinha depois de meia hora de estrada, e não se lê de relance.
+        pneu?.temperaturaC?.let {
+            Text(
+                "${TripFormat.decimal(it, 0)}°",
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                color = Cores.TextoApoio,
+            )
+        }
+    }
 }
 
 /**
@@ -155,7 +166,9 @@ private fun ValorDePneu(painel: PainelDoVeiculo, pressoes: Map<Roda, Double?>, r
  * o carro chega ao Brasil, e é o que faz o desenho bater com quem está sentado
  * olhando para ele.
  */
-private fun DrawScope.desenharCarro(abertas: Set<Abertura>) {
+private fun DrawScope.desenharCarro(painel: PainelDoVeiculo) {
+    val abertas = painel.abertas.toSet()
+    val vidrosAbertos = painel.vidrosAbertos.toSet()
     val traco = size.minDimension * 0.030f
     val fino = Stroke(width = traco * 0.8f)
     val contorno = Stroke(width = traco * 1.4f)
@@ -179,11 +192,13 @@ private fun DrawScope.desenharCarro(abertas: Set<Abertura>) {
      * que dá a forma da porta, e o aviso ficaria uma mancha sem lugar; assim a
      * peça continua reconhecível e ainda assim salta aos olhos.
      */
-    fun painel(caminho: Path, abertura: Abertura?) {
-        val aberto = abertura != null && abertura in abertas
+    fun peca(caminho: Path, aberto: Boolean) {
         if (aberto) drawPath(caminho, Cores.Atencao.copy(alpha = 0.55f))
         drawPath(caminho, if (aberto) Cores.Atencao else Cores.Contorno, style = fino)
     }
+
+    fun painel(caminho: Path, abertura: Abertura?) =
+        peca(caminho, abertura != null && abertura in abertas)
 
     // Carroceria: uma silhueta simétrica, com o bico mais estreito que a
     // traseira, como num SUV. As curvas evitam o ar de caixa do desenho antigo.
@@ -221,7 +236,10 @@ private fun DrawScope.desenharCarro(abertas: Set<Abertura>) {
     // Teto, com o teto solar por dentro. O H6 tem teto panorâmico, e é o retângulo
     // interno que faz o desenho parecer o carro certo e não um carro qualquer.
     painel(forma(0.22f to 0.425f, 0.78f to 0.425f, 0.78f to 0.79f, 0.22f to 0.79f), null)
-    painel(forma(0.29f to 0.465f, 0.71f to 0.465f, 0.71f to 0.70f, 0.29f to 0.70f), null)
+    peca(
+        forma(0.29f to 0.465f, 0.71f to 0.465f, 0.71f to 0.70f, 0.29f to 0.70f),
+        painel.tetoSolarAberto == true,
+    )
 
     // Vidro traseiro e tampa do porta-malas.
     painel(forma(0.24f to 0.795f, 0.76f to 0.795f, 0.81f to 0.885f, 0.19f to 0.885f), null)
@@ -230,24 +248,42 @@ private fun DrawScope.desenharCarro(abertas: Set<Abertura>) {
         Abertura.PORTA_MALAS,
     )
 
-    // As quatro portas: as faixas entre o flanco da carroceria e a lateral do
-    // teto, cada uma na posição real da peça.
-    painel(
-        forma(0.045f to 0.44f, 0.215f to 0.44f, 0.215f to 0.615f, 0.045f to 0.615f),
-        Abertura.PORTA_MOTORISTA,
+    /**
+     * Uma porta e o vidro dela: a faixa entre o flanco e a lateral do teto,
+     * com uma tira mais estreita por dentro representando o vidro.
+     *
+     * Os dois no mesmo lugar porque no carro são a mesma peça, e porque foi
+     * exatamente isso que faltou no primeiro teste: o vidro aberto virava linha
+     * de texto e não aparecia no desenho, onde o motorista procura.
+     */
+    fun porta(esquerda: Boolean, deY: Float, ateY: Float, qual: Abertura, vidro: Vidro) {
+        val foraX = if (esquerda) 0.045f else 0.955f
+        val dentroX = if (esquerda) 0.215f else 0.785f
+        val vidroX = if (esquerda) 0.145f else 0.855f
+        painel(forma(foraX to deY, dentroX to deY, dentroX to ateY, foraX to ateY), qual)
+        peca(
+            forma(vidroX to deY + 0.02f, dentroX to deY + 0.02f, dentroX to ateY - 0.02f, vidroX to ateY - 0.02f),
+            vidro in vidrosAbertos,
+        )
+    }
+    porta(true, 0.44f, 0.615f, Abertura.PORTA_MOTORISTA, Vidro.MOTORISTA)
+    porta(true, 0.62f, 0.785f, Abertura.PORTA_TRASEIRA_ESQ, Vidro.TRASEIRO_ESQ)
+    porta(false, 0.44f, 0.615f, Abertura.PORTA_PASSAGEIRO, Vidro.PASSAGEIRO)
+    porta(false, 0.62f, 0.785f, Abertura.PORTA_TRASEIRA_DIR, Vidro.TRASEIRO_DIR)
+
+    // As rodas, por fora da carroceria. Existem para as pressões terem onde
+    // encostar: sem elas os números ficariam soltos ao lado de um contorno.
+    fun roda(x: Float, y: Float) = drawLine(
+        color = Cores.Contorno,
+        start = ponto(x, y - 0.055f),
+        end = ponto(x, y + 0.055f),
+        strokeWidth = traco * 2.6f,
+        cap = androidx.compose.ui.graphics.StrokeCap.Round,
     )
-    painel(
-        forma(0.045f to 0.62f, 0.215f to 0.62f, 0.215f to 0.785f, 0.05f to 0.785f),
-        Abertura.PORTA_TRASEIRA_ESQ,
-    )
-    painel(
-        forma(0.785f to 0.44f, 0.955f to 0.44f, 0.955f to 0.615f, 0.785f to 0.615f),
-        Abertura.PORTA_PASSAGEIRO,
-    )
-    painel(
-        forma(0.785f to 0.62f, 0.955f to 0.62f, 0.95f to 0.785f, 0.785f to 0.785f),
-        Abertura.PORTA_TRASEIRA_DIR,
-    )
+    roda(0.025f, 0.30f)
+    roda(0.975f, 0.30f)
+    roda(0.025f, 0.775f)
+    roda(0.975f, 0.775f)
 
     // Retrovisores: dois riscos para fora, na altura do para-brisa. Custam dois
     // traços e são o detalhe que faz a silhueta ser lida como carro na hora.
@@ -262,6 +298,17 @@ private fun DrawScope.desenharCarro(abertas: Set<Abertura>) {
     retrovisor(0.95f, 0.995f)
 }
 
+/**
+ * O que sobra depois do desenho.
+ *
+ * Porta, vidro, capô, porta-malas e teto solar **não** entram aqui: eles acendem
+ * na peça correspondente do carrinho, que é onde o motorista procura, e repetir
+ * cada um como linha de texto enchia a faixa de quatro linhas iguais dizendo o
+ * que o desenho já dizia.
+ *
+ * Cinto continua em texto porque assento não tem como ser desenhado nesta
+ * escala sem virar mancha — e porque é o único aviso que fala de gente.
+ */
 @Composable
 private fun Avisos(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
     Column(modifier.verticalScroll(rememberScrollState())) {
@@ -273,7 +320,14 @@ private fun Avisos(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
 
             painel.tudoCerto -> Linha("Tudo certo", Cores.Confirmacao)
 
-            else -> painel.avisos.forEach { Linha(it, Cores.Atencao) }
+            else -> {
+                painel.semCinto.forEach { Linha(it.rotulo, Cores.Atencao) }
+                // Sem cinto solto, ainda assim há algo aberto: o desenho está
+                // mostrando qual. Uma palavra basta para o olho ir até lá.
+                if (painel.semCinto.isEmpty()) {
+                    Linha("Veja o carro ao lado", Cores.Atencao, Cores.TextoApoio)
+                }
+            }
         }
     }
 }

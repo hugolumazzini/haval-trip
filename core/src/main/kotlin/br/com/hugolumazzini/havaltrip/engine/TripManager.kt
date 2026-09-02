@@ -72,6 +72,27 @@ class TripManager(
      * vale é a diferença entre este instante e o de religar.
      */
     private var ignitionOffSinceMs: Long? = null
+
+    /**
+     * O instante da última gravação, quando o app voltou sem ter visto a chave
+     * sair.
+     *
+     * A central não avisa que vai desligar: ela corta a energia. Nesse caso o
+     * app morre com a ignição ainda marcada como ligada, [ignitionOffSinceMs]
+     * fica vazio e a zeragem automática nunca acontece — que é exatamente o que
+     * o carro mostrou na prática. O que sobra como pista é a hora da última
+     * gravação: o app estava vivo até ali, e o buraco entre aquele instante e a
+     * primeira amostra de agora é candidato a "carro dormindo".
+     *
+     * Candidato, e não certeza, porque o app também morre quando o motorista
+     * abre outro aplicativo no meio da viagem. Quem desempata é o hodômetro,
+     * em [avaliarHiato].
+     */
+    private var hiatoDesdeMs: Long? = null
+
+    /** Hodômetro da última gravação, régua do desempate de [hiatoDesdeMs]. */
+    private var odometroNoHiatoKm: Double = 0.0
+
     private var live = VehicleLive()
     private var selectedTripId: String? = null
 
@@ -252,6 +273,8 @@ class TripManager(
         val anterior = lastSampleMs
         if (anterior != null && sample.timestampMs < anterior) return
 
+        avaliarHiato(sample)
+
         if (sample.ignition != ignition) {
             handleIgnitionChange(sample.ignition, sample.timestampMs)
         }
@@ -349,6 +372,37 @@ class TripManager(
      * para um contador que se apaga sozinho — e é justamente o histórico que dá
      * sentido a ele: cada viagem vira um registro comparável.
      */
+    /**
+     * Decide, na primeira amostra depois de o app voltar, se o buraco desde a
+     * última gravação foi o carro dormindo.
+     *
+     * O hodômetro é o juiz: se o carro andou nesse meio-tempo, o app é que
+     * esteve fora do ar — o motorista trocou de aplicativo, atendeu o telefone,
+     * e a viagem continuou. Zerar aí apagaria uma viagem em andamento, que é o
+     * pior erro possível. Se o hodômetro está no mesmo lugar depois de todo esse
+     * tempo, o carro estava parado, e é a mesma situação que a chave fora.
+     */
+    private fun avaliarHiato(sample: TelemetrySample) {
+        val desde = hiatoDesdeMs ?: return
+        hiatoDesdeMs = null
+
+        val paradoS = (sample.timestampMs - desde) / 1000.0
+        if (paradoS <= 0.0) return
+        val andouKm = sample.odometerTotalKm - odometroNoHiatoKm
+        if (andouKm > HIATO_TOLERANCIA_KM) return
+
+        // A Trip que recomeça precisa marcar a quilometragem de agora, não a de
+        // ontem, então o hodômetro entra antes.
+        odometerTotalKm = maxOf(odometerTotalKm, sample.odometerTotalKm)
+        odometerKnown = true
+
+        // A partir daqui é indistinguível de ter visto a chave sair naquele
+        // instante — então é isso que o resto do código passa a enxergar.
+        ignitionOffSinceMs = desde
+        aplicarZeragemAutomatica(sample.timestampMs)
+        ignitionOffSinceMs = null
+    }
+
     private fun aplicarZeragemAutomatica(atMs: Long) {
         val desligadaDesde = ignitionOffSinceMs ?: return
         val paradaS = (atMs - desligadaDesde) / 1000.0
@@ -425,6 +479,13 @@ class TripManager(
         odometerTotalKm = salvo.odometerTotalKm
         odometerKnown = salvo.odometerTotalKm > 0.0
         ignitionOffSinceMs = salvo.ignitionOffSinceMs
+        // Se a chave saiu direito, o instante já está gravado e não há hiato a
+        // investigar. O caso interessante é o contrário: o app foi desligado no
+        // tapa, ainda achando que o carro estava ligado.
+        if (salvo.ignitionOffSinceMs == null && salvo.ignition == IgnitionState.ON) {
+            hiatoDesdeMs = salvo.savedAtMs
+            odometroNoHiatoKm = salvo.odometerTotalKm
+        }
         // O último instante lido não é restaurado de propósito: entre gravar e
         // religar podem ter passado horas, e esse buraco não é tempo de viagem.
         lastSampleMs = null
@@ -464,6 +525,18 @@ class TripManager(
          * mais tempo desligado, o trecho seguinte é outra viagem.
          */
         const val AUTO_RESET_PADRAO_S = 5 * 60.0
+
+        /**
+         * Quanto o hodômetro pode ter andado durante o hiato e a parada ainda
+         * contar como carro dormindo.
+         *
+         * Não é zero porque o hodômetro do carro tem passo grosso e a última
+         * gravação acontece a cada quilômetro: a viagem pode ter terminado
+         * algumas centenas de metros depois do último snapshot, com o carro
+         * chegando na garagem. Um quilômetro é curto demais para ser "o app
+         * ficou fora do ar enquanto eu dirigia".
+         */
+        const val HIATO_TOLERANCIA_KM = 1.0
 
         /** Os contadores que o painel mostra por padrão. */
         val DEFAULT_TRIPS = listOf(

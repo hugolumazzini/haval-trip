@@ -20,7 +20,7 @@ data class PainelDoVeiculo(
     val vidros: List<Estado<Vidro>> = emptyList(),
     val tetoSolarAberto: Boolean? = null,
     val pneus: List<Pneu> = emptyList(),
-    val unidadeDePressao: String? = null,
+    val unidadeDePressao: Unidade = Unidade.BAR,
 ) {
     /** O que está aberto agora. Vazio é o estado normal do carro andando. */
     val abertas: List<Abertura> get() = acionados(aberturas)
@@ -64,7 +64,30 @@ data class PainelDoVeiculo(
     /** Um item e se ele está acionado (aberto, no caso das portas). */
     data class Estado<T>(val oQue: T, val acionado: Boolean)
 
-    data class Pneu(val roda: Roda, val pressao: Double?)
+    /**
+     * Um pneu: pressão em bar e temperatura em grau, do jeito que o carro manda.
+     *
+     * A pressão fica guardada em bar mesmo quando a tela mostra psi. Converter
+     * só na hora de desenhar evita que uma troca de unidade no painel do carro
+     * vire uma conversão dobrada em algum canto do app.
+     */
+    data class Pneu(val roda: Roda, val pressaoBar: Double?, val temperaturaC: Double? = null) {
+        /** A pressão na unidade pedida. `null` continua `null`. */
+        fun pressao(unidade: Unidade): Double? = pressaoBar?.times(unidade.porBar)
+    }
+
+    /**
+     * Em que unidade mostrar a pressão.
+     *
+     * Não é escolha nossa: o carro publica em `car.basic.tpms_units` qual
+     * unidade o motorista escolheu no painel, e a lateral tem que concordar com
+     * o que o cluster mostra a um palmo de distância.
+     */
+    enum class Unidade(val rotulo: String, val porBar: Double) {
+        BAR("bar", 1.0),
+        PSI("psi", 14.5038),
+        KPA("kPa", 100.0),
+    }
 
     /**
      * As aberturas, **na ordem em que o carro as publica**.
@@ -81,11 +104,19 @@ data class PainelDoVeiculo(
         PORTA_MALAS("Porta-malas", "Porta-malas"),
     }
 
-    /** Ordem de `car.basic.seat_belt_warning`: motorista, passageiro, atrás. */
+    /**
+     * Ordem de `car.basic.seat_belt_warning`.
+     *
+     * São **cinco** posições, uma por lugar do carro — e não três, como o app
+     * assumiu até o primeiro teste no H6. O banco traseiro é reportado assento
+     * a assento, inclusive o do meio.
+     */
     enum class Assento(val rotulo: String, val curto: String) {
         MOTORISTA("Cinto do motorista", "Motorista"),
         PASSAGEIRO("Cinto do passageiro", "Passageiro"),
-        TRASEIROS("Cintos traseiros", "Traseiros"),
+        TRASEIRO_ESQ("Cinto traseiro esq.", "Tras. esq."),
+        TRASEIRO_CENTRO("Cinto traseiro centro", "Tras. centro"),
+        TRASEIRO_DIR("Cinto traseiro dir.", "Tras. dir."),
     }
 
     /** Ordem de `car.basic.window_status`, a mesma das portas. */
@@ -124,14 +155,14 @@ data class PainelDoVeiculo(
             pneus: String? = null,
             unidadePneus: String? = null,
         ): PainelDoVeiculo {
-            val rodas = lerPneus(pneus)
             return PainelDoVeiculo(
                 aberturas = combinar(Abertura.entries, portas),
                 cintos = combinar(Assento.entries, cintos),
-                vidros = combinar(Vidro.entries, vidros),
+                // O vidro é o único que fala ao contrário: fechado é `1`.
+                vidros = combinar(Vidro.entries, vidros, fechado = 1.0),
                 tetoSolarAberto = ligado(tetoSolar),
-                pneus = rodas,
-                unidadeDePressao = unidadeDePressao(rodas),
+                pneus = lerPneus(pneus),
+                unidadeDePressao = unidadeDePressao(unidadePneus),
             )
         }
 
@@ -141,18 +172,27 @@ data class PainelDoVeiculo(
         /**
          * Casa cada posição da lista com o item de mesmo índice.
          *
-         * Qualquer coisa diferente de zero conta como acionado. O carro publica
-         * `1` para aberto na maior parte das propriedades, mas há códigos
-         * intermediários — vidro em movimento, por exemplo — e todos significam
-         * "não está fechado", que é o que interessa mostrar.
+         * Qualquer coisa diferente de [fechado] conta como acionado, porque há
+         * códigos intermediários — vidro em movimento aparece como `3` — e
+         * todos significam "não está fechado", que é o que interessa mostrar.
+         *
+         * O valor de repouso muda conforme a propriedade, e isso não é detalhe:
+         * porta e cinto descansam em `0`, mas o vidro fechado publica `1`. Com
+         * a regra única de "diferente de zero é aberto", o H6 parado de janelas
+         * fechadas acusava os quatro vidros abertos — foi o que apareceu no
+         * primeiro teste no carro.
          *
          * Sobra na lista é ignorada, e falta também: uma versão de firmware que
          * publique uma posição a mais não pode derrubar a tela inteira.
          */
-        private fun <T> combinar(itens: List<T>, bruto: String?): List<Estado<T>> {
+        private fun <T> combinar(
+            itens: List<T>,
+            bruto: String?,
+            fechado: Double = 0.0,
+        ): List<Estado<T>> {
             val numeros = Unidades.lerNumeros(bruto) ?: return emptyList()
             return itens.take(numeros.size).mapIndexed { i, item ->
-                Estado(item, numeros[i] != 0.0)
+                Estado(item, numeros[i] != fechado)
             }
         }
 
@@ -160,31 +200,49 @@ data class PainelDoVeiculo(
         private fun ligado(bruto: String?): Boolean? =
             bruto?.trim()?.toDoubleOrNull()?.let { it != 0.0 }
 
+        /**
+         * Os quatro pneus a partir de `car.basic.tpms_status`.
+         *
+         * A propriedade traz **oito** números, não quatro: é um par por roda,
+         * pressão em bar e temperatura em grau. Lida como quatro pressões — que
+         * foi o erro da primeira versão — o app mostrava `2,4 / 32,0` de cada
+         * lado: a pressão do dianteiro esquerdo e a *temperatura* dele no lugar
+         * do dianteiro direito.
+         *
+         * O formato antigo, de só quatro números, continua aceito: nenhum outro
+         * H6 foi lido ainda, e derrubar a tela por causa de um firmware
+         * diferente seria pior que mostrar a pressão sem a temperatura.
+         */
         private fun lerPneus(bruto: String?): List<Pneu> {
             val numeros = Unidades.lerNumeros(bruto) ?: return emptyList()
-            return Roda.entries.take(numeros.size).mapIndexed { i, roda ->
-                // Zero num pneu é sensor sem resposta, não pneu vazio: um pneu
-                // com zero de pressão não roda. Melhor um traço na tela.
-                Pneu(roda, numeros[i].takeIf { it > 0.0 })
+            val comTemperatura = numeros.size >= Roda.entries.size * 2
+
+            // Zero num pneu é sensor sem resposta, não pneu vazio: um pneu com
+            // zero de pressão não roda. Melhor um traço na tela.
+            fun valor(n: Double?) = n?.takeIf { it > 0.0 }
+
+            return Roda.entries.mapIndexedNotNull { i, roda ->
+                if (comTemperatura) {
+                    Pneu(roda, valor(numeros.getOrNull(i * 2)), numeros.getOrNull(i * 2 + 1))
+                } else {
+                    if (i >= numeros.size) null else Pneu(roda, valor(numeros[i]))
+                }
             }
         }
 
         /**
-         * Em que unidade as pressões estão.
+         * Em que unidade mostrar a pressão, pelo código de `car.basic.tpms_units`.
          *
-         * O carro publica um código em `car.basic.tpms_units`, mas ele ainda não
-         * foi decifrado dentro do H6 — e chutar a tabela erraria calado. A ordem
-         * de grandeza, ao contrário, é inequívoca: nenhum pneu de passeio tem 30
-         * bar nem 2 kPa. O código cru continua indo para o diagnóstico, para que
-         * um dia isto vire leitura de verdade.
+         * O código `1` é psi: no H6 lido em 02/09/2026 ele vinha `1` com o
+         * cluster mostrando `34.1 psi` para uma pressão publicada como `2,297`
+         * — que é a mesma coisa em bar. Os outros códigos ninguém viu ainda, e
+         * por isso o padrão é bar, que é a unidade em que o carro **publica**:
+         * na dúvida, mostrar o número cru é melhor que convertê-lo errado.
          */
-        private fun unidadeDePressao(pneus: List<Pneu>): String? {
-            val maior = pneus.mapNotNull { it.pressao }.maxOrNull() ?: return null
-            return when {
-                maior >= 100.0 -> "kPa"
-                maior >= 10.0 -> "psi"
-                else -> "bar"
+        private fun unidadeDePressao(codigo: String?): Unidade =
+            when (codigo?.trim()?.toDoubleOrNull()?.toInt()) {
+                1 -> Unidade.PSI
+                else -> Unidade.BAR
             }
-        }
     }
 }

@@ -85,6 +85,22 @@ class TripEngineTest {
     }
 
     @Test
+    fun `media de consumo espera juntar combustivel antes de virar numero`() {
+        // O caso real: híbrido saindo no elétrico. Anda 5 km injetando quase
+        // nada e a divisão dava 4.000 km/L na tela.
+        var m = TripMetrics()
+        repeat(300) { m = engine.accumulate(m, amostra(60.0, injecao = 0.003), 1.0) }
+        assertTrue(m.distanceKm > 4.0)
+        assertTrue(m.fuelLitres < TripMetrics.MIN_LITROS_PARA_MEDIA)
+        assertNull(m.avgFuelConsumptionKml)
+
+        // Passado o meio litro, o número aparece — e plausível, não absurdo.
+        repeat(600) { m = engine.accumulate(m, amostra(60.0, injecao = 6.0), 1.0) }
+        val media = m.avgFuelConsumptionKml!!
+        assertTrue("média fora do plausível: $media", media in 5.0..40.0)
+    }
+
+    @Test
     fun `velocidade media considera o tempo parado e a de movimento nao`() {
         var m = TripMetrics()
         repeat(1800) { m = engine.accumulate(m, amostra(80.0), 1.0) }   // 40 km em 30 min

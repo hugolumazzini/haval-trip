@@ -80,9 +80,18 @@ data class TripMetrics(
     /**
      * Consumo médio da Trip, em km/L. `null` enquanto não houver combustível
      * queimado — devolver 0.0 aqui mentiria dizendo "o carro não anda nada".
+     *
+     * Também `null` antes de [MIN_LITROS_PARA_MEDIA]. Uma divisão por um número
+     * quase zero estoura: nos primeiros metros de uma Trip o híbrido anda no
+     * elétrico, o motor não injeta quase nada, e `1 km ÷ 0,00025 L` dá os
+     * 4.000 km/L que apareceram na tela. Não é erro de conta — é conta certa
+     * sobre uma amostra pequena demais para significar alguma coisa. Um traço
+     * enquanto a Trip não junta combustível suficiente é mais honesto que um
+     * número absurdo, e evita que o motorista veja o consumo "despencar" de
+     * 4.000 para 12 como se o carro tivesse piorado.
      */
     val avgFuelConsumptionKml: Double? get() =
-        if (fuelLitres > EPSILON) distanceKm / fuelLitres else null
+        if (fuelLitres >= MIN_LITROS_PARA_MEDIA) distanceKm / fuelLitres else null
 
     /** Velocidade média, em km/h, contando o tempo parado. `null` sem tempo. */
     val avgSpeedKmh: Double? get() =
@@ -109,6 +118,16 @@ data class TripMetrics(
 
         /** Piso para comparações com zero em ponto flutuante. */
         const val EPSILON = 1e-9
+
+        /**
+         * Combustível mínimo para o consumo médio virar número na tela.
+         *
+         * Meio litro é da ordem de 5 a 8 km rodados num H6 — o bastante para a
+         * média parar de dançar. Abaixo disso o divisor é pequeno demais e
+         * qualquer arredondamento do sensor vira uma variação enorme no
+         * resultado.
+         */
+        const val MIN_LITROS_PARA_MEDIA = 0.5
     }
 }
 

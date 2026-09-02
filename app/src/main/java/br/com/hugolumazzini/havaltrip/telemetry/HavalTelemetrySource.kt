@@ -208,9 +208,11 @@ class DiarioDeCampo(private val limiteDaFita: Int = LIMITE_PADRAO_DA_FITA) {
      * A fita viva, onde os eventos entram um a um.
      *
      * É uma fila e não uma lista imutável por causa do volume: o carro publica
-     * ~26 eventos por segundo, e recopiar dez mil elementos a cada um deles
-     * daria um quarto de milhão de cópias por segundo na central — que é um
+     * 30 e poucas leituras por segundo, e recopiar dez mil elementos a cada uma
+     * daria centenas de milhares de cópias por segundo na central — que é um
      * aparelho modesto. Aqui entra e sai pelas pontas, sem copiar nada.
+     *
+     * Só entram valores que mudaram; veja [registrar].
      *
      * Fica sob trava porque quem escreve é o callback do carro, numa thread do
      * Binder, e quem lê é a interface.
@@ -227,11 +229,22 @@ class DiarioDeCampo(private val limiteDaFita: Int = LIMITE_PADRAO_DA_FITA) {
     fun registrar(chave: String, valor: String) {
         val agora = System.currentTimeMillis()
         val anterior = _atual.value[chave]
+        // O contador conta tudo, inclusive as repetições: é ele que responde
+        // "essa chave está viva?" na tela de diagnóstico. Uma chave relida mil
+        // vezes com o mesmo valor é diferente de uma que nunca chegou.
         _atual.value = _atual.value + (chave to Leitura(
             valor = valor,
             emMs = agora,
             vezes = (anterior?.vezes ?: 0) + 1,
         ))
+
+        // A fita, ao contrário, só quer mudança. Releitura com o valor igual
+        // não conta nada de novo sobre o carro e come o espaço de um evento que
+        // contaria: numa coleta com o carro parado, `vehicle_speed` apareceu
+        // 8.842 vezes seguidas com o mesmo `0.0`, e a fita inteira de dez mil
+        // cobria menos de cinco minutos. Guardando só o que muda, os mesmos dez
+        // mil eventos passam a valer horas de carro parado.
+        if (anterior?.valor == valor) return
 
         val publicar = synchronized(fitaViva) {
             fitaViva.addLast(Evento(agora, chave, valor))
@@ -264,9 +277,11 @@ class DiarioDeCampo(private val limiteDaFita: Int = LIMITE_PADRAO_DA_FITA) {
 
     companion object {
         /**
-         * Teto da fita, em eventos. A ~26 eventos por segundo, 10 mil dão uns
-         * seis minutos de histórico — o bastante para pegar um trecho inteiro
-         * de trânsito, com paradas e arrancadas, e não só o instante do envio.
+         * Teto da fita, em eventos. Como só mudanças entram, dez mil cobrem um
+         * bom trecho de trânsito andando e horas com o carro parado — o
+         * bastante para pegar o percurso inteiro, com paradas e arrancadas, e
+         * não só o instante do envio. (Gravando toda releitura, como era antes,
+         * os mesmos dez mil acabavam em menos de cinco minutos.)
          *
          * Quem recorta para caber no envio é o [Relatorio]; aqui o critério é
          * só quanto vale a pena manter em memória.

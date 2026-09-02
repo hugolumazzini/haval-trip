@@ -126,6 +126,7 @@ object Relatorio {
         val fita = diario.fita.value
         val cabem = fita.takeLast(maxEventos)
         sb.appendLine("--- FITA DOS ÚLTIMOS EVENTOS (hora | chave | valor cru) ---")
+        sb.appendLine("(só mudanças: uma chave relida com o mesmo valor não entra aqui; quantas vezes ela chegou está na lista de chaves acima)")
         sb.appendLine("(é aqui que a unidade aparece: como o número se move enquanto o carro anda)")
         if (cabem.size < fita.size) {
             sb.appendLine("(mostrando os ${cabem.size} mais recentes de ${fita.size}; o arquivo salvo no aparelho tem todos)")

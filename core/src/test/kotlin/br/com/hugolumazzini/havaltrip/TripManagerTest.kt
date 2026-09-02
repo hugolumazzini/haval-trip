@@ -238,6 +238,41 @@ class TripManagerTest {
     }
 
     @Test
+    fun `app morto junto com o carro ainda zera a Trip automatica ao voltar`() {
+        val m = manager()
+        m.handleIgnitionChange(IgnitionState.ON)
+        m.dirigir(600, 60.0)
+        m.flush()
+        assertEquals(10.0, m.state.value.trip("AUTO")!!.metrics.distanceKm, 1e-6)
+
+        // A central corta a energia sem avisar: ninguém chama handleIgnitionChange.
+        agora += 8 * 60 * 60 * 1000
+        val depois = manager()
+        depois.dirigir(1, 0.0)
+
+        val auto = depois.state.value.trip("AUTO")!!
+        assertEquals(0.0, auto.metrics.distanceKm, 1e-9)
+        assertEquals(1, depois.state.value.history.count { it.tripId == "AUTO" })
+    }
+
+    @Test
+    fun `app fechado no meio da viagem nao zera a Trip automatica`() {
+        val m = manager()
+        m.handleIgnitionChange(IgnitionState.ON)
+        m.dirigir(600, 60.0)
+        m.flush()
+
+        // Dez minutos fora do ar, mas o carro andou: era outro app na tela.
+        agora += 10 * 60 * 1000
+        odometro += 12.0
+        val depois = manager()
+        depois.dirigir(1, 60.0)
+
+        // Os 10 km de antes seguem lá — a viagem continua de onde parou.
+        assertTrue(depois.state.value.trip("AUTO")!!.metrics.distanceKm >= 10.0)
+    }
+
+    @Test
     fun `parada curta no posto nao zera a Trip automatica`() {
         val m = manager()
         m.handleIgnitionChange(IgnitionState.ON)

@@ -38,15 +38,33 @@ object Unidades {
         }
     }
 
-    /** Lê o par `{a,b}`. `null` se vier em qualquer outro formato. */
-    fun lerConsumoInstantaneo(bruto: String?): ConsumoInstantaneo? {
+    /**
+     * A lista de números de uma propriedade composta do carro.
+     *
+     * O H6 publica grandezas de várias partes como `{a,b,c}` — o consumo
+     * instantâneo é `{unidade,valor}`, as portas são um número por abertura, os
+     * pneus um por roda. A ordem é sempre a mesma e é ela que dá o significado:
+     * não vêm nomes, vêm posições.
+     *
+     * `null` quando não é esse formato, e não lista vazia: "o carro não falou
+     * nessa língua" precisa ser distinguível de "falou e está tudo zerado".
+     */
+    fun lerNumeros(bruto: String?): List<Double>? {
         val texto = bruto?.trim() ?: return null
         if (!texto.startsWith("{") || !texto.endsWith("}")) return null
-        val partes = texto.substring(1, texto.length - 1).split(',')
-        if (partes.size < 2) return null
-        val unidade = partes[0].trim().toDoubleOrNull()?.toInt() ?: return null
-        val valor = partes[1].trim().toDoubleOrNull() ?: return null
-        return ConsumoInstantaneo(unidade, valor)
+        val partes = texto.substring(1, texto.length - 1)
+            .split(',')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+        if (partes.isEmpty()) return null
+        return partes.map { it.toDoubleOrNull() ?: return null }
+    }
+
+    /** Lê o par `{a,b}`. `null` se vier em qualquer outro formato. */
+    fun lerConsumoInstantaneo(bruto: String?): ConsumoInstantaneo? {
+        val numeros = lerNumeros(bruto) ?: return null
+        if (numeros.size < 2) return null
+        return ConsumoInstantaneo(numeros[0].toInt(), numeros[1])
     }
 
     /**

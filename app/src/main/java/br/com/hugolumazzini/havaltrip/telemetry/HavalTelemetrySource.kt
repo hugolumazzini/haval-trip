@@ -103,6 +103,23 @@ class HavalTelemetrySource(
         const val CHAVE_TREM_DE_FORCA = "car.ev_info.hcu_power_train_state"
 
         /**
+         * O estado físico do carro: o que está aberto, solto ou sem ar.
+         *
+         * Não entra em cálculo nenhum — é o que a lateral da tela mostra. Cada
+         * uma destas propriedades vem como `{a,b,c}`, uma posição por porta, por
+         * assento ou por roda; quem dá nome às posições é
+         * [br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo].
+         */
+        const val CHAVE_PORTAS = "car.basic.door_status"
+        const val CHAVE_CINTOS = "car.basic.seat_belt_warning"
+        const val CHAVE_VIDROS = "car.basic.window_status"
+        const val CHAVE_TETO_SOLAR = "car.basic.sunroof_status"
+        const val CHAVE_PNEUS = "car.basic.tpms_status"
+
+        /** Código da unidade das pressões. Ainda não decifrado; vai cru para o diagnóstico. */
+        const val CHAVE_UNIDADE_PNEUS = "car.basic.tpms_units"
+
+        /**
          * O que escutamos. A lista é fechada de propósito: `car.basic.vin_code`
          * também é publicado, e o chassi é o documento do carro — não entra na
          * memória do app para não haver como ele escapar num relatório.
@@ -132,6 +149,14 @@ class HavalTelemetrySource(
             CHAVE_TREM_DE_FORCA,
             "car.ev_info.fuel_consume_info",
             "car.ev_info.cycle_fuel_consume_info",
+            CHAVE_PORTAS,
+            CHAVE_CINTOS,
+            CHAVE_VIDROS,
+            CHAVE_TETO_SOLAR,
+            CHAVE_PNEUS,
+            CHAVE_UNIDADE_PNEUS,
+            "car.basic.tpms_warning",
+            "car.basic.door_lock_status",
         )
 
         /**

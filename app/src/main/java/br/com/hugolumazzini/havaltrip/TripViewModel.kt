@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.hugolumazzini.havaltrip.domain.IgnitionState
+import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo
 import br.com.hugolumazzini.havaltrip.domain.TripRecord
 import br.com.hugolumazzini.havaltrip.engine.TripManager
 import br.com.hugolumazzini.havaltrip.engine.TripState
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -89,19 +91,33 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
     /** `true` quando existe a ponte do HavalShisuku nesta central. */
     val shisukuInstalado = HavalTelemetrySource.shisukuInstalado(app)
 
+    /** O último valor de cada chave, compartilhado por todas as fontes. */
+    private val estadoDoCarro = EstadoDoCarro(diario)
+
     private val simulador = SimulatedTelemetrySource(
         // O simulador continua de onde o snapshot parou. Um hodômetro que volta
         // ao valor de fábrica a cada abertura do app deixaria a tela de
         // detalhes dizendo que a Trip andou 3 km sem o hodômetro sair do lugar.
         odometroKm = manager.state.value.live.odometerTotalKm.takeIf { it > 0.0 } ?: 48_213.4,
+        estado = estadoDoCarro,
     )
-
-    /** O último valor de cada chave, compartilhado pelas duas fontes reais. */
-    private val estadoDoCarro = EstadoDoCarro(diario)
 
     private val carro = HavalTelemetrySource(context = app, estado = estadoDoCarro)
 
     private val linhaDireta = ShizukuTelemetrySource(estado = estadoDoCarro)
+
+    /**
+     * Portas, cintos e pneus, recalculados a cada valor que chega.
+     *
+     * Sai do diário e não do gerenciador de viagens porque não é conta: é o
+     * estado físico do carro, que a tela mostra e ninguém integra. O
+     * [distinctUntilChanged] é o que segura a recomposição — o carro publica
+     * dezenas de valores por segundo e quase nenhum deles mexe numa porta.
+     */
+    val painelDoVeiculo: StateFlow<PainelDoVeiculo> = diario.atual
+        .map { estadoDoCarro.painelDoVeiculo() }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, PainelDoVeiculo())
 
     /** Como está a linha direta, para a tela dizer o que falta fazer. */
     val situacaoShizuku: StateFlow<ShizukuTelemetrySource.Situacao> = linhaDireta.situacao

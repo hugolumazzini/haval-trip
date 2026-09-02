@@ -45,7 +45,7 @@ val EstiloRotulo = TextStyle(
  */
 val EstiloNumeroGrande = TextStyle(
     fontFamily = PlexSans,
-    fontSize = 52.sp,
+    fontSize = 62.sp,
     fontWeight = FontWeight.SemiBold,
     color = Cores.Texto,
 )

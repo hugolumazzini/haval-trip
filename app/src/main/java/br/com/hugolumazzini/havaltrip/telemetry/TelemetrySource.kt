@@ -35,6 +35,14 @@ class SimulatedTelemetrySource(
     /** Onde o hodômetro retoma. Quem cria passa o valor do último snapshot. */
     private var odometroKm: Double = 48_213.4,
     private var tanqueL: Double = 42.0,
+    /**
+     * Para onde vão as propriedades cruas do veículo — portas, cintos, pneus.
+     *
+     * Opcional porque o simulador nasceu antes delas e os testes não precisam.
+     * Sem isto, a lateral da tela ficaria em "sem leitura do carro" na bancada,
+     * e não haveria como conferir o desenho sem estar sentado no H6.
+     */
+    private val estado: EstadoDoCarro? = null,
 ) : TelemetrySource {
 
     /** Ligado/desligado, controlado pelo botão de ignição da tela. */
@@ -50,6 +58,7 @@ class SimulatedTelemetrySource(
         while (true) {
             delay(intervaloMs)
             avancar(intervaloMs / 1000.0)
+            publicarEstadoDoVeiculo()
             emit(
                 TelemetrySample(
                     timestampMs = System.currentTimeMillis(),
@@ -61,6 +70,23 @@ class SimulatedTelemetrySource(
                 )
             )
         }
+    }
+
+    /**
+     * O carro de mentira também tem portas.
+     *
+     * A porta do motorista abre com o carro parado e fecha quando ele anda —
+     * que é o comportamento de quem entra e sai. Serve para conferir na bancada
+     * que o aviso acende e apaga; num carro de verdade, quem manda é o sensor.
+     */
+    private fun publicarEstadoDoVeiculo() {
+        val alvo = estado ?: return
+        val motoristaAberta = if (velocidadeKmh < 0.5 && segundosNoTrecho % 20 < 8) 1 else 0
+        alvo.registrar(HavalTelemetrySource.CHAVE_PORTAS, "{$motoristaAberta,0,0,0,0,0}")
+        alvo.registrar(HavalTelemetrySource.CHAVE_CINTOS, "{0,0,0}")
+        alvo.registrar(HavalTelemetrySource.CHAVE_VIDROS, "{0,0,0,0}")
+        alvo.registrar(HavalTelemetrySource.CHAVE_TETO_SOLAR, "0")
+        alvo.registrar(HavalTelemetrySource.CHAVE_PNEUS, "{232,230,228,231}")
     }
 
     private fun avancar(deltaS: Double) {

@@ -1,6 +1,7 @@
 package br.com.hugolumazzini.havaltrip.telemetry
 
 import br.com.hugolumazzini.havaltrip.domain.IgnitionState
+import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo
 import br.com.hugolumazzini.havaltrip.domain.TelemetrySample
 import java.util.concurrent.ConcurrentHashMap
 
@@ -41,6 +42,22 @@ class EstadoDoCarro(private val diario: DiarioDeCampo) {
      * acelerar, e o diagnóstico pareceria travado sem estar.
      */
     fun publicarFita() = diario.publicarFita()
+
+    /**
+     * O estado físico do carro — portas, cintos, pneus — para a lateral da tela.
+     *
+     * Fica fora de [montarAmostra] porque não é amostra: nada disso entra no
+     * cálculo da viagem, e misturar as duas coisas obrigaria o núcleo a carregar
+     * uma porta aberta por dentro de cada integração de combustível.
+     */
+    fun painelDoVeiculo(): PainelDoVeiculo = PainelDoVeiculo.ler(
+        portas = cache[HavalTelemetrySource.CHAVE_PORTAS],
+        cintos = cache[HavalTelemetrySource.CHAVE_CINTOS],
+        vidros = cache[HavalTelemetrySource.CHAVE_VIDROS],
+        tetoSolar = cache[HavalTelemetrySource.CHAVE_TETO_SOLAR],
+        pneus = cache[HavalTelemetrySource.CHAVE_PNEUS],
+        unidadePneus = cache[HavalTelemetrySource.CHAVE_UNIDADE_PNEUS],
+    )
 
     fun montarAmostra(): TelemetrySample {
         val velocidade = numero(HavalTelemetrySource.CHAVE_VELOCIDADE) ?: 0.0

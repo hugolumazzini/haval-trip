@@ -4,12 +4,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -31,6 +34,7 @@ import br.com.hugolumazzini.havaltrip.ui.theme.Cores
 fun PainelScreen(vm: TripViewModel, estado: TripState) {
     val trip = estado.selectedTrip ?: return
     val m = trip.metrics
+    val veiculo by vm.painelDoVeiculo.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize()) {
         // Faixa do veículo: vale para todas as Trips, então fica fora delas.
@@ -69,35 +73,44 @@ fun PainelScreen(vm: TripViewModel, estado: TripState) {
 
         Spacer(Modifier.height(18.dp))
 
-        // Os quatro quadrantes.
+        // Os quatro quadrantes, com o estado do carro na lateral. A lateral tem
+        // largura fixa e os quadrantes dividem o que sobra: assim o desenho do
+        // carro não encolhe junto quando um rótulo cresce.
         Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Quadrante(
-                "DISTÂNCIA",
-                TripFormat.decimal(m.distanceKm, 1),
-                "km",
-                Modifier.weight(1f).fillMaxSize(),
-            )
-            Quadrante(
-                "CONSUMO MÉDIO",
-                TripFormat.decimal(m.avgFuelConsumptionKml, 1),
-                "km/L",
-                Modifier.weight(1f).fillMaxSize(),
-            )
-        }
-        Spacer(Modifier.height(14.dp))
-        Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Quadrante(
-                "VELOCIDADE MÉDIA",
-                TripFormat.decimal(m.avgSpeedKmh, 0),
-                "km/h",
-                Modifier.weight(1f).fillMaxSize(),
-            )
-            Quadrante(
-                "TEMPO TOTAL",
-                TripFormat.duracao(m.totalTimeS),
-                TripFormat.unidadeDuracao(m.totalTimeS),
-                Modifier.weight(1f).fillMaxSize(),
-            )
+            Column(Modifier.weight(1f).fillMaxSize()) {
+                Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Quadrante(
+                        "DISTÂNCIA",
+                        TripFormat.decimal(m.distanceKm, 1),
+                        "km",
+                        Modifier.weight(1f).fillMaxSize(),
+                    )
+                    Quadrante(
+                        "CONSUMO MÉDIO",
+                        TripFormat.decimal(m.avgFuelConsumptionKml, 1),
+                        "km/L",
+                        Modifier.weight(1f).fillMaxSize(),
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+                Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Quadrante(
+                        "VELOCIDADE MÉDIA",
+                        TripFormat.decimal(m.avgSpeedKmh, 0),
+                        "km/h",
+                        Modifier.weight(1f).fillMaxSize(),
+                    )
+                    Quadrante(
+                        "TEMPO TOTAL",
+                        TripFormat.duracao(m.totalTimeS),
+                        TripFormat.unidadeDuracao(m.totalTimeS),
+                        Modifier.weight(1f).fillMaxSize(),
+                    )
+                }
+            }
+            // Altura cheia, largura própria: com `fillMaxSize` a lateral tomaria
+            // a linha inteira na medição e os quadrantes ficariam com zero.
+            LateralDoVeiculo(veiculo, Modifier.fillMaxHeight())
         }
 
         Spacer(Modifier.height(16.dp))

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,8 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.Canvas
@@ -57,13 +58,17 @@ fun LateralDoVeiculo(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
         Text("VEÍCULO", style = EstiloRotulo)
         Spacer(Modifier.height(10.dp))
 
-        Diagrama(painel)
+        // O desenho fica com a sobra de altura, e os avisos com o que pedirem.
+        // Ao contrário: um carro de proporção fixa cresceria até empurrar os
+        // avisos para fora da faixa — que é justamente a parte que não pode
+        // sumir quando algo está aberto.
+        Diagrama(painel, Modifier.weight(1f))
 
         Spacer(Modifier.height(12.dp))
         Box(Modifier.fillMaxWidth().height(1.dp).background(Cores.Contorno))
         Spacer(Modifier.height(10.dp))
 
-        Avisos(painel, Modifier.weight(1f))
+        Avisos(painel)
     }
 }
 
@@ -75,21 +80,22 @@ fun LateralDoVeiculo(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
  * decorar a sigla.
  */
 @Composable
-private fun Diagrama(painel: PainelDoVeiculo) {
+private fun Diagrama(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
     val pressoes = painel.pneus.associate { it.roda to it.pressao }
     val abertas = painel.abertas.toSet()
 
-    Column(Modifier.fillMaxWidth()) {
+    Column(modifier.fillMaxWidth()) {
         LinhaDePneus(
             painel, pressoes, Roda.DIANTEIRA_ESQ, Roda.DIANTEIRA_DIR,
         )
         Box(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 30.dp, vertical = 4.dp)
-                .aspectRatio(0.62f),
+            Modifier.fillMaxWidth().weight(1f).padding(vertical = 6.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            Canvas(Modifier.fillMaxSize()) { desenharCarro(abertas) }
+            // Proporção real do H6: 1,89 m de largura por 4,65 m de
+            // comprimento. Manda a altura disponível, não a largura: assim o
+            // carro encolhe para caber e nunca invade o espaço dos avisos.
+            Canvas(Modifier.fillMaxHeight().aspectRatio(0.405f)) { desenharCarro(abertas) }
         }
         LinhaDePneus(
             painel, pressoes, Roda.TRASEIRA_ESQ, Roda.TRASEIRA_DIR,
@@ -133,66 +139,127 @@ private fun ValorDePneu(painel: PainelDoVeiculo, pressoes: Map<Roda, Double?>, r
 }
 
 /**
- * O contorno do carro e as seis aberturas.
+ * O H6 visto de cima, com as seis aberturas como painéis que acendem.
  *
- * Desenhado à mão em vez de virar um arquivo de vetor porque cada traço muda de
- * cor conforme o carro: um `.xml` estático precisaria de doze versões, e uma
- * imagem por estado é o tipo de coisa que sai do lugar quando alguém mexe.
+ * Desenhado à mão em vez de virar um arquivo de vetor porque cada painel muda de
+ * cor conforme o carro: um `.xml` estático precisaria de dezenas de versões, e
+ * uma imagem por estado é o tipo de coisa que sai do lugar quando alguém mexe.
+ *
+ * As proporções são as do H6 de verdade — 4,65 m por 1,89 m, cabine recuada,
+ * capô longo — porque é o que faz o motorista reconhecer o próprio carro em vez
+ * de ver um retângulo genérico. Todas as coordenadas são frações do quadro, de
+ * 0 a 1, para o desenho servir em qualquer tamanho: `y = 0` é o para-choque
+ * dianteiro, `y = 1` é o traseiro, `x = 0` é o lado do motorista.
  *
  * Volante à esquerda: a porta do motorista é a dianteira esquerda. É assim que
  * o carro chega ao Brasil, e é o que faz o desenho bater com quem está sentado
  * olhando para ele.
  */
 private fun DrawScope.desenharCarro(abertas: Set<Abertura>) {
-    val fechado = Cores.Contorno
-    val aberto = Cores.Atencao
-    fun cor(a: Abertura) = if (a in abertas) aberto else fechado
+    val traco = size.minDimension * 0.030f
+    val fino = Stroke(width = traco * 0.8f)
+    val contorno = Stroke(width = traco * 1.4f)
 
-    val traco = size.minDimension * 0.055f
-    val corpo = Stroke(width = traco)
-    val raio = size.minDimension * 0.22f
+    fun ponto(x: Float, y: Float) = Offset(size.width * x, size.height * y)
 
-    // Carroceria.
-    drawRoundRect(
-        color = Cores.Contorno,
-        topLeft = Offset(traco / 2, traco / 2),
-        size = Size(size.width - traco, size.height - traco),
-        cornerRadius = androidx.compose.ui.geometry.CornerRadius(raio, raio),
-        style = corpo,
+    /** Um polígono em coordenadas de 0 a 1, já fechado. */
+    fun forma(vararg pares: Pair<Float, Float>) = Path().apply {
+        pares.forEachIndexed { i, (x, y) ->
+            val p = ponto(x, y)
+            if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
+        }
+        close()
+    }
+
+    /**
+     * Desenha um painel: contorno sempre, e por dentro um preenchimento âmbar
+     * translúcido quando está aberto.
+     *
+     * O preenchimento é translúcido de propósito. Cor chapada apagaria o traço
+     * que dá a forma da porta, e o aviso ficaria uma mancha sem lugar; assim a
+     * peça continua reconhecível e ainda assim salta aos olhos.
+     */
+    fun painel(caminho: Path, abertura: Abertura?) {
+        val aberto = abertura != null && abertura in abertas
+        if (aberto) drawPath(caminho, Cores.Atencao.copy(alpha = 0.55f))
+        drawPath(caminho, if (aberto) Cores.Atencao else Cores.Contorno, style = fino)
+    }
+
+    // Carroceria: uma silhueta simétrica, com o bico mais estreito que a
+    // traseira, como num SUV. As curvas evitam o ar de caixa do desenho antigo.
+    val carroceria = Path().apply {
+        moveTo(ponto(0.50f, 0.005f).x, ponto(0.50f, 0.005f).y)
+        fun curva(c1: Pair<Float, Float>, c2: Pair<Float, Float>, fim: Pair<Float, Float>) {
+            cubicTo(
+                ponto(c1.first, c1.second).x, ponto(c1.first, c1.second).y,
+                ponto(c2.first, c2.second).x, ponto(c2.first, c2.second).y,
+                ponto(fim.first, fim.second).x, ponto(fim.first, fim.second).y,
+            )
+        }
+        curva(0.24f to 0.010f, 0.09f to 0.045f, 0.065f to 0.13f)   // canto dianteiro esq.
+        curva(0.035f to 0.28f, 0.035f to 0.70f, 0.065f to 0.87f)   // flanco esquerdo
+        curva(0.085f to 0.965f, 0.24f to 0.995f, 0.50f to 0.995f)  // canto traseiro esq.
+        curva(0.76f to 0.995f, 0.915f to 0.965f, 0.935f to 0.87f)  // canto traseiro dir.
+        curva(0.965f to 0.70f, 0.965f to 0.28f, 0.935f to 0.13f)   // flanco direito
+        curva(0.91f to 0.045f, 0.76f to 0.010f, 0.50f to 0.005f)   // canto dianteiro dir.
+        close()
+    }
+    // A silhueta em cinza mais claro que os painéis internos: é ela que precisa
+    // ser lida como carro de longe; as divisões são detalhe de segunda leitura.
+    drawPath(carroceria, Cores.TextoApoio, style = contorno)
+
+    // Capô: da grade até a base do para-brisa.
+    painel(
+        forma(0.13f to 0.055f, 0.87f to 0.055f, 0.84f to 0.30f, 0.16f to 0.30f),
+        Abertura.CAPO,
     )
 
-    // Capô e porta-malas: barras horizontais nas pontas.
-    fun barraHorizontal(y: Float, a: Abertura) = drawLine(
-        color = cor(a),
-        start = Offset(size.width * 0.26f, y),
-        end = Offset(size.width * 0.74f, y),
-        strokeWidth = traco * 1.6f,
+    // Para-brisa. É ele que diz qual ponta é a frente — sem isso o desenho fica
+    // simétrico e "porta traseira" deixa de querer dizer alguma coisa.
+    painel(forma(0.16f to 0.305f, 0.84f to 0.305f, 0.77f to 0.42f, 0.23f to 0.42f), null)
+
+    // Teto, com o teto solar por dentro. O H6 tem teto panorâmico, e é o retângulo
+    // interno que faz o desenho parecer o carro certo e não um carro qualquer.
+    painel(forma(0.22f to 0.425f, 0.78f to 0.425f, 0.78f to 0.79f, 0.22f to 0.79f), null)
+    painel(forma(0.29f to 0.465f, 0.71f to 0.465f, 0.71f to 0.70f, 0.29f to 0.70f), null)
+
+    // Vidro traseiro e tampa do porta-malas.
+    painel(forma(0.24f to 0.795f, 0.76f to 0.795f, 0.81f to 0.885f, 0.19f to 0.885f), null)
+    painel(
+        forma(0.19f to 0.89f, 0.81f to 0.89f, 0.78f to 0.965f, 0.22f to 0.965f),
+        Abertura.PORTA_MALAS,
+    )
+
+    // As quatro portas: as faixas entre o flanco da carroceria e a lateral do
+    // teto, cada uma na posição real da peça.
+    painel(
+        forma(0.045f to 0.44f, 0.215f to 0.44f, 0.215f to 0.615f, 0.045f to 0.615f),
+        Abertura.PORTA_MOTORISTA,
+    )
+    painel(
+        forma(0.045f to 0.62f, 0.215f to 0.62f, 0.215f to 0.785f, 0.05f to 0.785f),
+        Abertura.PORTA_TRASEIRA_ESQ,
+    )
+    painel(
+        forma(0.785f to 0.44f, 0.955f to 0.44f, 0.955f to 0.615f, 0.785f to 0.615f),
+        Abertura.PORTA_PASSAGEIRO,
+    )
+    painel(
+        forma(0.785f to 0.62f, 0.955f to 0.62f, 0.95f to 0.785f, 0.785f to 0.785f),
+        Abertura.PORTA_TRASEIRA_DIR,
+    )
+
+    // Retrovisores: dois riscos para fora, na altura do para-brisa. Custam dois
+    // traços e são o detalhe que faz a silhueta ser lida como carro na hora.
+    fun retrovisor(deX: Float, paraX: Float) = drawLine(
+        color = Cores.Contorno,
+        start = ponto(deX, 0.395f),
+        end = ponto(paraX, 0.36f),
+        strokeWidth = traco * 1.2f,
         cap = androidx.compose.ui.graphics.StrokeCap.Round,
     )
-    barraHorizontal(size.height * 0.10f, Abertura.CAPO)
-    barraHorizontal(size.height * 0.90f, Abertura.PORTA_MALAS)
-
-    // As quatro portas: barras verticais nas laterais.
-    fun barraVertical(x: Float, centroY: Float, a: Abertura) = drawLine(
-        color = cor(a),
-        start = Offset(x, centroY - size.height * 0.10f),
-        end = Offset(x, centroY + size.height * 0.10f),
-        strokeWidth = traco * 1.6f,
-        cap = androidx.compose.ui.graphics.StrokeCap.Round,
-    )
-    barraVertical(traco / 2, size.height * 0.37f, Abertura.PORTA_MOTORISTA)
-    barraVertical(size.width - traco / 2, size.height * 0.37f, Abertura.PORTA_PASSAGEIRO)
-    barraVertical(traco / 2, size.height * 0.65f, Abertura.PORTA_TRASEIRA_ESQ)
-    barraVertical(size.width - traco / 2, size.height * 0.65f, Abertura.PORTA_TRASEIRA_DIR)
-
-    // O para-brisa dá a dianteira do carro. Sem ele o desenho é simétrico e não
-    // se sabe qual ponta é a frente — e aí "porta traseira" não quer dizer nada.
-    drawLine(
-        color = Cores.Contorno,
-        start = Offset(size.width * 0.20f, size.height * 0.24f),
-        end = Offset(size.width * 0.80f, size.height * 0.24f),
-        strokeWidth = traco * 0.7f,
-    )
+    retrovisor(0.05f, 0.005f)
+    retrovisor(0.95f, 0.995f)
 }
 
 @Composable

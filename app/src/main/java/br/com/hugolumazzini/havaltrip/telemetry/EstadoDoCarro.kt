@@ -20,11 +20,36 @@ class EstadoDoCarro(private val diario: DiarioDeCampo) {
 
     private val cache = ConcurrentHashMap<String, String>()
 
+    /**
+     * Chaves fixadas à mão pela bancada de testes, com o valor a manter.
+     *
+     * Sem isto, mandar uma porta aberta pelo `adb` não adiantaria: o simulador
+     * republica o estado do veículo a cada segundo e apagaria o valor antes de
+     * dar tempo de olhar a tela.
+     */
+    private val travadas = ConcurrentHashMap<String, String>()
+
     /** Guarda o valor cru e espelha no diário de campo. */
     fun registrar(chave: String, valor: String) {
+        if (travadas.containsKey(chave)) return
         cache[chave] = valor
         diario.registrar(chave, valor)
     }
+
+    /**
+     * Fixa um valor à mão e passa a ignorar o que a fonte disser dessa chave.
+     *
+     * Só a bancada de testes chama isto — é o que permite conferir na mesa o
+     * aviso de porta aberta e o de pneu vazio sem precisar do carro.
+     */
+    fun travar(chave: String, valor: String) {
+        travadas.remove(chave)
+        registrar(chave, valor)
+        travadas[chave] = valor
+    }
+
+    /** Devolve o controle das chaves à fonte de verdade. */
+    fun destravar() = travadas.clear()
 
     /**
      * O consumo instantâneo já decodificado, para quem precisa saber em que

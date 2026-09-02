@@ -11,6 +11,7 @@ import br.com.hugolumazzini.havaltrip.engine.TripState
 import br.com.hugolumazzini.havaltrip.services.TripComparison
 import br.com.hugolumazzini.havaltrip.services.TripComparisonResult
 import br.com.hugolumazzini.havaltrip.storage.FileTripStorage
+import br.com.hugolumazzini.havaltrip.telemetry.BancadaDeTestes
 import br.com.hugolumazzini.havaltrip.telemetry.DiarioDeCampo
 import br.com.hugolumazzini.havaltrip.telemetry.EstadoDoCarro
 import br.com.hugolumazzini.havaltrip.telemetry.HavalTelemetrySource
@@ -160,6 +161,14 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
         // por causa de uma parada que só existiu na memória do aplicativo.
         simulador.ignicao = manager.state.value.live.ignition
         escutar()
+    }
+
+    /** A entrada de valores à mão pelo `adb`. `null` fora do build de debug. */
+    private val desligarBancada = BancadaDeTestes.ligar(app, estadoDoCarro)
+
+    override fun onCleared() {
+        desligarBancada?.invoke()
+        super.onCleared()
     }
 
     private fun escutar() {

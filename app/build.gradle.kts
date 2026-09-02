@@ -39,6 +39,9 @@ android {
 
     buildFeatures {
         compose = true
+        // Para o código saber se está num build de debug: é o que mantém a
+        // bancada de testes fora do APK que vai para o carro.
+        buildConfig = true
         // As duas interfaces do serviço de veículo da GWM. Não são código
         // nosso: descrevem os comandos que a central já expõe, e existem aqui
         // porque o Android precisa gerar o intermediário para chamá-los.

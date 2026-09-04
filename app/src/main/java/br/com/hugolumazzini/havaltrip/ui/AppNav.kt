@@ -146,6 +146,10 @@ private fun BarraLateral(
                 ponto = null,
                 onClick = onHistorico,
             )
+
+            Spacer(Modifier.height(16.dp))
+            Text("SISTEMA", style = EstiloRotulo)
+            Spacer(Modifier.height(6.dp))
             ItemLateral(
                 titulo = "Diagnóstico",
                 apoio = if (ignicaoSimulada) "simulador ligado" else "dados crus do carro",
@@ -155,7 +159,7 @@ private fun BarraLateral(
             )
             ItemLateral(
                 titulo = "Configuração",
-                apoio = "contadores e zeragem",
+                apoio = "ajustes e versão",
                 selecionado = emConfiguracao,
                 ponto = null,
                 onClick = onConfiguracao,

@@ -3,6 +3,8 @@ package br.com.hugolumazzini.havaltrip
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import br.com.hugolumazzini.havaltrip.atualizacao.Atualizacao
+import br.com.hugolumazzini.havaltrip.atualizacao.VersaoPublicada
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo
 import br.com.hugolumazzini.havaltrip.domain.TripRecord
 import br.com.hugolumazzini.havaltrip.engine.TripState
@@ -47,6 +49,26 @@ sealed interface Envio {
     data object Enviando : Envio
     data class Pronto(val endereco: String) : Envio
     data class Falhou(val motivo: String, val arquivo: String) : Envio
+}
+
+/** Em que pé está a busca por uma versão nova do app. */
+sealed interface Atualizador {
+    data object Parado : Atualizador
+    data object Procurando : Atualizador
+
+    /** O catálogo respondeu e não há nada novo. */
+    data class EmDia(val versao: String) : Atualizador
+
+    /** Existe versão nova, esperando a decisão de baixar. */
+    data class Disponivel(val versao: VersaoPublicada) : Atualizador
+
+    /** [progresso] vai de 0 a 1, ou é `null` quando o servidor não diz o tamanho. */
+    data class Baixando(val versao: VersaoPublicada, val progresso: Float?) : Atualizador
+
+    /** Baixado e conferido: o instalador do sistema está com ele. */
+    data class Instalando(val versao: VersaoPublicada) : Atualizador
+
+    data class Falhou(val motivo: String) : Atualizador
 }
 
 /**
@@ -146,6 +168,52 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
     fun definirContadoresManuais(quantos: Int) = motor.definirContadoresManuais(quantos)
 
     fun definirZeragemAutomatica(segundos: Double?) = motor.definirZeragemAutomatica(segundos)
+
+    // ------------------------------------------------------------- atualização
+
+    /** Nome e código da versão instalada, para a tela de configuração. */
+    val versaoInstalada: Pair<String, Long> = Atualizacao.versaoInstalada(app)
+
+    private val _atualizador = MutableStateFlow<Atualizador>(Atualizador.Parado)
+    val atualizador: StateFlow<Atualizador> = _atualizador.asStateFlow()
+
+    /** Pergunta ao catálogo da loja se existe versão mais nova que a instalada. */
+    fun procurarAtualizacao() {
+        if (_atualizador.value is Atualizador.Procurando) return
+        _atualizador.value = Atualizador.Procurando
+        viewModelScope.launch {
+            _atualizador.value = runCatching { Atualizacao.consultar(getApplication()) }.fold(
+                onSuccess = { publicada ->
+                    if (publicada.versionCode > versaoInstalada.second) {
+                        Atualizador.Disponivel(publicada)
+                    } else {
+                        Atualizador.EmDia(versaoInstalada.first)
+                    }
+                },
+                onFailure = { Atualizador.Falhou(it.message ?: it::class.java.simpleName) },
+            )
+        }
+    }
+
+    /**
+     * Baixa a versão nova e entrega ao instalador do sistema.
+     *
+     * Dando certo, este processo morre no meio da instalação — por isso não há
+     * estado de "pronto": o próximo estado é o app já sendo o novo.
+     */
+    fun baixarEInstalar(versao: VersaoPublicada) {
+        if (_atualizador.value is Atualizador.Baixando) return
+        _atualizador.value = Atualizador.Baixando(versao, 0f)
+        viewModelScope.launch {
+            _atualizador.value = runCatching {
+                val apk = Atualizacao.baixar(getApplication(), versao) { fracao ->
+                    _atualizador.value = Atualizador.Baixando(versao, fracao.takeIf { it >= 0f })
+                }
+                Atualizacao.instalar(getApplication(), apk)
+                Atualizador.Instalando(versao)
+            }.getOrElse { Atualizador.Falhou(it.message ?: it::class.java.simpleName) }
+        }
+    }
 
     // ------------------------------------------------------------- diagnóstico
 

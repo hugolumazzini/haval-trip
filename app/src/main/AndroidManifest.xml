@@ -25,6 +25,13 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!--
+        Para o app se atualizar sozinho pela tela de configuração, sem passar
+        pela loja. Quem instala de fato é o sistema, e ele continua pedindo a
+        confirmação de sempre; isto só permite chamá-lo.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!--
         Sem isto, a partir do Android 11 o app não enxerga que o HavalShisuku
         existe, e diria "não instalado" numa central onde ele está rodando.
     -->
@@ -85,6 +92,21 @@
             android:exported="true"
             android:multiprocess="false"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <!--
+            Como o APK baixado chega ao instalador do Android quando a sessão
+            do PackageInstaller é recusada pela ROM da central: um arquivo do
+            nosso cache não pode ser lido por outro app sem esta ponte.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Só a pasta dos APKs baixados. O resto do app continua fora do alcance. -->
+    <cache-path name="apks" path="apks/" />
+</paths>

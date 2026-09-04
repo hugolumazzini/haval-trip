@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -30,6 +31,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import br.com.hugolumazzini.havaltrip.Atualizador
 import br.com.hugolumazzini.havaltrip.TripViewModel
 import br.com.hugolumazzini.havaltrip.engine.TripState
 import br.com.hugolumazzini.havaltrip.storage.TripSnapshot
@@ -105,8 +108,120 @@ fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
         Spacer(Modifier.height(14.dp))
 
         Cartao(Modifier.fillMaxWidth()) { ZeragemAutomatica(vm, estado) }
+
+        Spacer(Modifier.height(14.dp))
+
+        Cartao(Modifier.fillMaxWidth()) { SobreEAtualizacao(vm) }
     }
 }
+
+/**
+ * A versão instalada e o caminho para a próxima.
+ *
+ * A versão fica escrita mesmo sem ninguém procurar atualização: quando algo
+ * estranho acontece no carro, a primeira pergunta é sempre "qual versão é essa?",
+ * e ter de descobrir isso pelas configurações do Android, dirigindo, é ruim.
+ */
+@Composable
+private fun SobreEAtualizacao(vm: TripViewModel) {
+    val (nome, codigo) = vm.versaoInstalada
+    val situacao by vm.atualizador.collectAsStateWithLifecycle()
+
+    Column {
+        Text("Versão", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "$nome (código $codigo)",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Cores.TextoCorrido,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "A busca consulta o catálogo da Haval APK Store. Precisa de internet — " +
+                "no carro, o Wi‑Fi do celular resolve.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(12.dp))
+
+        when (val atual = situacao) {
+            is Atualizador.Procurando -> Text(
+                "Procurando…",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Cores.TextoApoio,
+            )
+
+            is Atualizador.EmDia -> {
+                Text(
+                    "Você já está na versão mais nova.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Cores.Confirmacao,
+                )
+                Spacer(Modifier.height(10.dp))
+                BotaoAcao("Procurar de novo", vm::procurarAtualizacao)
+            }
+
+            is Atualizador.Disponivel -> {
+                Text(
+                    "Versão ${atual.versao.versionName} disponível — " +
+                        "${megabytes(atual.versao.sizeBytes)}.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Cores.Destaque,
+                )
+                Spacer(Modifier.height(10.dp))
+                BotaoAcao(
+                    texto = "Baixar e instalar",
+                    onClick = { vm.baixarEInstalar(atual.versao) },
+                    cor = Cores.SuperficieSelecionada,
+                    corTexto = Cores.Destaque,
+                )
+            }
+
+            is Atualizador.Baixando -> {
+                Text(
+                    atual.progresso
+                        ?.let { "Baixando… ${(it * 100).toInt()}%" }
+                        ?: "Baixando…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Cores.TextoCorrido,
+                )
+                Spacer(Modifier.height(8.dp))
+                // Sem porcentagem quando o servidor não diz o tamanho: uma barra
+                // que anda sozinha sem saber para onde mentiria sobre o quanto falta.
+                atual.progresso?.let {
+                    LinearProgressIndicator(
+                        progress = { it },
+                        modifier = Modifier.widthIn(max = 700.dp).fillMaxWidth(),
+                        color = Cores.Destaque,
+                        trackColor = Cores.Campo,
+                    )
+                }
+            }
+
+            is Atualizador.Instalando -> Text(
+                "O instalador do Android assumiu daqui. Confirme na tela dele; " +
+                    "as viagens ficam guardadas.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Cores.TextoCorrido,
+            )
+
+            is Atualizador.Falhou -> {
+                Text(
+                    "Não deu certo: ${atual.motivo}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Cores.Atencao,
+                )
+                Spacer(Modifier.height(10.dp))
+                BotaoAcao("Tentar de novo", vm::procurarAtualizacao)
+            }
+
+            is Atualizador.Parado -> BotaoAcao("Buscar atualização", vm::procurarAtualizacao)
+        }
+    }
+}
+
+private fun megabytes(bytes: Long): String =
+    "%.1f MB".format(bytes / 1_048_576.0).replace('.', ',')
 
 /**
  * A barra do tempo de zeragem.

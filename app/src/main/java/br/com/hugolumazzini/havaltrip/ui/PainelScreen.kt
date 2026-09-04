@@ -58,9 +58,11 @@ fun PainelScreen(vm: TripViewModel, estado: TripState) {
                     // sem aviso, pareceria defeito. Em minutos redondos, não em
                     // mm:ss — "05:00" aqui se leria como relógio em contagem.
                     val apoio = textoDoStatus(trip.status) + (
-                        trip.autoResetAfterOffS
-                            ?.let { " • zera após ${(it / 60).toInt()} min desligado" }
-                            ?: ""
+                        trip.autoResetAfterOffS?.let {
+                            val minutos = (it / 60).toInt()
+                            if (minutos == 0) " • zera ao desligar"
+                            else " • zera após ${rotuloDoTempo(minutos)} desligado"
+                        } ?: ""
                         )
                     Text(
                         apoio,

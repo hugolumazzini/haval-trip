@@ -5,6 +5,26 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!--
+        Para começar a contar junto com o carro, sem ninguém abrir o app: é este
+        aviso que a central manda quando termina de iniciar.
+    -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!--
+        Um serviço em primeiro plano é o que impede o Android de matar a
+        contagem no meio da viagem quando precisa de memória. Exigido a partir
+        do Android 9; o tipo `dataSync`, a partir do 14.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!--
+        A notificação do serviço. Na central (Android 9) é concedida na
+        instalação; a declaração existe para centrais mais novas.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
         Sem isto, a partir do Android 11 o app não enxerga que o HavalShisuku
         existe, e diria "não instalado" numa central onde ele está rodando.
     -->
@@ -33,6 +53,25 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".ServicoDeBordo"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <receiver
+            android:name=".AoLigarOCarro"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!--
             É por este provider que o Shizuku entrega ao app a linha direta com

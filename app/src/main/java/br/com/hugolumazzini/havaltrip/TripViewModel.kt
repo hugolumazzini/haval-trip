@@ -3,32 +3,19 @@ package br.com.hugolumazzini.havaltrip
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import br.com.hugolumazzini.havaltrip.domain.IgnitionState
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo
 import br.com.hugolumazzini.havaltrip.domain.TripRecord
-import br.com.hugolumazzini.havaltrip.engine.TripManager
 import br.com.hugolumazzini.havaltrip.engine.TripState
 import br.com.hugolumazzini.havaltrip.services.TripComparison
 import br.com.hugolumazzini.havaltrip.services.TripComparisonResult
-import br.com.hugolumazzini.havaltrip.storage.FileTripStorage
-import br.com.hugolumazzini.havaltrip.telemetry.BancadaDeTestes
-import br.com.hugolumazzini.havaltrip.telemetry.DiarioDeCampo
-import br.com.hugolumazzini.havaltrip.telemetry.EstadoDoCarro
 import br.com.hugolumazzini.havaltrip.telemetry.HavalTelemetrySource
 import br.com.hugolumazzini.havaltrip.telemetry.Relatorio
 import br.com.hugolumazzini.havaltrip.telemetry.ShizukuTelemetrySource
-import br.com.hugolumazzini.havaltrip.telemetry.SimulatedTelemetrySource
-import br.com.hugolumazzini.havaltrip.telemetry.TelemetrySource
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.io.File
 
 /** Qual tela está em foco. Navegação simples: são quatro, e nenhuma aninha. */
 sealed interface Tela {
@@ -82,68 +69,19 @@ sealed interface ModoHistorico {
  */
 class TripViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val manager = TripManager(
-        storage = FileTripStorage(File(app.filesDir, "trip")),
-    )
-
-    /** Tudo que chegou cru do carro, para a tela de diagnóstico e o relatório. */
-    val diario = DiarioDeCampo()
-
-    /** `true` quando existe a ponte do HavalShisuku nesta central. */
-    val shisukuInstalado = HavalTelemetrySource.shisukuInstalado(app)
-
-    /** O último valor de cada chave, compartilhado por todas as fontes. */
-    private val estadoDoCarro = EstadoDoCarro(diario)
-
-    private val simulador = SimulatedTelemetrySource(
-        // O simulador continua de onde o snapshot parou. Um hodômetro que volta
-        // ao valor de fábrica a cada abertura do app deixaria a tela de
-        // detalhes dizendo que a Trip andou 3 km sem o hodômetro sair do lugar.
-        odometroKm = manager.state.value.live.odometerTotalKm.takeIf { it > 0.0 } ?: 48_213.4,
-        estado = estadoDoCarro,
-    )
-
-    private val carro = HavalTelemetrySource(context = app, estado = estadoDoCarro)
-
-    private val linhaDireta = ShizukuTelemetrySource(estado = estadoDoCarro)
-
     /**
-     * Portas, cintos e pneus, recalculados a cada valor que chega.
-     *
-     * Sai do diário e não do gerenciador de viagens porque não é conta: é o
-     * estado físico do carro, que a tela mostra e ninguém integra. O
-     * [distinctUntilChanged] é o que segura a recomposição — o carro publica
-     * dezenas de valores por segundo e quase nenhum deles mexe numa porta.
+     * Quem realmente conta. O ViewModel não guarda mais estado de viagem: ele
+     * nasce e morre com a tela, e a contagem não pode.
      */
-    val painelDoVeiculo: StateFlow<PainelDoVeiculo> = diario.atual
-        .map { estadoDoCarro.painelDoVeiculo() }
-        .distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, PainelDoVeiculo())
+    private val motor = MotorDeBordo.de(app)
 
-    /** Como está a linha direta, para a tela dizer o que falta fazer. */
-    val situacaoShizuku: StateFlow<ShizukuTelemetrySource.Situacao> = linhaDireta.situacao
-
-    // A preferida é a linha direta, e não por elegância: é a única em que a
-    // lista de chaves é nossa. Pela ponte do Shisuku, tanque, autonomia e
-    // consumo médio só chegam se alguém marcar caixinhas lá dentro.
-    private val _fonte = MutableStateFlow(
-        when {
-            ShizukuTelemetrySource.disponivel() -> Fonte.SHIZUKU
-            shisukuInstalado -> Fonte.SHISUKU
-            else -> Fonte.SIMULADOR
-        }
-    )
-
-    val fonte: StateFlow<Fonte> = _fonte.asStateFlow()
-
-    /** `true` quando os números vêm do carro, e não do simulador. */
-    val fonteReal: StateFlow<Boolean> = _fonte
-        .map { it != Fonte.SIMULADOR }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, _fonte.value != Fonte.SIMULADOR)
-
-    private var escuta: Job? = null
-
-    val state: StateFlow<TripState> = manager.state
+    val diario get() = motor.diario
+    val shisukuInstalado get() = motor.shisukuInstalado
+    val painelDoVeiculo: StateFlow<PainelDoVeiculo> get() = motor.painelDoVeiculo
+    val situacaoShizuku: StateFlow<ShizukuTelemetrySource.Situacao> get() = motor.situacaoShizuku
+    val fonte: StateFlow<Fonte> get() = motor.fonte
+    val fonteReal: StateFlow<Boolean> get() = motor.fonteReal
+    val state: StateFlow<TripState> get() = motor.state
 
     private val _envio = MutableStateFlow<Envio>(Envio.Parado)
     val envio: StateFlow<Envio> = _envio.asStateFlow()
@@ -154,97 +92,30 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
     private val _modoHistorico = MutableStateFlow<ModoHistorico>(ModoHistorico.Vendo())
     val modoHistorico: StateFlow<ModoHistorico> = _modoHistorico.asStateFlow()
 
-    init {
-        // A chave do carro não gira sozinha quando o app é recriado. Sem isto,
-        // o simulador voltaria a "desligado" e o módulo veria um corte de
-        // ignição que nunca houve — e, passados 5 min, zeraria a Viagem atual
-        // por causa de uma parada que só existiu na memória do aplicativo.
-        simulador.ignicao = manager.state.value.live.ignition
-        escutar()
-    }
-
-    /** A entrada de valores à mão pelo `adb`. `null` fora do build de debug. */
-    private val desligarBancada = BancadaDeTestes.ligar(app, estadoDoCarro) {
-        _fonte.value == Fonte.SIMULADOR
-    }
-
-    override fun onCleared() {
-        desligarBancada?.invoke()
-        super.onCleared()
-    }
-
-    private fun escutar() {
-        escuta?.cancel()
-        val fonte: TelemetrySource = when (_fonte.value) {
-            Fonte.SHIZUKU -> linhaDireta
-            Fonte.SHISUKU -> carro
-            Fonte.SIMULADOR -> simulador
-        }
-        escuta = viewModelScope.launch {
-            var anterior = manager.state.value.live.ignition
-            fonte.samples().collect { amostra ->
-                // Com a fonte real, a virada da chave chega dentro da amostra.
-                // O gerenciador precisa dela pelo caminho próprio: é o que
-                // arquiva a viagem e carimba o horário do desligamento.
-                if (amostra.ignition != anterior) {
-                    anterior = amostra.ignition
-                    manager.handleIgnitionChange(amostra.ignition)
-                }
-                manager.processTelemetry(amostra)
-            }
-        }
-    }
-
-    /**
-     * Troca entre o carro e o simulador.
-     *
-     * Existe porque a central pode ter o HavalShisuku instalado e mesmo assim
-     * não haver carro dizendo nada — numa bancada, ou com a ignição desligada.
-     * A escolha é manual de propósito: um fallback automático transformaria
-     * "o carro está parado" em números inventados, que é o pior erro possível
-     * num aparelho que serve para medir.
-     */
-    fun usarFonte(nova: Fonte) {
-        if (_fonte.value == nova) return
-        _fonte.value = nova
-        // Entrando no simulador, ele parte da ignição que está valendo. Sem
-        // isso o módulo veria um corte de chave que nunca houve.
-        if (nova == Fonte.SIMULADOR) simulador.ignicao = state.value.live.ignition
-        escutar()
-    }
+    fun usarFonte(nova: Fonte) = motor.usarFonte(nova)
 
     /** Passa para a próxima fonte. Um botão só, porque a barra é estreita. */
-    fun proximaFonte() {
-        val todas = Fonte.entries
-        usarFonte(todas[(todas.indexOf(_fonte.value) + 1) % todas.size])
-    }
-
-    // ------------------------------------------------------------- ignição
+    fun proximaFonte() = motor.proximaFonte()
 
     /** Só faz sentido no simulador; no carro quem gira a chave é a chave. */
-    fun alternarIgnicao() {
-        if (_fonte.value != Fonte.SIMULADOR) return
-        val novo = if (state.value.live.ignition == IgnitionState.ON) IgnitionState.OFF else IgnitionState.ON
-        simulador.ignicao = novo
-        manager.handleIgnitionChange(novo)
-    }
+    fun alternarIgnicao() = motor.alternarIgnicao()
 
     // ------------------------------------------------------------- Trips
 
-    fun selecionar(tripId: String) = manager.selectTrip(tripId)
+    fun selecionar(tripId: String) = motor.selecionar(tripId)
 
-    fun pausar(tripId: String) = manager.pauseTrip(tripId)
+    fun pausar(tripId: String) = motor.pausar(tripId)
 
-    fun retomar(tripId: String) = manager.resumeTrip(tripId)
+    fun retomar(tripId: String) = motor.retomar(tripId)
 
-    fun zerar(tripId: String) = manager.resetTrip(tripId)
+    fun zerar(tripId: String) = motor.zerar(tripId)
 
     fun arquivar(tripId: String) {
-        manager.saveToHistory(tripId)
+        motor.arquivar(tripId)
     }
 
     /** Grava antes de a central cortar energia. Chamado pelo `onStop` da tela. */
-    fun gravarAgora() = manager.flush()
+    fun gravarAgora() = motor.gravarAgora()
 
     // ------------------------------------------------------------- navegação
 
@@ -275,10 +146,7 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
      * Na linha direta isso também é o gatilho do pedido de autorização do
      * Shizuku, que é o que destrava a leitura na primeira vez.
      */
-    fun pedirTudoAoCarro() {
-        HavalTelemetrySource.pedirTudo(getApplication())
-        if (_fonte.value == Fonte.SHIZUKU) escutar()
-    }
+    fun pedirTudoAoCarro() = motor.pedirTudoAoCarro()
 
     /** Todo problema de dado se resolve lá, não aqui. */
     fun abrirShisuku() = HavalTelemetrySource.abrirShisuku(getApplication())
@@ -302,7 +170,7 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
             fun montar(maxEventos: Int) = Relatorio.montar(
                 diario = diario,
                 estado = state.value,
-                fonte = _fonte.value,
+                fonte = fonte.value,
                 shisuku = shisukuInstalado,
                 maxEventos = maxEventos,
             )
@@ -346,12 +214,12 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun renomearRegistro(recordId: String, label: String) {
-        manager.renameRecord(recordId, label)
+        motor.renomearRegistro(recordId, label)
     }
 
     /** Exclui e volta para a lista: o painel de detalhes ficaria órfão. */
     fun excluirRegistro(recordId: String) {
-        manager.deleteRecord(recordId)
+        motor.excluirRegistro(recordId)
         _modoHistorico.value = ModoHistorico.Vendo()
     }
 

@@ -185,7 +185,13 @@ class TripEngine(val config: EngineConfig = EngineConfig()) {
      */
     fun autonomyKm(fuelLevelL: Double, average: ConsumptionAverage): Double? {
         val kmPorLitro = average.kmPerLitre ?: return null
-        if (fuelLevelL <= 0.0) return 0.0
+        // Zero litro é quase sempre "a bóia não respondeu", e não "o tanque
+        // secou": o H6 publica `-1` em `remain_fuel_percentage` enquanto o
+        // sensor não tem valor, e isso vira zero litro na conversão. Anunciar
+        // "autonomia 0 km" nesse caso é o pior erro possível — assusta, e
+        // assusta errado. Um traço diz a verdade: não sabemos. E um tanque que
+        // seca de fato nunca chega a zero com o carro ainda andando.
+        if (fuelLevelL <= 0.0) return null
         return fuelLevelL * kmPorLitro
     }
 

@@ -62,11 +62,13 @@ fun AppNav(vm: TripViewModel) {
             ignicao = estado.live.ignition,
             emHistorico = tela is Tela.Historico,
             emDiagnostico = tela is Tela.Diagnostico,
+            emConfiguracao = tela is Tela.Configuracao,
             // No carro a chave é física: um botão que fingisse girá-la mentiria.
             ignicaoSimulada = !fonteReal,
             onTrip = { vm.selecionar(it); vm.voltarAoPainel() },
             onHistorico = vm::abrirHistorico,
             onDiagnostico = vm::abrirDiagnostico,
+            onConfiguracao = vm::abrirConfiguracao,
             onIgnicao = vm::alternarIgnicao,
         )
 
@@ -76,6 +78,7 @@ fun AppNav(vm: TripViewModel) {
                 is Tela.Detalhes -> DetalhesScreen(vm, estado, atual.tripId)
                 is Tela.Historico -> HistoricoScreen(vm, estado)
                 is Tela.Diagnostico -> DiagnosticoScreen(vm)
+                is Tela.Configuracao -> ConfiguracaoScreen(vm, estado)
             }
         }
     }
@@ -88,10 +91,12 @@ private fun BarraLateral(
     ignicao: IgnitionState,
     emHistorico: Boolean,
     emDiagnostico: Boolean,
+    emConfiguracao: Boolean,
     ignicaoSimulada: Boolean,
     onTrip: (String) -> Unit,
     onHistorico: () -> Unit,
     onDiagnostico: () -> Unit,
+    onConfiguracao: () -> Unit,
     onIgnicao: () -> Unit,
 ) {
     Column(
@@ -124,7 +129,8 @@ private fun BarraLateral(
                     } else {
                         textoDoStatus(trip.status)
                     },
-                    selecionado = !emHistorico && !emDiagnostico && trip.id == selecionada,
+                    selecionado = !emHistorico && !emDiagnostico && !emConfiguracao &&
+                        trip.id == selecionada,
                     ponto = { PontoStatus(trip.status) },
                     onClick = { onTrip(trip.id) },
                 )
@@ -146,6 +152,13 @@ private fun BarraLateral(
                 selecionado = emDiagnostico,
                 ponto = null,
                 onClick = onDiagnostico,
+            )
+            ItemLateral(
+                titulo = "Configuração",
+                apoio = "contadores e zeragem",
+                selecionado = emConfiguracao,
+                ponto = null,
+                onClick = onConfiguracao,
             )
             Spacer(Modifier.height(12.dp))
         }

@@ -154,6 +154,8 @@ class MotorDeBordo private constructor(private val app: Application) {
     fun gravarAgora() = manager.flush()
     fun renomearRegistro(recordId: String, label: String) = manager.renameRecord(recordId, label)
     fun excluirRegistro(recordId: String) = manager.deleteRecord(recordId)
+    fun definirContadoresManuais(quantos: Int) = manager.definirContadoresManuais(quantos)
+    fun definirZeragemAutomatica(segundos: Double?) = manager.definirZeragemAutomatica(segundos)
 
     /** Reemite tudo; na linha direta é também o gatilho da autorização do Shizuku. */
     fun pedirTudoAoCarro() {

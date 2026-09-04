@@ -437,6 +437,52 @@ class TripManagerTest {
         assertTrue(m.state.value.history.isEmpty())
     }
 
+    // ------------------------------------------------------------- ajustes
+
+    @Test
+    fun `reduzir os contadores esconde os ultimos e congela o que eles mediram`() {
+        val m = manager()
+        m.handleIgnitionChange(IgnitionState.ON)
+        m.dirigir(600, 60.0)
+        val dAntes = m.state.value.trip("D")!!.metrics.distanceKm
+        assertEquals(10.0, dAntes, 1e-6)
+
+        m.definirContadoresManuais(2)
+        // Some da lista: sobram a automática mais A e B.
+        assertEquals(3, m.state.value.trips.size)
+        assertNull(m.state.value.trip("D"))
+
+        // Escondido não conta: dirigir mais não pode mexer no que ele já tinha.
+        m.dirigir(600, 60.0)
+        m.definirContadoresManuais(4)
+        assertEquals(dAntes, m.state.value.trip("D")!!.metrics.distanceKm, 1e-9)
+        // E o que ficou à mostra andou os dois trechos.
+        assertEquals(20.0, m.state.value.trip("A")!!.metrics.distanceKm, 1e-6)
+    }
+
+    @Test
+    fun `esconder o contador em foco passa o foco para um visivel`() {
+        val m = manager()
+        m.selectTrip("D")
+        m.definirContadoresManuais(1)
+        assertNotNull(m.state.value.selectedTripId)
+        assertNotNull(m.state.value.trip(m.state.value.selectedTripId!!))
+    }
+
+    @Test
+    fun `a zeragem automatica da Viagem atual e configuravel`() {
+        val m = manager()
+        m.definirZeragemAutomatica(30.0)
+        m.handleIgnitionChange(IgnitionState.ON)
+        m.dirigir(600, 60.0)
+        assertEquals(10.0, m.state.value.trip(TripManager.ID_AUTOMATICA)!!.metrics.distanceKm, 1e-6)
+
+        m.handleIgnitionChange(IgnitionState.OFF)
+        agora += 31_000
+        m.handleIgnitionChange(IgnitionState.ON)
+        assertEquals(0.0, m.state.value.trip(TripManager.ID_AUTOMATICA)!!.metrics.distanceKm, 1e-9)
+    }
+
     // ------------------------------------------------------------- hodômetro
 
     @Test

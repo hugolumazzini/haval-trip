@@ -17,12 +17,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
-/** Qual tela está em foco. Navegação simples: são quatro, e nenhuma aninha. */
+/** Qual tela está em foco. Navegação simples: são cinco, e nenhuma aninha. */
 sealed interface Tela {
     data object Painel : Tela
     data class Detalhes(val tripId: String) : Tela
     data object Historico : Tela
     data object Diagnostico : Tela
+    data object Configuracao : Tela
 }
 
 /**
@@ -137,6 +138,14 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
         _envio.value = Envio.Parado
         _tela.value = Tela.Diagnostico
     }
+
+    fun abrirConfiguracao() { _tela.value = Tela.Configuracao }
+
+    // ------------------------------------------------------------- ajustes
+
+    fun definirContadoresManuais(quantos: Int) = motor.definirContadoresManuais(quantos)
+
+    fun definirZeragemAutomatica(segundos: Double?) = motor.definirZeragemAutomatica(segundos)
 
     // ------------------------------------------------------------- diagnóstico
 

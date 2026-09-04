@@ -161,7 +161,10 @@ class TripEngineTest {
         repeat(30) { media = media.update(deltaKm = 1.0, deltaLitres = 0.1, windowKm = 25.0) }
         assertEquals(10.0, media.kmPerLitre!!, 1e-6)
         assertEquals(400.0, engine.autonomyKm(40.0, media)!!, 1e-4)
-        assertEquals(0.0, engine.autonomyKm(0.0, media)!!, 1e-9)
+        // Sem litro conhecido não há autonomia a dar. Zero litro aqui não é
+        // tanque seco: é o `-1` que o H6 publica quando a bóia não respondeu,
+        // já convertido. "0 km" seria um susto falso na cara de quem dirige.
+        assertNull(engine.autonomyKm(0.0, media))
         assertNull(engine.autonomyKm(40.0, ConsumptionAverage()))
     }
 

@@ -15,6 +15,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Se a central não avisou a inicialização — ou se o app foi instalado
+        // com o carro já ligado —, abrir a tela é o segundo gatilho: daqui em
+        // diante a contagem continua mesmo depois de fechá-la.
+        ServicoDeBordo.garantir(this)
         setContent {
             HavalTripTheme {
                 AppNav(vm)

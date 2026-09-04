@@ -1,5 +1,6 @@
 package br.com.hugolumazzini.havaltrip.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +25,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -32,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import br.com.hugolumazzini.havaltrip.R
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo.Abertura
+import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo.Assento
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo.Roda
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo.Vidro
 import br.com.hugolumazzini.havaltrip.format.TripFormat
@@ -179,6 +184,75 @@ private fun ValorDePneu(
 }
 
 /**
+ * Onde fica cada assento dentro do quadro de 794 × 720, em fração de 0 a 1.
+ *
+ * Medido no `carro_h6.png`: o teto solar panorâmico do H6 é de vidro, e por ele
+ * os quatro bancos aparecem na vista de cima. O do meio atrás não aparece — é
+ * banco corrido —, então fica entre os dois de fora, que é onde a pessoa senta.
+ *
+ * Números à mão são o preço de não haver camada pronta para cinto em nenhum dos
+ * dois conjuntos de imagem. Se um dia vier uma, isto sai inteiro: uma peça que
+ * acende nunca sai do lugar, uma coordenada decorada sai.
+ */
+private val ASSENTO = mapOf(
+    Assento.MOTORISTA to Pair(0.476f, 0.521f),
+    Assento.PASSAGEIRO to Pair(0.529f, 0.521f),
+    Assento.TRASEIRO_ESQ to Pair(0.472f, 0.642f),
+    Assento.TRASEIRO_CENTRO to Pair(0.502f, 0.642f),
+    Assento.TRASEIRO_DIR to Pair(0.533f, 0.642f),
+)
+
+/** O tamanho da marca do cinto, em fração do quadro. Cabe dentro de um banco. */
+private const val MARCA_LARGURA = 0.030f
+private const val MARCA_ALTURA = 0.060f
+
+/**
+ * Acende o assento de quem está sem cinto, em cima do desenho do carro.
+ *
+ * Era a única coisa que continuava só em texto, e texto numa faixa estreita não
+ * responde à pergunta que se faz de verdade — *quem* está sem cinto. Com o carro
+ * ali do lado, apontar o banco responde sem ler nada.
+ *
+ * Só o banco em falta acende. Marcar os cinco de verde quando está tudo certo
+ * encheria o desenho de cor no estado normal, e aí a cor pararia de significar
+ * "olhe aqui".
+ *
+ * Vale um aviso sobre o dado: o carro publica `seat_belt_warning`, que é o
+ * *alerta*, não a fivela. Banco vazio e banco com cinto afivelado chegam iguais,
+ * em zero. Isto acende quando o carro reclama — nem antes, nem no lugar dele.
+ */
+@Composable
+private fun Cintos(semCinto: List<Assento>, modifier: Modifier = Modifier) {
+    if (semCinto.isEmpty()) return
+    Canvas(modifier) {
+        // Refaz à mão a conta que o `ContentScale.Crop` faz nas imagens: a
+        // altura manda, e a sobra de largura sai centrada para fora. Sem repetir
+        // isso, a marca ficaria no lugar certo do *quadro* e no lugar errado da
+        // *tela* — deslocada exatamente pelo tanto que o recorte come.
+        val escala = size.height / 720f
+        val larguraDesenhada = 794f * escala
+        val esquerda = (size.width - larguraDesenhada) / 2f
+        val l = MARCA_LARGURA * larguraDesenhada
+        val a = MARCA_ALTURA * size.height
+
+        semCinto.forEach { assento ->
+            val (fx, fy) = ASSENTO[assento] ?: return@forEach
+            val centroX = esquerda + fx * larguraDesenhada
+            val centroY = fy * size.height
+            drawRoundRect(
+                color = Cores.Atencao,
+                topLeft = Offset(centroX - l / 2f, centroY - a / 2f),
+                size = Size(l, a),
+                cornerRadius = CornerRadius(l * 0.35f),
+                // Translúcido: por baixo está o banco desenhado, e apagá-lo
+                // deixaria uma pastilha vermelha flutuando sem dizer onde é.
+                alpha = 0.75f,
+            )
+        }
+    }
+}
+
+/**
  * Quanto da faixa as pressões ocupam. Menos que 1 aproxima os números do carro;
  * o limite é a porta aberta, que sai da silhueta e não pode ficar por baixo do
  * texto.
@@ -288,8 +362,6 @@ private fun CarroEmCamadas(painel: PainelDoVeiculo, modifier: Modifier = Modifie
         // uma porta aberta desenhada por baixo dele ficaria cortada.
         if (painel.tetoSolarAberto == true) camada(R.drawable.carro_teto_solar_aberto)
 
-        painel.vidrosAbertos.forEach { vidro -> CAMADA_DO_VIDRO[vidro]?.let { camada(it) } }
-
         // As quatro portas, sempre — a fechada ou a aberta, nunca nenhuma.
         // Percorrer o mapa, e não a lista de abertas, é o que garante isso: a
         // lista de abertas não sabe da existência das que estão fechadas, e foi
@@ -300,9 +372,19 @@ private fun CarroEmCamadas(painel: PainelDoVeiculo, modifier: Modifier = Modifie
             camada(if (porta in abertas) aberta else fechada)
         }
 
-        // O porta-malas por último e só quando aberto: a tampa fechada já vem
-        // desenhada na base, ao contrário das portas.
+        // O porta-malas só quando aberto: a tampa fechada já vem desenhada na
+        // base, ao contrário das portas.
         if (Abertura.PORTA_MALAS in abertas) camada(R.drawable.carro_porta_malas)
+
+        // Os vidros **depois** das portas, e é isso que os faz aparecer. A faixa
+        // vermelha do vidro aberto corre pela borda da porta; desenhada antes,
+        // ficava debaixo da camada da porta fechada, que é opaca ali. Vidro
+        // aberto e porta fechada é justamente a combinação mais comum das duas.
+        painel.vidrosAbertos.forEach { vidro -> CAMADA_DO_VIDRO[vidro]?.let { camada(it) } }
+
+        // E os cintos por cima de tudo: são os únicos que ficam dentro do carro,
+        // e nenhuma peça pode passar na frente deles.
+        Cintos(painel.semCinto, Modifier.fillMaxSize())
     }
 }
 
@@ -314,8 +396,9 @@ private fun CarroEmCamadas(painel: PainelDoVeiculo, modifier: Modifier = Modifie
  * cada um como linha de texto enchia a faixa de quatro linhas iguais dizendo o
  * que o desenho já dizia.
  *
- * Cinto continua em texto porque assento não tem como ser desenhado nesta
- * escala sem virar mancha — e porque é o único aviso que fala de gente.
+ * O cinto também saiu do texto: o banco de quem está sem ele acende no desenho.
+ * Uma linha escrita "Cinto traseiro esq." obriga a traduzir a frase em lugar; o
+ * banco aceso já é o lugar.
  */
 @Composable
 private fun Avisos(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
@@ -329,8 +412,7 @@ private fun Avisos(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
             painel.tudoCerto -> Linha("Tudo certo", Cores.Confirmacao)
 
             else -> {
-                painel.semCinto.forEach { Linha(it.rotulo, Cores.Atencao) }
-                // O pneu também: o número já está em âmbar logo acima, mas
+                // O pneu: o número já está em âmbar logo acima, mas
                 // sozinho ele só diz que está baixo comparado a quê. A linha
                 // nomeia a roda, que é o que decide de que lado do carro
                 // agachar no posto.
@@ -341,15 +423,16 @@ private fun Avisos(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
                 if (Abertura.CAPO in painel.abertas) {
                     Linha(Abertura.CAPO.rotulo, Cores.Atencao)
                 }
-                // Sem cinto solto, ainda assim há algo aberto: o desenho está
-                // mostrando qual. Uma palavra basta para o olho ir até lá.
+                // Há algo aberto ou alguém sem cinto: o desenho está mostrando
+                // qual e quem. Uma palavra basta para o olho ir até lá.
                 //
                 // O capô não conta: ele já ganhou a própria linha acima, e
                 // mandar olhar um desenho que não mudou seria mandar procurar
                 // o que não está lá.
                 val noDesenho = painel.abertas.any { it != Abertura.CAPO } ||
-                    painel.vidrosAbertos.isNotEmpty() || painel.tetoSolarAberto == true
-                if (painel.semCinto.isEmpty() && noDesenho) {
+                    painel.vidrosAbertos.isNotEmpty() || painel.tetoSolarAberto == true ||
+                    painel.semCinto.isNotEmpty()
+                if (noDesenho) {
                     Linha("Veja o carro ao lado", Cores.Atencao, Cores.TextoApoio)
                 }
             }

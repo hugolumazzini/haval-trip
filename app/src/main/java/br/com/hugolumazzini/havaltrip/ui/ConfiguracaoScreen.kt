@@ -137,7 +137,7 @@ private fun SobreEAtualizacao(vm: TripViewModel) {
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            "A busca consulta o catálogo da Haval APK Store. Precisa de internet — " +
+            "A verificação consulta o catálogo da Haval APK Store. Precisa de internet — " +
                 "no carro, o Wi‑Fi do celular resolve.",
             style = MaterialTheme.typography.bodySmall,
             color = Cores.TextoApoio,
@@ -158,7 +158,7 @@ private fun SobreEAtualizacao(vm: TripViewModel) {
                     color = Cores.Confirmacao,
                 )
                 Spacer(Modifier.height(10.dp))
-                BotaoAcao("Procurar de novo", vm::procurarAtualizacao)
+                BotaoAcao("Verificar atualização", vm::procurarAtualizacao)
             }
 
             is Atualizador.Disponivel -> {
@@ -215,7 +215,7 @@ private fun SobreEAtualizacao(vm: TripViewModel) {
                 BotaoAcao("Tentar de novo", vm::procurarAtualizacao)
             }
 
-            is Atualizador.Parado -> BotaoAcao("Buscar atualização", vm::procurarAtualizacao)
+            is Atualizador.Parado -> BotaoAcao("Verificar atualização", vm::procurarAtualizacao)
         }
     }
 }

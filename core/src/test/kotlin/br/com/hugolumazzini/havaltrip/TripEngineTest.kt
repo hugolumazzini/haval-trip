@@ -169,6 +169,17 @@ class TripEngineTest {
     }
 
     @Test
+    fun `a autonomia do carro ganha da nossa estimativa`() {
+        var media = ConsumptionAverage()
+        repeat(30) { media = media.update(deltaKm = 1.0, deltaLitres = 0.1, windowKm = 25.0) }
+        // Nossa conta daria 400 km; o carro disse 512 e é ele quem tem a bóia.
+        val doCarro = amostra(60.0).copy(autonomyKmFromCar = 512.0)
+        assertEquals(512.0, engine.liveState(doCarro, media).autonomyDteKm!!, 1e-9)
+        // Calado o carro, a estimativa volta a valer.
+        assertEquals(400.0, engine.liveState(amostra(60.0), media).autonomyDteKm!!, 1e-4)
+    }
+
+    @Test
     fun `a janela nao pula com um instante atipico`() {
         var media = ConsumptionAverage()
         repeat(30) { media = media.update(1.0, 0.1, 25.0) }

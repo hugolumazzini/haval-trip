@@ -95,7 +95,29 @@ class EstadoDoCarro(private val diario: DiarioDeCampo) {
             odometerTotalKm = numero(HavalTelemetrySource.CHAVE_HODOMETRO) ?: 0.0,
             fuelLevelL = Unidades.litrosNoTanque(percentual),
             ignition = ignicao(),
+            autonomyKmFromCar = autonomiaDoCarro(),
         )
+    }
+
+    /**
+     * A autonomia que o próprio carro calcula, em km, ou `null` se ele não diz.
+     *
+     * No H6 híbrido ela vem partida em duas — o que ainda dá de gasolina e o que
+     * ainda dá de bateria —, e o que o motorista quer saber é até onde o carro
+     * vai, não com qual motor. Por isso as duas se somam. A `car.basic.
+     * remain_odometer` fica como reserva porque num híbrido ela chega zerada,
+     * mas é o que existiria num carro só a combustão.
+     *
+     * Zero é tratado como "não respondeu", e não como "acabou": um tanque que
+     * seca de fato não chega a zero com o carro ainda andando, e anunciar
+     * autonomia zero no painel assusta — e assusta errado.
+     */
+    private fun autonomiaDoCarro(): Double? {
+        val combustivel = numero(HavalTelemetrySource.CHAVE_AUTONOMIA_COMBUSTIVEL)
+        val eletrica = numero(HavalTelemetrySource.CHAVE_AUTONOMIA_ELETRICA)
+        val hibrida = listOfNotNull(combustivel, eletrica).filter { it > 0.0 }
+        if (hibrida.isNotEmpty()) return hibrida.sum()
+        return numero(HavalTelemetrySource.CHAVE_AUTONOMIA_DO_CARRO)?.takeIf { it > 0.0 }
     }
 
     /**

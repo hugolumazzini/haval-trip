@@ -30,11 +30,28 @@ data class TripSnapshot(
      * se a Trip automática deve começar viagem nova.
      */
     val ignitionOffSinceMs: Long? = null,
+    /**
+     * Quantos contadores manuais o motorista quer ver, de 1 a 4.
+     *
+     * Os que sobram continuam gravados com tudo o que mediram: esconder um
+     * contador não pode apagar a viagem que ele estava contando, porque quem
+     * reduz de quatro para dois às vezes só quer a tela mais limpa hoje.
+     */
+    val contadoresManuais: Int = MAX_CONTADORES_MANUAIS,
     val savedAtMs: Long = 0L,
 ) {
     companion object {
         /** 2: saiu o preço do combustível, entrou [ignitionOffSinceMs]. */
         const val SCHEMA_VERSION = 2
+
+        /**
+         * O teto de contadores manuais: A, B, C e D.
+         *
+         * Quatro porque é quanto cabe na coluna da esquerda sem rolagem na tela
+         * da central, e porque acima disso ninguém lembra para que serve cada
+         * um.
+         */
+        const val MAX_CONTADORES_MANUAIS = 4
     }
 }
 

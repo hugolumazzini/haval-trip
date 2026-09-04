@@ -24,6 +24,13 @@ data class TripState(
     val history: List<TripRecord> = emptyList(),
     val live: VehicleLive = VehicleLive(),
     val selectedTripId: String? = null,
+    /** Quantos contadores manuais estão à mostra — o que a tela de ajustes edita. */
+    val contadoresManuais: Int = TripSnapshot.MAX_CONTADORES_MANUAIS,
+    /**
+     * Segundos de chave fora até a Viagem atual zerar sozinha, ou `null` se a
+     * zeragem automática estiver desligada.
+     */
+    val zeragemAutomaticaS: Double? = null,
 ) {
     val selectedTrip: Trip? get() = trips.firstOrNull { it.id == selectedTripId } ?: trips.firstOrNull()
     fun trip(id: String): Trip? = trips.firstOrNull { it.id == id }
@@ -96,6 +103,12 @@ class TripManager(
     private var live = VehicleLive()
     private var selectedTripId: String? = null
 
+    /**
+     * Quantos contadores manuais estão à mostra. Os escondidos continuam na
+     * lista e no arquivo, apenas fora da tela e fora da conta.
+     */
+    private var contadoresManuais: Int = TripSnapshot.MAX_CONTADORES_MANUAIS
+
     init {
         val salvo = storage.load()
         if (salvo != null) {
@@ -141,7 +154,19 @@ class TripManager(
             odometerLastKm = odometroConhecido(),
         )
         val indice = trips.indexOfFirst { it.id == tripId }
-        if (indice >= 0) trips[indice] = nova else trips.add(nova)
+        if (indice >= 0) {
+            trips[indice] = nova
+        } else {
+            trips.add(nova)
+            // Quem cria um contador quer vê-lo. Se o limite escolhido nas
+            // configurações deixaria o recém-nascido fora da lista, o limite
+            // cede — esconder na hora exata em que se pediu para mostrar seria
+            // indistinguível de o comando ter falhado.
+            if (tripId != ID_AUTOMATICA) {
+                val manuais = trips.count { it.id != ID_AUTOMATICA }
+                if (manuais > contadoresManuais) contadoresManuais = manuais
+            }
+        }
         salvarAgora(agora)
         publicar()
     }
@@ -253,6 +278,48 @@ class TripManager(
 
     // ---------------------------------------------------------------- seleção
 
+    // ---------------------------------------------------------------- ajustes
+
+    /**
+     * Quantos contadores manuais mostrar, de 1 a 4 — fora a Viagem atual.
+     *
+     * Esconder não apaga: o contador some da tela e para de receber amostras,
+     * mas continua no arquivo com tudo o que já mediu. Voltar a mostrá-lo o traz
+     * de volta com os mesmos números, e aí é o motorista quem decide zerar.
+     */
+    fun definirContadoresManuais(quantos: Int) {
+        val novo = quantos.coerceIn(1, TripSnapshot.MAX_CONTADORES_MANUAIS)
+        if (novo == contadoresManuais) return
+        contadoresManuais = novo
+        // O foco pode ter acabado de sair da tela junto com o contador que o
+        // tinha. Sem isto o painel ficaria em branco apontando para um
+        // contador que ninguém mais enxerga.
+        if (visiveis().none { it.id == selectedTripId }) {
+            selectedTripId = visiveis().firstOrNull()?.id
+        }
+        salvarAgora(clock())
+        publicar()
+    }
+
+    /** Quantos contadores manuais estão à mostra agora. */
+    fun contadoresManuais(): Int = contadoresManuais
+
+    /**
+     * Depois de quantos segundos de chave fora a Viagem atual fecha e recomeça.
+     *
+     * `null` desliga a zeragem automática: a Viagem atual passa a se comportar
+     * como as outras e só zera quando alguém mandar.
+     */
+    fun definirZeragemAutomatica(segundos: Double?) {
+        val indice = trips.indexOfFirst { it.id == ID_AUTOMATICA }
+        if (indice < 0) return
+        trips[indice] = trips[indice].copy(autoResetAfterOffS = segundos)
+        salvarAgora(clock())
+        publicar()
+    }
+
+    // ---------------------------------------------------------------- foco
+
     /** Troca a Trip em foco no painel. Não afeta contagem nenhuma. */
     fun selectTrip(tripId: String) {
         if (trips.any { it.id == tripId }) {
@@ -285,8 +352,13 @@ class TripManager(
         odometerKnown = true
 
         if (ignition == IgnitionState.ON) {
+            // Contador escondido não recebe amostra: ele congela onde parou.
+            // Zerá-lo ao esconder perderia dado, e deixá-lo contando às escuras
+            // seria pior ainda — reapareceria meses depois com uma quilometragem
+            // que ninguém pediu para medir.
+            val aMostra = visiveis().map { it.id }.toSet()
             trips = trips.map { trip ->
-                if (!trip.isAccumulating) trip
+                if (!trip.isAccumulating || trip.id !in aMostra) trip
                 else trip.copy(
                     metrics = engine.accumulate(trip.metrics, sample, deltaS),
                     // Trip iniciada antes da primeira amostra fixa aqui a
@@ -458,6 +530,7 @@ class TripManager(
         odometerTotalKm = odometerTotalKm,
         lastSampleMs = lastSampleMs,
         ignitionOffSinceMs = ignitionOffSinceMs,
+        contadoresManuais = contadoresManuais,
         savedAtMs = atMs,
     )
 
@@ -479,6 +552,10 @@ class TripManager(
         odometerTotalKm = salvo.odometerTotalKm
         odometerKnown = salvo.odometerTotalKm > 0.0
         ignitionOffSinceMs = salvo.ignitionOffSinceMs
+        // O teto é o padrão de fábrica, mas nunca menor que o que já existe:
+        // um contador criado além dos quatro sumiria ao religar o carro.
+        val teto = maxOf(TripSnapshot.MAX_CONTADORES_MANUAIS, trips.count { it.id != ID_AUTOMATICA })
+        contadoresManuais = salvo.contadoresManuais.coerceIn(1, teto)
         // Se a chave saiu direito, o instante já está gravado e não há hiato a
         // investigar. O caso interessante é o contrário: o app foi desligado no
         // tapa, ainda achando que o carro estava ligado.
@@ -507,12 +584,28 @@ class TripManager(
      */
     private fun distanciaAcumulada() = odometerTotalKm
 
+    /**
+     * Os contadores que a tela vê: a Trip automática e os manuais escolhidos.
+     *
+     * A automática nunca entra na conta — ela é o contador que existe sem
+     * ninguém pedir, e desligá-la deixaria o app sem o número que ele existe
+     * para dar. Os manuais são cortados do fim: reduzir para dois deixa A e B.
+     */
+    private fun visiveis(): List<Trip> {
+        var manuais = 0
+        return trips.filter { trip ->
+            if (trip.id == ID_AUTOMATICA) true else ++manuais <= contadoresManuais
+        }
+    }
+
     private fun publicar() {
         _state.value = TripState(
-            trips = trips.toList(),
+            trips = visiveis(),
             history = history.toList(),
             live = live,
             selectedTripId = selectedTripId,
+            contadoresManuais = contadoresManuais,
+            zeragemAutomaticaS = trips.firstOrNull { it.id == ID_AUTOMATICA }?.autoResetAfterOffS,
         )
     }
 
@@ -538,6 +631,9 @@ class TripManager(
          */
         const val HIATO_TOLERANCIA_KM = 1.0
 
+        /** O identificador da Viagem atual, a que zera sozinha. */
+        const val ID_AUTOMATICA = "AUTO"
+
         /** Os contadores que o painel mostra por padrão. */
         val DEFAULT_TRIPS = listOf(
             // Todos nascem em espera, nenhum inativo: um contador de viagem
@@ -545,7 +641,7 @@ class TripManager(
             // esquecer de ligar, e aí a viagem já passou. STANDBY vira ACTIVE
             // sozinho na primeira vez que o carro liga.
             Trip(
-                id = "AUTO",
+                id = ID_AUTOMATICA,
                 label = "Viagem atual",
                 status = TripStatus.STANDBY,
                 autoResetAfterOffS = AUTO_RESET_PADRAO_S,

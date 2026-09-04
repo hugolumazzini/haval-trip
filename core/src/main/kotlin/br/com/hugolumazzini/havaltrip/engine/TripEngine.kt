@@ -202,7 +202,13 @@ class TripEngine(val config: EngineConfig = EngineConfig()) {
         fuelLevelL = sample.fuelLevelL,
         ignition = sample.ignition,
         instantFuelConsumptionKml = instantConsumptionKml(sample),
-        autonomyDteKm = autonomyKm(sample.fuelLevelL, average),
+        // A do carro ganha sempre que existir. Ele lê o tanque com uma bóia
+        // calibrada de fábrica e sabe o que a metade elétrica ainda tem para
+        // dar; a nossa é uma estimativa feita de fora, boa o bastante para
+        // quando o carro se cala e pior que a dele em todo o resto. Duas
+        // autonomias diferentes na mesma viagem — a do painel dele e a nossa —
+        // também seria motivo justo para desconfiar das duas.
+        autonomyDteKm = sample.autonomyKmFromCar ?: autonomyKm(sample.fuelLevelL, average),
         lastSampleMs = sample.timestampMs,
     )
 

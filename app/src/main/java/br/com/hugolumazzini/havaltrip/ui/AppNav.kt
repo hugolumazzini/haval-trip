@@ -101,7 +101,7 @@ private fun BarraLateral(
 ) {
     Column(
         Modifier
-            .width(200.dp)
+            .width(240.dp)
             .fillMaxHeight()
             .background(Cores.Lateral)
             .padding(horizontal = 14.dp, vertical = 14.dp)

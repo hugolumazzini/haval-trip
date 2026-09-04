@@ -45,6 +45,9 @@ enum class IgnitionState { ON, OFF }
  *   nunca é escrito por este módulo — ver [Trip.odometerStartKm].
  * @param fuelLevelL combustível restante no tanque, em litros.
  * @param ignition estado da ignição no instante da leitura.
+ * @param autonomyKmFromCar a autonomia que o próprio carro calcula, em km, ou
+ *   `null` quando ele não publica nenhuma. Ver [Trip] e o motor de cálculo:
+ *   quando ela existe, é ela que vai para a tela.
  */
 @Serializable
 data class TelemetrySample(
@@ -54,6 +57,7 @@ data class TelemetrySample(
     val odometerTotalKm: Double,
     val fuelLevelL: Double,
     val ignition: IgnitionState,
+    val autonomyKmFromCar: Double? = null,
 )
 
 /**

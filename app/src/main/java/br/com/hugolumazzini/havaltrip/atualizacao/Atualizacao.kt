@@ -1,8 +1,10 @@
 package br.com.hugolumazzini.havaltrip.atualizacao
 
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
@@ -44,6 +46,8 @@ data class VersaoPublicada(
  * está na rede, não sua.
  */
 object Atualizacao {
+
+    private const val ACAO_INSTALACAO = "br.com.hugolumazzini.havaltrip.INSTALACAO"
 
     private const val CATALOGO =
         "https://raw.githubusercontent.com/hugolumazzini/haval-apk-store/main/catalog.json"
@@ -153,14 +157,12 @@ object Atualizacao {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) setSize(apk.length())
         }
         val id = instalador.createSession(parametros)
+        ouvirOInstalador(context, apk)
         instalador.openSession(id).use { sessao ->
             sessao.openWrite("base.apk", 0, apk.length()).use { saida ->
                 apk.inputStream().use { entrada -> entrada.copyTo(saida, 64 * 1024) }
                 sessao.fsync(saida)
             }
-            // O aviso do sistema vai para a Activity que já está na frente; não
-            // há resultado a tratar aqui porque, dando certo, este processo
-            // morre junto com a versão antiga.
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
             } else {
@@ -169,10 +171,57 @@ object Atualizacao {
             val aviso = PendingIntent.getBroadcast(
                 context,
                 id,
-                Intent("br.com.hugolumazzini.havaltrip.INSTALACAO"),
+                Intent(ACAO_INSTALACAO).setPackage(context.packageName),
                 flags,
             )
             sessao.commit(aviso.intentSender)
+        }
+    }
+
+    /**
+     * Escuta o que o sistema responde à sessão e leva o pedido de confirmação à tela.
+     *
+     * Sem isto, `commit()` volta sem erro nenhum e não acontece mais nada: o
+     * Android manda um aviso de "preciso que a pessoa confirme" para o nosso
+     * `PendingIntent`, e se ninguém abrir a tela que vem dentro dele a
+     * instalação fica parada para sempre, calada. Foi exatamente o que
+     * aconteceu na primeira tentativa no emulador.
+     *
+     * Se o sistema recusar a sessão, aqui é o único lugar que fica sabendo —
+     * `commit()` já voltou —, então a queda para o diálogo clássico também
+     * mora aqui.
+     */
+    private fun ouvirOInstalador(context: Context, apk: File) {
+        val app = context.applicationContext
+        val ouvinte = object : BroadcastReceiver() {
+            override fun onReceive(quem: Context, intent: Intent) {
+                when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, -1)) {
+                    PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                        val tela: Intent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            intent.getParcelableExtra(Intent.EXTRA_INTENT)
+                        }
+                        tela?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        tela?.let { app.startActivity(it) }
+                    }
+                    // Sucesso mata este processo junto com a versão antiga;
+                    // qualquer outro desfecho ainda tem o diálogo clássico.
+                    PackageInstaller.STATUS_SUCCESS -> runCatching { app.unregisterReceiver(this) }
+                    else -> {
+                        runCatching { app.unregisterReceiver(this) }
+                        runCatching { porDialogo(app, apk) }
+                    }
+                }
+            }
+        }
+        val filtro = IntentFilter(ACAO_INSTALACAO)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            app.registerReceiver(ouvinte, filtro, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            app.registerReceiver(ouvinte, filtro)
         }
     }
 

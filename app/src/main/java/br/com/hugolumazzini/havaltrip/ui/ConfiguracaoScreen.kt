@@ -36,6 +36,9 @@ import br.com.hugolumazzini.havaltrip.Atualizador
 import br.com.hugolumazzini.havaltrip.Cluster
 import br.com.hugolumazzini.havaltrip.CorDoCluster
 import br.com.hugolumazzini.havaltrip.ItemDoCluster
+import br.com.hugolumazzini.havaltrip.LugarNoPainel
+import br.com.hugolumazzini.havaltrip.TamanhoDoCarro
+import br.com.hugolumazzini.havaltrip.TamanhoNoPainel
 import br.com.hugolumazzini.havaltrip.TripViewModel
 import br.com.hugolumazzini.havaltrip.engine.TripState
 import br.com.hugolumazzini.havaltrip.storage.TripSnapshot
@@ -344,10 +347,11 @@ private fun PainelDeInstrumentos(estado: TripState) {
         Text("Painel de instrumentos", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
         Spacer(Modifier.height(4.dp))
         Text(
-            "O resumo que aparece no painel atrás do volante. Para ele surgir lá, " +
-                "configure no Impulse, em Telas: pacote br.com.hugolumazzini.havaltrip, " +
-                "atividade br.com.hugolumazzini.havaltrip.ClusterActivity, tela 3 — " +
-                "e arraste até o canto que você quiser.",
+            "O resumo que aparece no painel atrás do volante. No Impulse, em Telas: " +
+                "pacote br.com.hugolumazzini.havaltrip, atividade " +
+                "br.com.hugolumazzini.havaltrip.ClusterActivity, tela 3. Lá, dê ao app " +
+                "a tela inteira — sliders no zero e na ponta, 1920 x 720. A posição " +
+                "de verdade se escolhe aqui embaixo, e o que sobra fica transparente.",
             style = MaterialTheme.typography.bodySmall,
             color = Cores.TextoApoio,
         )
@@ -416,6 +420,69 @@ private fun PainelDeInstrumentos(estado: TripState) {
         ) {
             CorDoCluster.entries.forEach { cor ->
                 OpcaoColorida(cor.rotulo, ajustes.cor == cor, Color(cor.argb)) { Cluster.usarCor(cor) }
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        Text("Em que canto do painel", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Nove lugares prontos, para não ter de acertar pixel com o dedo nos " +
+                "sliders do Impulse.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            LugarNoPainel.entries.forEach { lugar ->
+                Opcao(lugar.rotulo, ajustes.lugar == lugar) { Cluster.usarLugar(lugar) }
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        Text("Quanto espaço ocupa", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            TamanhoNoPainel.entries.forEach { tamanho ->
+                Opcao(tamanho.rotulo, ajustes.tamanho == tamanho) { Cluster.usarTamanho(tamanho) }
+            }
+        }
+
+        Spacer(Modifier.height(18.dp))
+        Text("O carro no painel", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "O desenho visto de cima, com portas, cintos e pressão dos pneus, numa " +
+                "janela separada — atividade br.com.hugolumazzini.havaltrip." +
+                "ClusterCarroActivity, também na tela 3 e também com a tela inteira. " +
+                "São duas janelas justamente para cada uma ficar num canto diferente.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(10.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            LugarNoPainel.entries.forEach { lugar ->
+                Opcao(lugar.rotulo, ajustes.lugarDoCarro == lugar) { Cluster.usarLugarDoCarro(lugar) }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            TamanhoDoCarro.entries.forEach { tamanho ->
+                Opcao(tamanho.rotulo, ajustes.tamanhoDoCarro == tamanho) {
+                    Cluster.usarTamanhoDoCarro(tamanho)
+                }
             }
         }
     }

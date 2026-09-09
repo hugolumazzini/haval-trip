@@ -21,6 +21,7 @@ class ClusterCarroActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Cluster.iniciar(this)
         ServicoDeBordo.garantir(this)
         setContent {
             HavalTripTheme {

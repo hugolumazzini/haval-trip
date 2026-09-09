@@ -18,8 +18,15 @@ object TripFormat {
 
     private val ptBr = Locale.forLanguageTag("pt-BR")
 
+    /**
+     * Número em pt-BR: vírgula decimal e ponto no milhar.
+     *
+     * O agrupamento não é enfeite. "48901" e "489010" se distinguem contando
+     * dígitos; "48.901" e "489.010", de relance — e um hodômetro é lido de
+     * relance, dirigindo.
+     */
     fun decimal(valor: Double?, casas: Int = 1): String =
-        valor?.let { String.format(ptBr, "%.${casas}f", it) } ?: AUSENTE
+        valor?.let { String.format(ptBr, "%,.${casas}f", it) } ?: AUSENTE
 
     fun km(valor: Double?) = valor?.let { "${decimal(it, 1)} km" } ?: AUSENTE
 

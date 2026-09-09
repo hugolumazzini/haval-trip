@@ -39,9 +39,12 @@ fun PainelScreen(vm: TripViewModel, estado: TripState) {
 
     Column(Modifier.fillMaxSize()) {
         // Faixa do veículo: vale para todas as Trips, então fica fora delas.
+        //
+        // Sem a velocidade atual, de propósito: ela já está no velocímetro do
+        // painel, em corpo enorme, e repeti-la aqui em letra miúda ao lado da
+        // velocidade média fazia o motorista confundir as duas.
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
             CelulaVeiculo("HODÔMETRO", TripFormat.km(estado.live.odometerTotalKm))
-            CelulaVeiculo("VELOCIDADE", TripFormat.kmh(estado.live.speedKmh))
             CelulaVeiculo("CONSUMO AGORA", TripFormat.kml(estado.live.instantFuelConsumptionKml))
             CelulaVeiculo("AUTONOMIA", TripFormat.km(estado.live.autonomyDteKm))
             Spacer(Modifier.weight(1f))

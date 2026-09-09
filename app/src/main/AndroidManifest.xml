@@ -80,6 +80,20 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|keyboardHidden|screenLayout|density|uiMode"
             android:theme="@style/Theme.HavalTrip.Cluster" />
 
+        <!--
+            O carro visto de cima, em janela própria. Separada da tela dos
+            números para o Impulse poder colocar cada uma num canto do painel.
+        -->
+        <activity
+            android:name=".ClusterCarroActivity"
+            android:exported="true"
+            android:label="Carro no painel"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:resizeableActivity="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|keyboardHidden|screenLayout|density|uiMode"
+            android:theme="@style/Theme.HavalTrip.Cluster" />
+
         <service
             android:name=".ServicoDeBordo"
             android:exported="false"

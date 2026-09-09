@@ -28,7 +28,7 @@ import br.com.hugolumazzini.havaltrip.TripViewModel
  * texto tem a tela da central.
  */
 @Composable
-fun ClusterCarroScreen(vm: TripViewModel) {
+fun ClusterCarroScreen(vm: TripViewModel, espiando: Boolean = false) {
     val painel by vm.painelDoVeiculo.collectAsStateWithLifecycle()
     val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
 
@@ -37,7 +37,7 @@ fun ClusterCarroScreen(vm: TripViewModel) {
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Transparent)
+            .background(fundo(espiando))
             .padding(4.dp),
         contentAlignment = ajustes.lugarDoCarro.alinhamento(),
     ) {

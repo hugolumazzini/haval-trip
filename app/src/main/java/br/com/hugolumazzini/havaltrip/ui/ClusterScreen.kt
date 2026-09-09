@@ -52,7 +52,7 @@ import br.com.hugolumazzini.havaltrip.ui.theme.Cores
  * [Cluster], escolhido na tela de configuração da central.
  */
 @Composable
-fun ClusterScreen(vm: TripViewModel) {
+fun ClusterScreen(vm: TripViewModel, espiando: Boolean = false) {
     val estado by vm.state.collectAsStateWithLifecycle()
     val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
 
@@ -66,7 +66,7 @@ fun ClusterScreen(vm: TripViewModel) {
     // os extremos dos sliders é fácil, acertar 733x7 com o dedo não é. Por isso
     // o conteúdo se encaixa num pedaço dela, no canto escolhido na configuração
     // — o resto continua transparente, mostrando o painel do carro.
-    Box(Modifier.fillMaxSize(), contentAlignment = ajustes.lugar.alinhamento()) {
+    Box(Modifier.fillMaxSize().background(fundo(espiando)), contentAlignment = ajustes.lugar.alinhamento()) {
         Box(
             Modifier
                 .fillMaxWidth(ajustes.tamanho.largura)
@@ -198,3 +198,11 @@ private fun Numero(valor: String, tamanho: Float, cor: Color) {
         maxLines = 1,
     )
 }
+
+/**
+ * Transparente no painel do carro — um retângulo escuro por cima pareceria um
+ * app colado. Escuro só na conferência feita na central, onde atrás não há
+ * painel nenhum e o texto claro sumiria sobre a tela de configuração.
+ */
+internal fun fundo(espiando: Boolean): Color =
+    if (espiando) Color(0xFF0B0B0F) else Color.Transparent

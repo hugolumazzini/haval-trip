@@ -27,7 +27,9 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import android.content.Intent
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -35,6 +37,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.Atualizador
 import br.com.hugolumazzini.havaltrip.Cluster
 import br.com.hugolumazzini.havaltrip.CorDoCluster
+import br.com.hugolumazzini.havaltrip.ClusterActivity
+import br.com.hugolumazzini.havaltrip.ESPIANDO
+import br.com.hugolumazzini.havaltrip.ClusterCarroActivity
 import br.com.hugolumazzini.havaltrip.ItemDoCluster
 import br.com.hugolumazzini.havaltrip.LugarNoPainel
 import br.com.hugolumazzini.havaltrip.TamanhoDoCarro
@@ -342,6 +347,17 @@ private fun OpcaoColorida(texto: String, marcada: Boolean, corMarcada: Color, on
 @OptIn(ExperimentalLayoutApi::class)
 private fun PainelDeInstrumentos(estado: TripState) {
     val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
+    val contexto = LocalContext.current
+
+    /**
+     * Abre a janela do painel aqui na central, para conferir o ajuste sem
+     * depender do Impulse nem do carro ligado. É a mesma tela, com o mesmo
+     * tamanho de tela (1920 x 720): o que aparecer aqui é o que vai aparecer
+     * lá. Para sair, o botão Voltar.
+     */
+    fun espiar(atividade: Class<*>) {
+        contexto.startActivity(Intent(contexto, atividade).putExtra(ESPIANDO, true))
+    }
 
     Column {
         Text("Painel de instrumentos", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
@@ -454,6 +470,9 @@ private fun PainelDeInstrumentos(estado: TripState) {
             }
         }
 
+        Spacer(Modifier.height(12.dp))
+        BotaoAcao("Ver como fica", onClick = { espiar(ClusterActivity::class.java) })
+
         Spacer(Modifier.height(18.dp))
         Text("O carro no painel", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
         Spacer(Modifier.height(4.dp))
@@ -485,6 +504,9 @@ private fun PainelDeInstrumentos(estado: TripState) {
                 }
             }
         }
+
+        Spacer(Modifier.height(12.dp))
+        BotaoAcao("Ver como fica o carro", onClick = { espiar(ClusterCarroActivity::class.java) })
     }
 }
 

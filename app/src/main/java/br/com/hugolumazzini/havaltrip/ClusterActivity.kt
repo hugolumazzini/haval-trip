@@ -34,7 +34,7 @@ class ClusterActivity : ComponentActivity() {
         ServicoDeBordo.garantir(this)
         setContent {
             HavalTripTheme {
-                ClusterScreen(vm)
+                ClusterScreen(vm, espiando = intent.getBooleanExtra(ESPIANDO, false))
             }
         }
     }
@@ -44,3 +44,10 @@ class ClusterActivity : ComponentActivity() {
         vm.gravarAgora()
     }
 }
+
+/**
+ * Extra que a tela de configuração manda ao abrir uma das janelas do painel só
+ * para conferir o ajuste: pinta um fundo escuro, já que na central não há
+ * painel de carro atrás para aparecer pela transparência.
+ */
+const val ESPIANDO = "espiando"

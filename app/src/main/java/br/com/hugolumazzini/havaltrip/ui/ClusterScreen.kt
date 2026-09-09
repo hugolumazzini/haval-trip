@@ -23,6 +23,7 @@ import br.com.hugolumazzini.havaltrip.AjustesDoCluster
 import br.com.hugolumazzini.havaltrip.Cluster
 import br.com.hugolumazzini.havaltrip.ItemDoCluster
 import br.com.hugolumazzini.havaltrip.TripViewModel
+import br.com.hugolumazzini.havaltrip.domain.MedidaDoPainel
 import br.com.hugolumazzini.havaltrip.domain.TripMetrics
 import br.com.hugolumazzini.havaltrip.domain.VehicleLive
 import br.com.hugolumazzini.havaltrip.ui.theme.Cores
@@ -86,21 +87,20 @@ private fun Painel(m: TripMetrics, live: VehicleLive, ajustes: AjustesDoCluster)
 
         val leituras = itens.map { it to it.leitura(m, live) }
 
-        // Um tamanho só para todos, e é o do que mais aperta. Deixar cada
+        // Um tamanho só para todos, e é o do dado que mais aperta. Deixar cada
         // número achar o seu deixava a faixa desalinhada, com o valor mais
         // curto virando o mais gritante — o olho lê isso como "este aqui é o
         // importante", que não é o que se quer dizer.
-        val pelaAltura = (altura.value * 0.42f).coerceIn(16f, 96f)
         val tamanho = leituras.minOf { (_, leitura) ->
-            // Um dígito ocupa mais ou menos 0,62 do tamanho da fonte nesta
-            // família; o mínimo de 4 impede que um valor curto ("8") peça uma
-            // letra gigantesca. Empilhado a unidade divide a linha com o
-            // número, então ela também pesa na largura — em letra menor, daí o
-            // 0,4 em vez de contá-la inteira.
-            val caracteres = maxOf(leitura.first.length, 4) +
-                if (emLinha) 0f else (leitura.second.length + 1) * 0.4f
-            largura.value / (caracteres * 0.62f)
-        }.let { cabe -> (pelaAltura * ajustes.escalaFonte).coerceAtMost(cabe) }
+            MedidaDoPainel.tamanhoDaFonte(
+                alturaDaFatia = altura.value,
+                larguraDaFatia = largura.value,
+                valor = leitura.first,
+                unidade = leitura.second,
+                emLinha = emLinha,
+                escala = ajustes.escalaFonte,
+            )
+        }
 
         if (emLinha) {
             Row(
@@ -136,7 +136,7 @@ private fun Bloco(
     modifier: Modifier = Modifier,
 ) {
     val (valor, unidade) = leitura
-    val rotulo = (numero * 0.32f).coerceAtLeast(9f)
+    val rotulo = (numero * MedidaDoPainel.PROPORCAO_DO_ROTULO).coerceAtLeast(9f)
 
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(

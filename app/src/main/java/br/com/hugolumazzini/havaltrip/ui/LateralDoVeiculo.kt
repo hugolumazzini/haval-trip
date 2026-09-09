@@ -90,7 +90,7 @@ fun LateralDoVeiculo(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
  * decorar a sigla.
  */
 @Composable
-private fun Diagrama(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
+fun Diagrama(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
     val pneus = painel.pneus.associateBy { it.roda }
 
     Column(modifier.fillMaxWidth()) {
@@ -433,7 +433,7 @@ private fun Avisos(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
                     painel.vidrosAbertos.isNotEmpty() || painel.tetoSolarAberto == true ||
                     painel.semCinto.isNotEmpty()
                 if (noDesenho) {
-                    Linha("Veja o carro ao lado", Cores.Atencao, Cores.TextoApoio)
+                    Linha("Veja o carro acima", Cores.Atencao, Cores.TextoApoio)
                 }
             }
         }

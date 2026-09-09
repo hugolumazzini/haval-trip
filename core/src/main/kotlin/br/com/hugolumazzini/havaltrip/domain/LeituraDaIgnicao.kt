@@ -27,8 +27,19 @@ object LeituraDaIgnicao {
     const val MODO_ENERGIA_LIGADO = 2
 
     /**
+     * Valores de `car.basic.engine_state` que significam "desligado".
+     *
+     * Vêm do código do Impulse (`ServiceManager.isMainScreenOn`), que trata
+     * `-1` e `15` como carro dormindo. Sem esta lista o `15` seria lido como
+     * motor girando, que é o erro antigo com outra roupa.
+     */
+    val MOTOR_DESLIGADO = setOf(-1.0, 0.0, 15.0)
+
+    /**
      * @param prontoParaAndar `car.basic.driving_ready_state` — a melhor prova
      *   que existe num híbrido, porque é ela que acende o "READY" do painel.
+     *   O Impulse trata `-1` e `0` como carro desligado; qualquer outro valor
+     *   é carro de pé.
      * @param motor `car.basic.engine_state`.
      * @param rotacao `car.basic.engine_speed`, em rpm.
      * @param modoEnergia `car.basic.power_mode`.
@@ -45,7 +56,7 @@ object LeituraDaIgnicao {
         val ligado = when {
             numero(prontoParaAndar)?.let { it > 0.0 } == true -> true
             numero(rotacao)?.let { it > 0.0 } == true -> true
-            numero(motor)?.let { it > 0.0 } == true -> true
+            numero(motor)?.let { it !in MOTOR_DESLIGADO } == true -> true
             velocidadeKmh >= TripMetrics.MOVING_THRESHOLD_KMH -> true
             numero(modoEnergia)?.let { it >= MODO_ENERGIA_LIGADO } == true -> true
             else -> false

@@ -25,7 +25,7 @@ class ClusterCarroActivity : ComponentActivity() {
         ServicoDeBordo.garantir(this)
         setContent {
             HavalTripTheme {
-                ClusterCarroScreen(vm)
+                ClusterCarroScreen(vm, espiando = intent.getBooleanExtra(ESPIANDO, false))
             }
         }
     }

@@ -1,6 +1,7 @@
 package br.com.hugolumazzini.havaltrip.telemetry
 
 import br.com.hugolumazzini.havaltrip.domain.IgnitionState
+import br.com.hugolumazzini.havaltrip.domain.LeituraDaIgnicao
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo
 import br.com.hugolumazzini.havaltrip.domain.TelemetrySample
 import java.util.concurrent.ConcurrentHashMap
@@ -94,7 +95,7 @@ class EstadoDoCarro(private val diario: DiarioDeCampo) {
             fuelRateLph = Unidades.litrosPorHora(consumoInstantaneo(), velocidade),
             odometerTotalKm = numero(HavalTelemetrySource.CHAVE_HODOMETRO) ?: 0.0,
             fuelLevelL = Unidades.litrosNoTanque(percentual),
-            ignition = ignicao(),
+            ignition = ignicao(velocidade),
             autonomyKmFromCar = autonomiaDoCarro(),
         )
     }
@@ -121,22 +122,20 @@ class EstadoDoCarro(private val diario: DiarioDeCampo) {
     }
 
     /**
-     * Ignição a partir do estado do motor, com o modo de energia como reserva.
+     * Ignição pela regra de [LeituraDaIgnicao] — só multimídia não conta.
      *
-     * O mapeamento dos valores ainda não foi confirmado no carro — por isso o
-     * critério é "qualquer coisa diferente de 0 é ligado", que erra no máximo
-     * para o lado seguro, e o valor cru vai inteiro para o diagnóstico.
+     * A decisão mora no núcleo, com testes, porque foi justamente aqui que o
+     * app errou: abrir a porta acende a central, e isso bastava para começar a
+     * contar viagem. Os valores crus continuam indo inteiros para o
+     * diagnóstico, que é onde se confere o que cada código significa.
      */
-    private fun ignicao(): IgnitionState {
-        val motor = cache[HavalTelemetrySource.CHAVE_MOTOR]
-        val energia = cache[HavalTelemetrySource.CHAVE_MODO_ENERGIA]
-        val ligado = when {
-            motor != null -> motor != "0"
-            energia != null -> energia != "0"
-            else -> false
-        }
-        return if (ligado) IgnitionState.ON else IgnitionState.OFF
-    }
+    private fun ignicao(velocidadeKmh: Double): IgnitionState = LeituraDaIgnicao.ler(
+        prontoParaAndar = cache[HavalTelemetrySource.CHAVE_PRONTO_PARA_ANDAR],
+        motor = cache[HavalTelemetrySource.CHAVE_MOTOR],
+        rotacao = cache[HavalTelemetrySource.CHAVE_ROTACAO],
+        modoEnergia = cache[HavalTelemetrySource.CHAVE_MODO_ENERGIA],
+        velocidadeKmh = velocidadeKmh,
+    )
 
     private fun numero(chave: String): Double? = cache[chave]?.trim()?.toDoubleOrNull()
 }

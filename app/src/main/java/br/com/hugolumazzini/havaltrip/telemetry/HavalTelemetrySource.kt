@@ -83,6 +83,10 @@ class HavalTelemetrySource(
         const val CHAVE_AUTONOMIA_DO_CARRO = "car.basic.remain_odometer"
         const val CHAVE_MOTOR = "car.basic.engine_state"
         const val CHAVE_MODO_ENERGIA = "car.basic.power_mode"
+        const val CHAVE_ROTACAO = "car.basic.engine_speed"
+
+        /** O "READY" do painel: o carro aceita andar. A prova de ignição num híbrido. */
+        const val CHAVE_PRONTO_PARA_ANDAR = "car.basic.driving_ready_state"
 
         /**
          * A metade híbrida do H6, que `car.basic.*` sozinho não enxerga.
@@ -133,9 +137,9 @@ class HavalTelemetrySource(
             CHAVE_AUTONOMIA_DO_CARRO,
             CHAVE_MOTOR,
             CHAVE_MODO_ENERGIA,
-            "car.basic.engine_speed",
+            CHAVE_ROTACAO,
             "car.basic.gear_status",
-            "car.basic.driving_ready_state",
+            CHAVE_PRONTO_PARA_ANDAR,
             "car.basic.cur_journey_odometer",
             "car.basic.cur_journey_avg_fuel_consume",
             "car.basic.accumulated_odometer",

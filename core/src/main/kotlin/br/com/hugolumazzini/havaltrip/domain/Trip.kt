@@ -97,6 +97,29 @@ data class TripMetrics(
     val avgFuelConsumptionKml: Double? get() =
         if (fuelLitres >= MIN_LITROS_PARA_MEDIA) distanceKm / fuelLitres else null
 
+    /**
+     * Quanto ainda falta queimar para o consumo médio virar número, em litros.
+     * Zero quando ele já apareceu.
+     *
+     * Existe para a tela poder dizer o que está faltando em vez de mostrar um
+     * traço mudo. Num híbrido saindo no elétrico esse traço dura quilômetros, e
+     * sem explicação ele parece defeito.
+     */
+    val litrosAteAMedia: Double get() = (MIN_LITROS_PARA_MEDIA - fuelLitres).coerceAtLeast(0.0)
+
+    /**
+     * Uma estimativa grosseira de quantos km ainda faltam para a média aparecer.
+     *
+     * Usa o próprio ritmo da Trip até aqui, que é justamente o número instável
+     * que ainda não se mostra — serve para dar ordem de grandeza ("uns 4 km"),
+     * não para ser lido como promessa. `null` enquanto não houver nem ritmo.
+     */
+    val kmAteAMedia: Double? get() {
+        if (litrosAteAMedia <= EPSILON) return 0.0
+        if (fuelLitres <= EPSILON || distanceKm <= EPSILON) return null
+        return litrosAteAMedia * (distanceKm / fuelLitres)
+    }
+
     /** Velocidade média, em km/h, contando o tempo parado. `null` sem tempo. */
     val avgSpeedKmh: Double? get() =
         if (totalTimeS > EPSILON) distanceKm / (totalTimeS / 3600.0) else null

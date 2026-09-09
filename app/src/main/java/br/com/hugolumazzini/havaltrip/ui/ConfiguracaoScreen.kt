@@ -33,6 +33,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.Atualizador
+import br.com.hugolumazzini.havaltrip.Cluster
+import br.com.hugolumazzini.havaltrip.CorDoCluster
+import br.com.hugolumazzini.havaltrip.ItemDoCluster
 import br.com.hugolumazzini.havaltrip.TripViewModel
 import br.com.hugolumazzini.havaltrip.engine.TripState
 import br.com.hugolumazzini.havaltrip.storage.TripSnapshot
@@ -108,6 +111,10 @@ fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
         Spacer(Modifier.height(14.dp))
 
         Cartao(Modifier.fillMaxWidth()) { ZeragemAutomatica(vm, estado) }
+
+        Spacer(Modifier.height(14.dp))
+
+        Cartao(Modifier.fillMaxWidth()) { PainelDeInstrumentos(estado) }
 
         Spacer(Modifier.height(14.dp))
 
@@ -292,6 +299,18 @@ private fun ZeragemAutomatica(vm: TripViewModel, estado: TripState) {
 /** Botão de escolha única, no tamanho de dedo que a central pede. */
 @Composable
 private fun Opcao(texto: String, marcada: Boolean, onClick: () -> Unit) {
+    OpcaoColorida(texto, marcada, Cores.Destaque, onClick)
+}
+
+/**
+ * A mesma pastilha, com a cor do texto marcado escolhida por quem chama.
+ *
+ * Existe para a escolha de cor do painel poder se mostrar na própria cor: uma
+ * lista de nomes ("Âmbar", "Verde") todos escritos em azul obrigaria o
+ * motorista a tocar para descobrir o que cada um faz.
+ */
+@Composable
+private fun OpcaoColorida(texto: String, marcada: Boolean, corMarcada: Color, onClick: () -> Unit) {
     Box(
         Modifier
             .clip(RoundedCornerShape(10.dp))
@@ -302,7 +321,110 @@ private fun Opcao(texto: String, marcada: Boolean, onClick: () -> Unit) {
         Text(
             texto,
             style = MaterialTheme.typography.titleSmall,
-            color = if (marcada) Cores.Destaque else Cores.TextoCorrido,
+            color = if (marcada) corMarcada else Cores.TextoCorrido,
         )
     }
 }
+
+/**
+ * O que o Haval Trip mostra no painel de instrumentos.
+ *
+ * Quem coloca a janela lá é o Impulse, na tela "Telas" dele — ele é que decide
+ * onde e de que tamanho. Aqui se decide só o conteúdo: qual contador, quais
+ * números, que tamanho de letra e que cor. A separação não é escolha minha, é
+ * como o mecanismo funciona, e por isso está escrita na tela: sem essa frase, o
+ * motorista configuraria tudo aqui e ficaria esperando algo aparecer sozinho.
+ */
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun PainelDeInstrumentos(estado: TripState) {
+    val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
+
+    Column {
+        Text("Painel de instrumentos", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "O resumo que aparece no painel atrás do volante. Para ele surgir lá, " +
+                "configure no Impulse, em Telas: pacote br.com.hugolumazzini.havaltrip, " +
+                "atividade br.com.hugolumazzini.havaltrip.ClusterActivity, tela 3 — " +
+                "e arraste até o canto que você quiser.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
+
+        Spacer(Modifier.height(14.dp))
+        Text("Qual contador", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            // "O da tela" é o padrão porque acompanha quem troca de contador na
+            // central, sem obrigar a vir aqui de novo.
+            Opcao("O da tela", ajustes.tripId == null) { Cluster.usarTrip(null) }
+            estado.trips.forEach { trip ->
+                Opcao(trip.label, ajustes.tripId == trip.id) { Cluster.usarTrip(trip.id) }
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        Text("Quais informações", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Aparecem na ordem em que você marcar. Três cabem bem numa faixa; " +
+                "acima disso, dê mais espaço à janela no Impulse.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ItemDoCluster.entries.forEach { item ->
+                Opcao(item.descricao, item in ajustes.itens) { Cluster.alternarItem(item) }
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        Text("Tamanho da letra", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Normal já se ajusta sozinho ao tamanho da janela. As outras opções " +
+                "só puxam esse cálculo para cima ou para baixo.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ESCALAS.forEach { (rotulo, escala) ->
+                Opcao(rotulo, kotlin.math.abs(ajustes.escalaFonte - escala) < 0.01f) {
+                    Cluster.usarEscala(escala)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        Text("Cor dos números", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            CorDoCluster.entries.forEach { cor ->
+                OpcaoColorida(cor.rotulo, ajustes.cor == cor, Color(cor.argb)) { Cluster.usarCor(cor) }
+            }
+        }
+    }
+}
+
+/** Os tamanhos de letra oferecidos, como multiplicador do cálculo automático. */
+private val ESCALAS = listOf(
+    "Menor" to 0.75f,
+    "Normal" to 1.0f,
+    "Maior" to 1.3f,
+    "Enorme" to 1.6f,
+)

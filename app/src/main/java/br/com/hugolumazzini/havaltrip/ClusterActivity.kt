@@ -30,6 +30,7 @@ class ClusterActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Sem `enableEdgeToEdge`: aqui não há barra de status nem de navegação
         // para desviar, e a janela é um retângulo qualquer no meio do painel.
+        Cluster.iniciar(this)
         ServicoDeBordo.garantir(this)
         setContent {
             HavalTripTheme {

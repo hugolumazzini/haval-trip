@@ -55,6 +55,52 @@ enum class CorDoCluster(val rotulo: String, val argb: Long) {
 }
 
 /**
+ * Um dos nove cantos da janela.
+ *
+ * Existe para o motorista não ter de acertar posição com sliders de pixel na
+ * tela do Impulse: lá ele dá ao app a tela inteira do painel (0,0 até
+ * 1920x720, os sliders nos extremos, que é fácil), e a posição de verdade se
+ * escolhe aqui, num botão. Como a janela é transparente, o que sobra em volta
+ * continua sendo o painel do carro.
+ *
+ * Os valores são o "viés" que o Compose usa: -1 é encostado no começo, 0 é o
+ * meio, 1 é encostado no fim.
+ */
+enum class LugarNoPainel(val rotulo: String, val horizontal: Float, val vertical: Float) {
+    CIMA_ESQUERDA("Cima, esquerda", -1f, -1f),
+    CIMA_CENTRO("Cima, centro", 0f, -1f),
+    CIMA_DIREITA("Cima, direita", 1f, -1f),
+    MEIO_ESQUERDA("Meio, esquerda", -1f, 0f),
+    MEIO_CENTRO("Meio, centro", 0f, 0f),
+    MEIO_DIREITA("Meio, direita", 1f, 0f),
+    BAIXO_ESQUERDA("Baixo, esquerda", -1f, 1f),
+    BAIXO_CENTRO("Baixo, centro", 0f, 1f),
+    BAIXO_DIREITA("Baixo, direita", 1f, 1f),
+}
+
+/**
+ * Quanto da janela o conteúdo ocupa, em frações de largura e altura.
+ *
+ * Frações, e não pixels, porque o mesmo ajuste tem de servir tanto para quem
+ * deu a tela inteira ao app quanto para quem deu um retângulo pequeno.
+ */
+enum class TamanhoNoPainel(val rotulo: String, val largura: Float, val altura: Float) {
+    PEQUENO("Pequeno", 0.24f, 0.18f),
+    MEDIO("Médio", 0.34f, 0.24f),
+    GRANDE("Grande", 0.46f, 0.32f),
+    FAIXA("Faixa larga", 0.70f, 0.20f),
+    TUDO("A janela toda", 1f, 1f),
+}
+
+/** Quanto da janela o desenho do carro ocupa, em fração da altura. */
+enum class TamanhoDoCarro(val rotulo: String, val fracao: Float) {
+    PEQUENO("Pequeno", 0.35f),
+    MEDIO("Médio", 0.55f),
+    GRANDE("Grande", 0.80f),
+    TUDO("A janela toda", 1f),
+}
+
+/**
  * O que o motorista escolheu para o painel de instrumentos.
  *
  * @param tripId qual contador vai para o painel. `null` significa "o que
@@ -74,6 +120,10 @@ data class AjustesDoCluster(
     ),
     val escalaFonte: Float = 1.0f,
     val cor: CorDoCluster = CorDoCluster.BRANCO,
+    val lugar: LugarNoPainel = LugarNoPainel.CIMA_CENTRO,
+    val tamanho: TamanhoNoPainel = TamanhoNoPainel.FAIXA,
+    val lugarDoCarro: LugarNoPainel = LugarNoPainel.MEIO_CENTRO,
+    val tamanhoDoCarro: TamanhoDoCarro = TamanhoDoCarro.MEDIO,
 ) {
     /**
      * A lista que a tela do painel usa de fato.
@@ -104,6 +154,10 @@ object Cluster {
     private const val ITENS = "itens"
     private const val ESCALA = "escalaFonte"
     private const val COR = "cor"
+    private const val LUGAR = "lugar"
+    private const val TAMANHO = "tamanho"
+    private const val LUGAR_CARRO = "lugarDoCarro"
+    private const val TAMANHO_CARRO = "tamanhoDoCarro"
 
     private lateinit var prefs: android.content.SharedPreferences
 
@@ -132,6 +186,18 @@ object Cluster {
             cor = prefs.getString(COR, null)
                 ?.let { nome -> CorDoCluster.entries.find { it.name == nome } }
                 ?: padrao.cor,
+            lugar = prefs.getString(LUGAR, null)
+                ?.let { nome -> LugarNoPainel.entries.find { it.name == nome } }
+                ?: padrao.lugar,
+            tamanho = prefs.getString(TAMANHO, null)
+                ?.let { nome -> TamanhoNoPainel.entries.find { it.name == nome } }
+                ?: padrao.tamanho,
+            lugarDoCarro = prefs.getString(LUGAR_CARRO, null)
+                ?.let { nome -> LugarNoPainel.entries.find { it.name == nome } }
+                ?: padrao.lugarDoCarro,
+            tamanhoDoCarro = prefs.getString(TAMANHO_CARRO, null)
+                ?.let { nome -> TamanhoDoCarro.entries.find { it.name == nome } }
+                ?: padrao.tamanhoDoCarro,
         )
     }
 
@@ -142,6 +208,10 @@ object Cluster {
             .putString(ITENS, novo.itens.joinToString(",") { it.name })
             .putFloat(ESCALA, novo.escalaFonte)
             .putString(COR, novo.cor.name)
+            .putString(LUGAR, novo.lugar.name)
+            .putString(TAMANHO, novo.tamanho.name)
+            .putString(LUGAR_CARRO, novo.lugarDoCarro.name)
+            .putString(TAMANHO_CARRO, novo.tamanhoDoCarro.name)
             .apply()
     }
 
@@ -160,4 +230,13 @@ object Cluster {
     fun usarEscala(escala: Float) = gravar(_ajustes.value.copy(escalaFonte = escala))
 
     fun usarCor(cor: CorDoCluster) = gravar(_ajustes.value.copy(cor = cor))
+
+    fun usarLugar(lugar: LugarNoPainel) = gravar(_ajustes.value.copy(lugar = lugar))
+
+    fun usarTamanho(tamanho: TamanhoNoPainel) = gravar(_ajustes.value.copy(tamanho = tamanho))
+
+    fun usarLugarDoCarro(lugar: LugarNoPainel) = gravar(_ajustes.value.copy(lugarDoCarro = lugar))
+
+    fun usarTamanhoDoCarro(tamanho: TamanhoDoCarro) =
+        gravar(_ajustes.value.copy(tamanhoDoCarro = tamanho))
 }

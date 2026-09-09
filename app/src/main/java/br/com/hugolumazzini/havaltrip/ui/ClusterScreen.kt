@@ -3,14 +3,18 @@ package br.com.hugolumazzini.havaltrip.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -22,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.AjustesDoCluster
 import br.com.hugolumazzini.havaltrip.Cluster
 import br.com.hugolumazzini.havaltrip.ItemDoCluster
+import br.com.hugolumazzini.havaltrip.LugarNoPainel
 import br.com.hugolumazzini.havaltrip.TripViewModel
 import br.com.hugolumazzini.havaltrip.domain.MedidaDoPainel
 import br.com.hugolumazzini.havaltrip.domain.TripMetrics
@@ -57,8 +62,23 @@ fun ClusterScreen(vm: TripViewModel) {
         ?: estado.selectedTrip
         ?: return
 
-    Painel(trip.metrics, estado.live, ajustes)
+    // A janela que o Impulse deu pode ser a tela inteira do painel: dar a ela
+    // os extremos dos sliders é fácil, acertar 733x7 com o dedo não é. Por isso
+    // o conteúdo se encaixa num pedaço dela, no canto escolhido na configuração
+    // — o resto continua transparente, mostrando o painel do carro.
+    Box(Modifier.fillMaxSize(), contentAlignment = ajustes.lugar.alinhamento()) {
+        Box(
+            Modifier
+                .fillMaxWidth(ajustes.tamanho.largura)
+                .fillMaxHeight(ajustes.tamanho.altura),
+        ) {
+            Painel(trip.metrics, estado.live, ajustes)
+        }
+    }
 }
+
+/** O canto escolhido, no formato que o Compose entende. */
+fun LugarNoPainel.alinhamento(): Alignment = BiasAlignment(horizontal, vertical)
 
 @Composable
 private fun Painel(m: TripMetrics, live: VehicleLive, ajustes: AjustesDoCluster) {

@@ -6,4 +6,16 @@
         <item name="android:statusBarColor">#FF0D0E12</item>
         <item name="android:navigationBarColor">#FF0A0A0C</item>
     </style>
+
+    <!--
+        A janela do cluster. Fundo transparente porque o painel do carro já tem
+        desenho por baixo; e sem título/ActionBar, que num retângulo de 200 px
+        de altura comeria metade do espaço.
+    -->
+    <style name="Theme.HavalTrip.Cluster" parent="Theme.HavalTrip">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
 </resources>

@@ -69,11 +69,18 @@
             de janela livre, configurado na tela "Telas" dele.
             `excludeFromRecents` é para ela não aparecer na lista de apps
             recentes da central como se fosse uma tela que o motorista abriu.
+
+            `taskAffinity` própria é o que permite esta janela e a do carro
+            existirem ao mesmo tempo. Sem ela, as duas herdam a afinidade
+            padrão — o nome do pacote —, caem na mesma tarefa, e uma tarefa só
+            pode estar num display de cada vez: abrir a segunda arrastava a
+            primeira junto e parecia que uma tinha substituído a outra.
         -->
         <activity
             android:name=".ClusterActivity"
             android:exported="true"
             android:label="Haval Trip no painel"
+            android:taskAffinity="${applicationId}.painel"
             android:launchMode="singleTask"
             android:excludeFromRecents="true"
             android:resizeableActivity="true"
@@ -82,12 +89,14 @@
 
         <!--
             O carro visto de cima, em janela própria. Separada da tela dos
-            números para o Impulse poder colocar cada uma num canto do painel.
+            números para o Impulse poder colocar cada uma num canto do painel —
+            e, por causa da `taskAffinity` própria, as duas ao mesmo tempo.
         -->
         <activity
             android:name=".ClusterCarroActivity"
             android:exported="true"
             android:label="Carro no painel"
+            android:taskAffinity="${applicationId}.carro"
             android:launchMode="singleTask"
             android:excludeFromRecents="true"
             android:resizeableActivity="true"

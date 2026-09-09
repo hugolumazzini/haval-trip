@@ -10,6 +10,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import br.com.hugolumazzini.havaltrip.painel.ProjetorDoPainel
 import androidx.core.content.ContextCompat
 
 /**
@@ -37,6 +38,12 @@ class ServicoDeBordo : Service() {
         runCatching { startForeground(ID_DA_NOTIFICACAO, montarNotificacao()) }
         // Basta pedir: o motor começa a escutar o carro no próprio construtor.
         MotorDeBordo.de(this)
+        // E, se o motorista escolheu telas para as janelas do painel, colocá-las
+        // lá sozinho — é o que substitui o cadastro na tela "Telas" do Impulse.
+        // Fica no serviço, e não numa Activity, porque na partida do carro
+        // ninguém abre o app: o serviço é o único que sobe de qualquer jeito.
+        Cluster.iniciar(this)
+        ProjetorDoPainel.projetarNaPartida(this, Cluster::telasEscolhidas)
     }
 
     /**

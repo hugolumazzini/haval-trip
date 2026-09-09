@@ -100,4 +100,33 @@ class MedidaDoPainelTest {
         )
         assertEquals(12f, fonte, 0.01f)
     }
+    @Test
+    fun `a caixa minima comporta a letra minima`() {
+        // O piso de 12sp de `tamanhoDaFonte` promete uma letra que a fatia pode
+        // não comportar. A caixa mínima é a contrapartida: com ela, a promessa
+        // se cumpre.
+        val altura = MedidaDoPainel.alturaMinimaDaCaixa(emLinha = true, itens = 3)
+        val util = altura - 2 * MedidaDoPainel.RESPIRO
+        assertTrue(
+            "faltou altura: caixa de $altura dp",
+            util >= MedidaDoPainel.alturaOcupada(12f, emLinha = true),
+        )
+    }
+
+    @Test
+    fun `empilhado a caixa minima cresce com o numero de itens`() {
+        val tres = MedidaDoPainel.alturaMinimaDaCaixa(emLinha = false, itens = 3)
+        val quatro = MedidaDoPainel.alturaMinimaDaCaixa(emLinha = false, itens = 4)
+        assertTrue("quatro itens não pediram mais altura", quatro > tres)
+    }
+
+    @Test
+    fun `a caixa minima cabe no overlay do simulador`() {
+        // 760x200 px a 220 dpi = 552x145 dp. Foi este retângulo que cortou os
+        // números e deixou só os rótulos na tela: 20% de 145 dp são 29 dp, e
+        // não cabe nem a letra mínima. O mínimo tem de caber aqui — senão o
+        // conserto empurra o conteúdo para fora da janela em vez de mostrá-lo.
+        assertTrue(MedidaDoPainel.alturaMinimaDaCaixa(emLinha = true, itens = 3) <= 145f)
+        assertTrue(MedidaDoPainel.larguraMinimaDaCaixa(emLinha = true, itens = 3) <= 552f)
+    }
 }

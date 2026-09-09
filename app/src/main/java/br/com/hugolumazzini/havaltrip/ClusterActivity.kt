@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
+import br.com.hugolumazzini.havaltrip.painel.fecharQuandoPedirem
 import br.com.hugolumazzini.havaltrip.ui.ClusterScreen
 import br.com.hugolumazzini.havaltrip.ui.theme.HavalTripTheme
 
@@ -31,10 +33,17 @@ class ClusterActivity : ComponentActivity() {
         // Sem `enableEdgeToEdge`: aqui não há barra de status nem de navegação
         // para desviar, e a janela é um retângulo qualquer no meio do painel.
         Cluster.iniciar(this)
+        // Perguntada aqui, e nao uma vez so na partida, porque a paleta pode
+        // ter mudado no volante desde a ultima vez que esta janela abriu.
+        Cluster.atualizarPaleta()
         ServicoDeBordo.garantir(this)
+        val espiando = intent.getBooleanExtra(ESPIANDO, false)
+        // Espiando é a conferência aqui na central, com o botão Voltar à mão;
+        // recolher é para a janela que está lá no painel, fora de alcance.
+        if (!espiando) fecharQuandoPedirem(JanelaDoPainel.NUMEROS)
         setContent {
             HavalTripTheme {
-                ClusterScreen(vm, espiando = intent.getBooleanExtra(ESPIANDO, false))
+                ClusterScreen(vm, espiando = espiando)
             }
         }
     }

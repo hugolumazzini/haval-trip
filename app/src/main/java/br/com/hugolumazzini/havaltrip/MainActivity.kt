@@ -18,6 +18,7 @@ class MainActivity : ComponentActivity() {
         // Se a central não avisou a inicialização — ou se o app foi instalado
         // com o carro já ligado —, abrir a tela é o segundo gatilho: daqui em
         // diante a contagem continua mesmo depois de fechá-la.
+        Cluster.iniciar(this)
         ServicoDeBordo.garantir(this)
         setContent {
             HavalTripTheme {

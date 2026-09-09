@@ -6,10 +6,11 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,10 +26,16 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.AjustesDoCluster
 import br.com.hugolumazzini.havaltrip.Cluster
+import br.com.hugolumazzini.havaltrip.FundoDoCluster
 import br.com.hugolumazzini.havaltrip.ItemDoCluster
+import br.com.hugolumazzini.havaltrip.CorDoCluster
 import br.com.hugolumazzini.havaltrip.LugarNoPainel
 import br.com.hugolumazzini.havaltrip.TripViewModel
 import br.com.hugolumazzini.havaltrip.domain.MedidaDoPainel
+import br.com.hugolumazzini.havaltrip.domain.PaletaSport
+import br.com.hugolumazzini.havaltrip.telemetry.PaletaDoImpulse
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shadow
 import br.com.hugolumazzini.havaltrip.domain.TripMetrics
 import br.com.hugolumazzini.havaltrip.domain.VehicleLive
 import br.com.hugolumazzini.havaltrip.ui.theme.Cores
@@ -55,6 +62,7 @@ import br.com.hugolumazzini.havaltrip.ui.theme.Cores
 fun ClusterScreen(vm: TripViewModel, espiando: Boolean = false) {
     val estado by vm.state.collectAsStateWithLifecycle()
     val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
+    val paleta by Cluster.paleta.collectAsStateWithLifecycle()
 
     // A Trip escolhida na configuração; se ela foi apagada desde então, cai na
     // selecionada da central em vez de deixar o painel em branco.
@@ -66,13 +74,40 @@ fun ClusterScreen(vm: TripViewModel, espiando: Boolean = false) {
     // os extremos dos sliders é fácil, acertar 733x7 com o dedo não é. Por isso
     // o conteúdo se encaixa num pedaço dela, no canto escolhido na configuração
     // — o resto continua transparente, mostrando o painel do carro.
-    Box(Modifier.fillMaxSize().background(fundo(espiando)), contentAlignment = ajustes.lugar.alinhamento()) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(fundo(espiando))) {
+        val itens = ajustes.ItensSeguros.size
+
+        // A fração pedida, antes de qualquer piso. É ela que decide o formato,
+        // e não a caixa final: se o piso mudasse linha para coluna no meio do
+        // caminho, o painel trocaria de desenho sozinho ao encolher a janela.
+        val larguraPedida = maxWidth * ajustes.tamanho.largura
+        val alturaPedida = maxHeight * ajustes.tamanho.altura
+        val emLinha = larguraPedida > alturaPedida * 1.6f
+
+        // As frações do "Tamanho" nasceram pensando num painel grande. Numa
+        // janela que já é uma tira fina — o overlay do simulador tem 145 dp de
+        // altura — 20% dela não comporta nem a letra mínima, e o número sumia
+        // cortado, sobrando só o rótulo. Então a fração é uma intenção: se o
+        // que ela pede não cabe o conteúdo, a caixa cresce até caber, no
+        // limite da janela.
+        val largura = larguraPedida
+            .coerceAtLeast(MedidaDoPainel.larguraMinimaDaCaixa(emLinha, itens).dp)
+            .coerceAtMost(maxWidth)
+        val altura = alturaPedida
+            .coerceAtLeast(MedidaDoPainel.alturaMinimaDaCaixa(emLinha, itens).dp)
+            .coerceAtMost(maxHeight)
+
         Box(
             Modifier
-                .fillMaxWidth(ajustes.tamanho.largura)
-                .fillMaxHeight(ajustes.tamanho.altura),
+                .align(ajustes.lugar.alinhamento())
+                .width(largura)
+                .height(altura)
+                // O fundo é do bloco, e não da janela: a janela é a tela
+                // inteira do painel, e pintá-la inteira apagaria o carro em
+                // vez de tapar só o pedaço que atrapalha.
+                .background(Color(ajustes.fundo.argb)),
         ) {
-            Painel(trip.metrics, estado.live, ajustes)
+            Painel(trip.metrics, estado.live, ajustes, emLinha, tinta(ajustes, paleta))
         }
     }
 }
@@ -81,23 +116,20 @@ fun ClusterScreen(vm: TripViewModel, espiando: Boolean = false) {
 fun LugarNoPainel.alinhamento(): Alignment = BiasAlignment(horizontal, vertical)
 
 @Composable
-private fun Painel(m: TripMetrics, live: VehicleLive, ajustes: AjustesDoCluster) {
+private fun Painel(
+    m: TripMetrics,
+    live: VehicleLive,
+    ajustes: AjustesDoCluster,
+    emLinha: Boolean,
+    tinta: Tinta,
+) {
     val itens = ajustes.ItensSeguros
-    val cor = Color(ajustes.cor.argb)
 
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            // Preto de verdade seria uma mancha sobre o painel. Transparente é
-            // o que faz a janela parecer conteúdo do carro.
-            .background(Color.Transparent)
-            .padding(8.dp),
+            .padding(MedidaDoPainel.RESPIRO.dp),
     ) {
-        // Um retângulo mais largo que alto comporta os dados lado a lado; um
-        // mais alto que largo, empilhados. A conta é simplória de propósito —
-        // é o formato que decide, não uma tabela de tamanhos que eu teria de
-        // adivinhar sem ver o painel.
-        val emLinha = maxWidth > maxHeight * 1.6f
         // Cada dado recebe uma fatia igual, e o tamanho da letra sai do menor
         // lado dela. Sem a largura nessa conta, quatro itens com a letra no
         // "Maior" saíam pela borda e o número aparecia cortado no painel — que
@@ -129,7 +161,7 @@ private fun Painel(m: TripMetrics, live: VehicleLive, ajustes: AjustesDoCluster)
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 leituras.forEach { (item, leitura) ->
-                    Bloco(item, leitura, tamanho, cor, emLinha, Modifier.weight(1f))
+                    Bloco(item, leitura, tamanho, tinta, emLinha, Modifier.weight(1f))
                 }
             }
         } else {
@@ -139,7 +171,7 @@ private fun Painel(m: TripMetrics, live: VehicleLive, ajustes: AjustesDoCluster)
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 leituras.forEach { (item, leitura) ->
-                    Bloco(item, leitura, tamanho, cor, emLinha, Modifier.weight(1f))
+                    Bloco(item, leitura, tamanho, tinta, emLinha, Modifier.weight(1f))
                 }
             }
         }
@@ -151,12 +183,12 @@ private fun Bloco(
     item: ItemDoCluster,
     leitura: Pair<String, String>,
     numero: Float,
-    cor: Color,
+    tinta: Tinta,
     emLinha: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val (valor, unidade) = leitura
-    val rotulo = (numero * MedidaDoPainel.PROPORCAO_DO_ROTULO).coerceAtLeast(9f)
+    val rotulo = MedidaDoPainel.tamanhoDoRotulo(numero)
 
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
@@ -171,11 +203,11 @@ private fun Bloco(
         // é o desenho mais limpo. Empilhado, ela vai ao lado do número: uma
         // terceira linha por dado esbarrava no rótulo do dado seguinte.
         if (emLinha) {
-            Numero(valor, numero, cor)
+            Numero(valor, numero, tinta)
             Text(unidade, color = Cores.TextoApoio, fontSize = rotulo.sp, maxLines = 1)
         } else {
             Row(verticalAlignment = Alignment.Bottom) {
-                Numero(valor, numero, cor)
+                Numero(valor, numero, tinta)
                 Text(
                     " $unidade",
                     color = Cores.TextoApoio,
@@ -189,13 +221,51 @@ private fun Bloco(
 }
 
 @Composable
-private fun Numero(valor: String, tamanho: Float, cor: Color) {
+private fun Numero(valor: String, tamanho: Float, tinta: Tinta) {
     Text(
         valor,
-        color = cor,
+        color = tinta.cor,
         fontSize = tamanho.sp,
         fontWeight = FontWeight.Medium,
         maxLines = 1,
+        style = tinta.halo?.let { halo ->
+            // O brilho do Analogico V2. O raio acompanha o tamanho da letra
+            // porque um halo de medida fixa, que fica discreto num numero
+            // grande, vira uma mancha borrada num numero pequeno.
+            LocalTextStyle.current.copy(
+                shadow = Shadow(color = halo, offset = Offset.Zero, blurRadius = tamanho * 0.5f),
+            )
+        } ?: LocalTextStyle.current,
+    )
+}
+
+/**
+ * Com que cor o numero e desenhado, e se leva brilho em volta.
+ *
+ * Duas coisas e nao uma porque o Impulse faz duas coisas diferentes: nas cores
+ * escolhidas a mao o digito e da cor, e no Analogico V2 o digito e quase
+ * branco e quem carrega a cor e o halo. Um campo so obrigaria a tela a
+ * perguntar "que modo e este?" toda vez que fosse desenhar.
+ */
+internal data class Tinta(val cor: Color, val halo: Color? = null)
+
+/**
+ * A tinta que vale agora: a cor escolhida a mao, ou a paleta do Impulse.
+ *
+ * Quando a paleta nao pode ser lida — Shizuku sem permissao, Impulse ausente —
+ * cai no branco sem halo. E o mesmo branco de sempre: quem escolheu "seguir o
+ * Impulse" numa central que nao responde ve um numero legivel, e o porque
+ * aparece na tela de configuracao, que e onde da para fazer algo a respeito.
+ */
+internal fun tinta(ajustes: AjustesDoCluster, paleta: PaletaDoImpulse.Resultado?): Tinta {
+    if (ajustes.cor != CorDoCluster.DO_IMPULSE) return Tinta(Color(ajustes.cor.argb))
+    val achada = (paleta as? PaletaDoImpulse.Resultado.Achou)?.paleta
+        ?: return Tinta(Color(CorDoCluster.DO_IMPULSE.argb))
+    return Tinta(
+        cor = Color(PaletaSport.BRANCO_DO_ANALOGICO_V2),
+        // A meia opacidade e o que o CSS do tema usa no brilho dos digitos:
+        // a cor cheia em volta de cada numero fecharia o vao entre eles.
+        halo = Color(achada.clara).copy(alpha = 0.55f),
     )
 }
 

@@ -36,10 +36,24 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.Atualizador
 import br.com.hugolumazzini.havaltrip.Cluster
+import androidx.compose.runtime.LaunchedEffect
 import br.com.hugolumazzini.havaltrip.CorDoCluster
+import br.com.hugolumazzini.havaltrip.telemetry.PaletaDoImpulse
+import br.com.hugolumazzini.havaltrip.FundoDoCluster
 import br.com.hugolumazzini.havaltrip.ClusterActivity
 import br.com.hugolumazzini.havaltrip.ESPIANDO
 import br.com.hugolumazzini.havaltrip.ClusterCarroActivity
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
+import br.com.hugolumazzini.havaltrip.painel.ProjetorDoPainel
+import br.com.hugolumazzini.havaltrip.painel.ShizukuShell
 import br.com.hugolumazzini.havaltrip.ItemDoCluster
 import br.com.hugolumazzini.havaltrip.LugarNoPainel
 import br.com.hugolumazzini.havaltrip.TamanhoDoCarro
@@ -347,6 +361,10 @@ private fun OpcaoColorida(texto: String, marcada: Boolean, corMarcada: Color, on
 @OptIn(ExperimentalLayoutApi::class)
 private fun PainelDeInstrumentos(estado: TripState) {
     val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
+    val paleta by Cluster.paleta.collectAsStateWithLifecycle()
+    // Sem isto, quem troca a paleta no volante e volta aqui continuaria vendo
+    // a resposta antiga: a leitura so acontece quando alguem a pede.
+    LaunchedEffect(Unit) { Cluster.atualizarPaleta() }
     val contexto = LocalContext.current
 
     /**
@@ -363,14 +381,16 @@ private fun PainelDeInstrumentos(estado: TripState) {
         Text("Painel de instrumentos", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
         Spacer(Modifier.height(4.dp))
         Text(
-            "O resumo que aparece no painel atrás do volante. No Impulse, em Telas: " +
-                "pacote br.com.hugolumazzini.havaltrip, atividade " +
-                "br.com.hugolumazzini.havaltrip.ClusterActivity, tela 3. Lá, dê ao app " +
-                "a tela inteira — sliders no zero e na ponta, 1920 x 720. A posição " +
-                "de verdade se escolhe aqui embaixo, e o que sobra fica transparente.",
+            "O resumo que aparece no painel atrás do volante. Escolha a tela aqui " +
+                "embaixo e o app se coloca lá sozinho, sem passar pelo Impulse; a " +
+                "posição dentro da tela se escolhe mais abaixo, e o que sobra fica " +
+                "transparente.",
             style = MaterialTheme.typography.bodySmall,
             color = Cores.TextoApoio,
         )
+
+        Spacer(Modifier.height(14.dp))
+        Projecao(JanelaDoPainel.NUMEROS, ajustes.telaDosNumeros)
 
         Spacer(Modifier.height(14.dp))
         Text("Qual contador", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
@@ -435,7 +455,33 @@ private fun PainelDeInstrumentos(estado: TripState) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             CorDoCluster.entries.forEach { cor ->
-                OpcaoColorida(cor.rotulo, ajustes.cor == cor, Color(cor.argb)) { Cluster.usarCor(cor) }
+                OpcaoColorida(cor.rotulo, ajustes.cor == cor, Color(corDaAmostra(cor, paleta))) {
+                    Cluster.usarCor(cor)
+                }
+            }
+        }
+        if (ajustes.cor == CorDoCluster.DO_IMPULSE) {
+            Spacer(Modifier.height(6.dp))
+            Text(recadoDaPaleta(paleta), style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+        }
+
+        Spacer(Modifier.height(14.dp))
+        Text("Fundo do bloco", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Transparente deixa o painel do carro aparecer por baixo. Escolha um dos " +
+                "opacos quando o bloco cair em cima de algo que o painel já desenha ali — " +
+                "número sobre número não se lê.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            FundoDoCluster.entries.forEach { fundo ->
+                Opcao(fundo.rotulo, ajustes.fundo == fundo) { Cluster.usarFundo(fundo) }
             }
         }
 
@@ -443,7 +489,7 @@ private fun PainelDeInstrumentos(estado: TripState) {
         Text("Em que canto do painel", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(4.dp))
         Text(
-            "Nove lugares prontos, para não ter de acertar pixel com o dedo nos " +
+            "Lugares prontos, para não ter de acertar pixel com o dedo nos " +
                 "sliders do Impulse.",
             style = MaterialTheme.typography.bodySmall,
             color = Cores.TextoApoio,
@@ -453,10 +499,26 @@ private fun PainelDeInstrumentos(estado: TripState) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            LugarNoPainel.entries.forEach { lugar ->
+            LugarNoPainel.Cantos.forEach { lugar ->
                 Opcao(lugar.rotulo, ajustes.lugar == lugar) { Cluster.usarLugar(lugar) }
             }
+            // A faixa da navegação fica junto dos cantos porque é isso que ela
+            // é para quem escolhe: mais um lugar. Que ela também acerte o
+            // tamanho é detalhe de implementação, não uma segunda decisão.
+            Opcao(
+                LugarNoPainel.FAIXA_NAVEGACAO.rotulo,
+                ajustes.lugar == LugarNoPainel.FAIXA_NAVEGACAO &&
+                    ajustes.tamanho == TamanhoNoPainel.FAIXA_DA_NAVEGACAO,
+            ) { Cluster.usarFaixaDaNavegacao() }
         }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "\"Faixa da navegação\" é a tarja larga logo abaixo dos ícones do topo, " +
+                "onde o painel do carro mostra as setas quando há rota. Ela já vem com " +
+                "o tamanho certo.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
 
         Spacer(Modifier.height(14.dp))
         Text("Quanto espaço ocupa", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
@@ -465,7 +527,7 @@ private fun PainelDeInstrumentos(estado: TripState) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            TamanhoNoPainel.entries.forEach { tamanho ->
+            TamanhoNoPainel.Escolhiveis.forEach { tamanho ->
                 Opcao(tamanho.rotulo, ajustes.tamanho == tamanho) { Cluster.usarTamanho(tamanho) }
             }
         }
@@ -478,9 +540,37 @@ private fun PainelDeInstrumentos(estado: TripState) {
         Spacer(Modifier.height(4.dp))
         Text(
             "O desenho visto de cima, com portas, cintos e pressão dos pneus, numa " +
-                "janela separada — atividade br.com.hugolumazzini.havaltrip." +
-                "ClusterCarroActivity, também na tela 3 e também com a tela inteira. " +
-                "São duas janelas justamente para cada uma ficar num canto diferente.",
+                "janela separada. São duas janelas justamente para cada uma poder " +
+                "ficar num lugar diferente — e até em telas diferentes: os números " +
+                "no painel e o carro na bola do ar, ao mesmo tempo.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
+
+        Spacer(Modifier.height(14.dp))
+        Projecao(JanelaDoPainel.CARRO, ajustes.telaDoCarro)
+
+        Spacer(Modifier.height(14.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            LugarNoPainel.Cantos.forEach { lugar ->
+                Opcao(lugar.rotulo, ajustes.lugarDoCarro == lugar) { Cluster.usarLugarDoCarro(lugar) }
+            }
+            // Mesmo arranjo da faixa da navegação: um chip só, que já acerta o
+            // tamanho junto, para não existir o meio-termo que precisa de aviso.
+            Opcao(
+                LugarNoPainel.BOLA_DO_AC.rotulo,
+                ajustes.lugarDoCarro == LugarNoPainel.BOLA_DO_AC &&
+                    ajustes.tamanhoDoCarro == TamanhoDoCarro.BOLA_DO_AC,
+            ) { Cluster.usarBolaDoAr() }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "\"Bola do ar\" é o recorte redondo que o Impulse abre na tela do ar-" +
+                "condicionado, encostado à direita. Para essa opção, aponte esta " +
+                "janela para a tela 1 inteira (1920 x 860), e não para o painel.",
             style = MaterialTheme.typography.bodySmall,
             color = Cores.TextoApoio,
         )
@@ -489,16 +579,7 @@ private fun PainelDeInstrumentos(estado: TripState) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            LugarNoPainel.entries.forEach { lugar ->
-                Opcao(lugar.rotulo, ajustes.lugarDoCarro == lugar) { Cluster.usarLugarDoCarro(lugar) }
-            }
-        }
-        Spacer(Modifier.height(10.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            TamanhoDoCarro.entries.forEach { tamanho ->
+            TamanhoDoCarro.Escolhiveis.forEach { tamanho ->
                 Opcao(tamanho.rotulo, ajustes.tamanhoDoCarro == tamanho) {
                     Cluster.usarTamanhoDoCarro(tamanho)
                 }
@@ -510,6 +591,128 @@ private fun PainelDeInstrumentos(estado: TripState) {
     }
 }
 
+/**
+ * Em que tela do carro esta janela fica, e o botão que a manda para lá.
+ *
+ * Substitui a configuração que antes se fazia na tela "Telas" do Impulse. O que
+ * o Impulse tinha e um app comum não é o Shizuku — e o Shizuku a gente também
+ * tem. Ver [ProjetorDoPainel] para o porquê de valer a pena sair de lá.
+ *
+ * A lista de telas é lida a cada abertura porque ela muda: numa central sem o
+ * carro ligado o painel pode nem estar aceso, e a mesma lista de dois segundos
+ * atrás mentiria.
+ */
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun Projecao(janela: JanelaDoPainel, escolhida: Int?) {
+    val contexto = LocalContext.current
+    val escopo = rememberCoroutineScope()
+    val resultados by ProjetorDoPainel.resultados.collectAsStateWithLifecycle()
+
+    /**
+     * Reler as telas e o estado do Shizuku é barato e precisa acontecer de
+     * novo: quem chega aqui, descobre que falta iniciar o Shizuku, vai lá e
+     * volta, encontraria a mesma resposta velha e concluiria que não adiantou.
+     * O contador força a releitura sem precisar de um botão "atualizar".
+     */
+    var releituras by remember { mutableIntStateOf(0) }
+    val telas = remember(releituras) { ProjetorDoPainel.telas(contexto) }
+    val situacao = remember(releituras) { ShizukuShell.situacao() }
+    val lifecycle = LocalLifecycleOwner.current
+    DisposableEffect(lifecycle) {
+        val olheiro = LifecycleEventObserver { _, evento ->
+            if (evento == Lifecycle.Event.ON_RESUME) releituras++
+        }
+        lifecycle.lifecycle.addObserver(olheiro)
+        onDispose { lifecycle.lifecycle.removeObserver(olheiro) }
+    }
+
+    Text("Em que tela", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "No H6 o painel de instrumentos costuma ser a tela 3. \"Nenhuma\" deixa a " +
+            "janela desligada — é o que usar se preferir continuar configurando " +
+            "esta janela pelo Impulse.",
+        style = MaterialTheme.typography.bodySmall,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(8.dp))
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Opcao("Nenhuma", escolhida == null) {
+            Cluster.usarTela(janela, null)
+            ProjetorDoPainel.recolher(janela)
+        }
+        telas.forEach { tela ->
+            Opcao(tela.descricao, escolhida == tela.id) { Cluster.usarTela(janela, tela.id) }
+        }
+    }
+
+    if (telas.isEmpty()) {
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Esta central não está mostrando nenhuma tela além da grande. No carro " +
+                "isso costuma significar painel apagado — tente de novo com o carro ligado.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
+    }
+
+    Spacer(Modifier.height(10.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        BotaoAcao(
+            texto = "Projetar ${janela.rotulo.lowercase()}",
+            habilitado = escolhida != null,
+            onClick = {
+                // Fora da thread principal: abre um processo pelo Shizuku e
+                // espera por ele. Na principal, isso congelaria a tela.
+                escopo.launch(Dispatchers.IO) {
+                    ProjetorDoPainel.projetar(contexto, janela, escolhida ?: return@launch)
+                    // Uma tentativa pode revelar que o Shizuku caiu no meio-tempo.
+                    releituras++
+                }
+            },
+        )
+        BotaoAcao("Recolher", onClick = { ProjetorDoPainel.recolher(janela) })
+    }
+
+    val recado = recadoDaProjecao(situacao, resultados[janela])
+    if (recado != null) {
+        Spacer(Modifier.height(6.dp))
+        Text(recado, style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+    }
+    if (situacao == ShizukuShell.Situacao.PRECISA_AUTORIZAR) {
+        Spacer(Modifier.height(8.dp))
+        BotaoAcao("Autorizar no Shizuku", onClick = ShizukuShell::pedirPermissao)
+    }
+}
+
+/**
+ * O que dizer sobre a projeção — inclusive, e principalmente, quando não deu.
+ *
+ * O estado do Shizuku vem antes do resultado da última tentativa: sem ele nada
+ * vai funcionar, e mostrar "não achei a pilha" para quem só precisa iniciar o
+ * Shizuku manda a pessoa investigar a coisa errada.
+ */
+private fun recadoDaProjecao(
+    situacao: ShizukuShell.Situacao,
+    resultado: ProjetorDoPainel.Resultado?,
+): String? = when {
+    situacao == ShizukuShell.Situacao.SEM_SHIZUKU ->
+        "O Shizuku não está rodando nesta central. É ele quem tem permissão de mexer " +
+            "nas telas — o Impulse também depende dele para isso. Abra o app do " +
+            "Shizuku e inicie-o."
+    situacao == ShizukuShell.Situacao.PRECISA_AUTORIZAR ->
+        "Falta autorizar o Haval Trip no Shizuku. É uma vez só."
+    resultado is ProjetorDoPainel.Resultado.Projetando -> "Mandando a janela para a tela…"
+    resultado is ProjetorDoPainel.Resultado.Projetada ->
+        "Projetada na tela ${resultado.tela}. Ela volta sozinha a cada partida do carro."
+    resultado is ProjetorDoPainel.Resultado.Falhou -> "Não deu: ${resultado.motivo}."
+    else -> null
+}
+
 /** Os tamanhos de letra oferecidos, como multiplicador do cálculo automático. */
 private val ESCALAS = listOf(
     "Menor" to 0.75f,
@@ -517,3 +720,29 @@ private val ESCALAS = listOf(
     "Maior" to 1.3f,
     "Enorme" to 1.6f,
 )
+
+/**
+ * A cor que o botao mostra na amostra.
+ *
+ * "Seguir o Impulse" nao tem cor propria, entao a amostra mostra a paleta que
+ * esta valendo agora — e assim o botao ja responde "qual e ela?" sem o
+ * motorista ter de selecionar para descobrir.
+ */
+private fun corDaAmostra(cor: CorDoCluster, paleta: PaletaDoImpulse.Resultado?): Long {
+    if (cor != CorDoCluster.DO_IMPULSE) return cor.argb
+    return (paleta as? PaletaDoImpulse.Resultado.Achou)?.paleta?.clara ?: cor.argb
+}
+
+/** O que dizer sobre a leitura da paleta, inclusive quando ela nao deu certo. */
+private fun recadoDaPaleta(paleta: PaletaDoImpulse.Resultado?): String = when (paleta) {
+    null -> "Perguntando ao Impulse qual paleta esta ativa…"
+    is PaletaDoImpulse.Resultado.Achou ->
+        "Paleta do Impulse agora: ${paleta.paleta.rotulo}. Os numeros ficam quase brancos " +
+            "com um brilho nessa cor, como no modo Analogico V2 do tema Sport Colors."
+    PaletaDoImpulse.Resultado.SemShizuku ->
+        "Precisa da permissao do Shizuku para ler a paleta do Impulse. Enquanto nao " +
+            "tiver, os numeros ficam brancos."
+    is PaletaDoImpulse.Resultado.NaoDeuParaLer ->
+        "Nao deu para saber a paleta (${paleta.motivo}); os numeros ficam brancos. " +
+            "Escolha uma cor da lista se preferir fixar."
+}

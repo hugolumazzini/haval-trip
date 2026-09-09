@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
+import br.com.hugolumazzini.havaltrip.painel.fecharQuandoPedirem
 import br.com.hugolumazzini.havaltrip.ui.ClusterCarroScreen
 import br.com.hugolumazzini.havaltrip.ui.theme.HavalTripTheme
 
@@ -22,10 +24,15 @@ class ClusterCarroActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Cluster.iniciar(this)
+        // Perguntada aqui, e nao uma vez so na partida, porque a paleta pode
+        // ter mudado no volante desde a ultima vez que esta janela abriu.
+        Cluster.atualizarPaleta()
         ServicoDeBordo.garantir(this)
+        val espiando = intent.getBooleanExtra(ESPIANDO, false)
+        if (!espiando) fecharQuandoPedirem(JanelaDoPainel.CARRO)
         setContent {
             HavalTripTheme {
-                ClusterCarroScreen(vm, espiando = intent.getBooleanExtra(ESPIANDO, false))
+                ClusterCarroScreen(vm, espiando = espiando)
             }
         }
     }

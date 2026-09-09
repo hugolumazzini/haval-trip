@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import br.com.hugolumazzini.havaltrip.TripViewModel
+import br.com.hugolumazzini.havaltrip.domain.TripMetrics
 import br.com.hugolumazzini.havaltrip.domain.TripStatus
 import br.com.hugolumazzini.havaltrip.engine.TripState
 import br.com.hugolumazzini.havaltrip.format.TripFormat
@@ -94,6 +95,7 @@ fun PainelScreen(vm: TripViewModel, estado: TripState) {
                         TripFormat.decimal(m.avgFuelConsumptionKml, 1),
                         "km/L",
                         Modifier.weight(1f).fillMaxSize(),
+                        apoio = faltaParaAMedia(m),
                     )
                 }
                 Spacer(Modifier.height(14.dp))
@@ -144,5 +146,24 @@ fun PainelScreen(vm: TripViewModel, estado: TripState) {
             )
             BotaoAcao("Detalhes", { vm.abrirDetalhes(trip.id) }, Modifier.weight(1f))
         }
+    }
+}
+
+/**
+ * O que ainda falta para o consumo médio deixar de ser um traço.
+ *
+ * A média só aparece depois de meio litro queimado — abaixo disso a divisão é
+ * por um número pequeno demais e o resultado dança de 4.000 a 12 km/L. Dizer
+ * quanto falta transforma uma tela que parece quebrada numa tela que está
+ * esperando, que é o que ela de fato está fazendo.
+ */
+private fun faltaParaAMedia(m: TripMetrics): String? {
+    if (m.avgFuelConsumptionKml != null) return null
+    val litros = TripFormat.decimal(m.litrosAteAMedia, 2)
+    val km = m.kmAteAMedia
+    return if (km != null && km > 0.0) {
+        "faltam ${TripFormat.decimal(km, 1)} km neste ritmo ($litros L)"
+    } else {
+        "aparece depois de $litros L queimados"
     }
 }

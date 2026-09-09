@@ -101,6 +101,27 @@ class TripEngineTest {
     }
 
     @Test
+    fun `a tela sabe dizer quanto falta para a media aparecer`() {
+        var m = TripMetrics()
+        // 5 min a 60 km/h queimando 6 L/h: 5 km e 0,5 L — na fronteira exata.
+        repeat(300) { m = engine.accumulate(m, amostra(60.0, injecao = 6.0), 1.0) }
+        assertEquals(0.0, m.litrosAteAMedia, 1e-9)
+        assertEquals(0.0, m.kmAteAMedia!!, 1e-9)
+
+        // Metade do caminho: 0,25 L queimados, 2,5 km rodados.
+        var meio = TripMetrics()
+        repeat(150) { meio = engine.accumulate(meio, amostra(60.0, injecao = 6.0), 1.0) }
+        assertNull(meio.avgFuelConsumptionKml)
+        assertEquals(0.25, meio.litrosAteAMedia, 1e-9)
+        // No ritmo dela — 10 km/L — faltam 2,5 km.
+        assertEquals(2.5, meio.kmAteAMedia!!, 1e-6)
+
+        // Sem nada queimado não há ritmo do qual estimar quilômetro nenhum.
+        assertEquals(TripMetrics.MIN_LITROS_PARA_MEDIA, TripMetrics().litrosAteAMedia, 1e-9)
+        assertNull(TripMetrics().kmAteAMedia)
+    }
+
+    @Test
     fun `velocidade media considera o tempo parado e a de movimento nao`() {
         var m = TripMetrics()
         repeat(1800) { m = engine.accumulate(m, amostra(80.0), 1.0) }   // 40 km em 30 min

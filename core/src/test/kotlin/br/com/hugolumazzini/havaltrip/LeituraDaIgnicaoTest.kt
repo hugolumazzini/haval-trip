@@ -52,6 +52,14 @@ class LeituraDaIgnicaoTest {
     }
 
     @Test
+    fun `os codigos de motor dormindo nao ligam nada`() {
+        // -1 e 15 são o "carro dormindo" do engine_state, segundo o Impulse.
+        assertEquals(IgnitionState.OFF, ler(motor = "-1", energia = "1"))
+        assertEquals(IgnitionState.OFF, ler(motor = "15", energia = "1"))
+        assertEquals(IgnitionState.ON, ler(motor = "2", energia = "1"))
+    }
+
+    @Test
     fun `valor ilegivel nao liga nada`() {
         assertEquals(IgnitionState.OFF, ler(pronto = "", motor = "sim", energia = "ACC"))
     }

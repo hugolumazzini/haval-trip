@@ -86,7 +86,25 @@ internal fun linhasDaMedida(medida: MedidaDaJanela?): List<String> {
             dec(medida.altura, medida.janelaAltura),
         "vies ${vies(medida.x, medida.largura, medida.janelaLargura)} , " +
             vies(medida.y, medida.altura, medida.janelaAltura),
+        "fundo ${fundo(medida.fundoArgb)}, " + if (medida.fundoRedondo) "redondo" else "reto",
     )
+}
+
+/**
+ * A cor do fundo em hexadecimal, com o nome do que ela faz.
+ *
+ * O que interessa nela é a primeira dupla — a opacidade. `00` é fundo que não
+ * tapa nada, `FF` tapa tudo. Escrever isso por extenso ao lado evita a leitura
+ * errada de quem vê `#00000000` e conclui "está preto".
+ */
+private fun fundo(argb: Long): String {
+    val hex = String.format(java.util.Locale.US, "#%08X", argb)
+    val opacidade = (argb ushr 24).toInt()
+    return when {
+        opacidade == 0 -> "$hex nao tapa"
+        opacidade < 255 -> "$hex tapa em parte"
+        else -> "$hex tapa tudo"
+    }
 }
 
 /** A fração da janela que o bloco ocupa, com as três casas de `TamanhoNoPainel`. */
@@ -129,7 +147,13 @@ private fun fmt(v: Double): String = String.format(java.util.Locale.US, "%+.3f",
  * painel não há barra nenhuma e as duas coincidem; foi só na conferência que o
  * erro apareceu, que é justamente para o que ela serve.
  */
-fun Modifier.medindo(janela: JanelaDoPainel, janelaLargura: Int, janelaAltura: Int): Modifier =
+fun Modifier.medindo(
+    janela: JanelaDoPainel,
+    janelaLargura: Int,
+    janelaAltura: Int,
+    fundoArgb: Long,
+    fundoRedondo: Boolean,
+): Modifier =
     this.onGloballyPositioned {
         val bloco = it.boundsInRoot()
         Cluster.anotarMedida(
@@ -141,6 +165,8 @@ fun Modifier.medindo(janela: JanelaDoPainel, janelaLargura: Int, janelaAltura: I
                 y = bloco.top.roundToInt(),
                 largura = bloco.width.roundToInt(),
                 altura = bloco.height.roundToInt(),
+                fundoArgb = fundoArgb,
+                fundoRedondo = fundoRedondo,
             ),
         )
     }

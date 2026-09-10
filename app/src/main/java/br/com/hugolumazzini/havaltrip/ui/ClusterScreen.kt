@@ -82,8 +82,10 @@ fun ClusterScreen(vm: TripViewModel, espiando: Boolean = false) {
         // A fração pedida, antes de qualquer piso. É ela que decide o formato,
         // e não a caixa final: se o piso mudasse linha para coluna no meio do
         // caminho, o painel trocaria de desenho sozinho ao encolher a janela.
-        val larguraPedida = maxWidth * ajustes.tamanho.largura
-        val alturaPedida = maxHeight * ajustes.tamanho.altura
+        // O estica multiplica os dois lados pelo mesmo fator: o bloco cresce em
+        // proporção, sem deformar, e o tamanho escolhido continua sendo a base.
+        val larguraPedida = maxWidth * ajustes.tamanho.largura * ajustes.zoomDosNumeros.fator
+        val alturaPedida = maxHeight * ajustes.tamanho.altura * ajustes.zoomDosNumeros.fator
         val emLinha = larguraPedida > alturaPedida * 1.6f
 
         // As frações do "Tamanho" nasceram pensando num painel grande. Numa
@@ -112,7 +114,13 @@ fun ClusterScreen(vm: TripViewModel, espiando: Boolean = false) {
                 // vez de tapar só o pedaço que atrapalha.
                 .background(Color(ajustes.fundo.argb))
                 // Conta à central onde caiu. Ver `QuadroDeMedidas`.
-                .medindo(JanelaDoPainel.NUMEROS, constraints.maxWidth, constraints.maxHeight),
+                .medindo(
+                    JanelaDoPainel.NUMEROS,
+                    constraints.maxWidth,
+                    constraints.maxHeight,
+                    ajustes.fundo.argb,
+                    false,
+                ),
         ) {
             Painel(trip.metrics, estado.live, ajustes, emLinha, tinta(ajustes, paleta))
         }

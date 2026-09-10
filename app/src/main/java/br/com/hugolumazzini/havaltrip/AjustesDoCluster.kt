@@ -260,6 +260,51 @@ data class Empurrao(val x: Int = 0, val y: Int = 0) {
 }
 
 /**
+ * Quanto o tamanho escolhido é esticado, em porcento.
+ *
+ * Os tamanhos prontos são degraus largos — de "Médio" para "Grande" o bloco
+ * salta um terço —, e no painel de verdade o que falta é quase sempre menos que
+ * um degrau. Isto multiplica o tamanho escolhido em vez de substituí-lo: os dois
+ * lados crescem juntos, na mesma proporção, então o bloco não deforma e as
+ * predefinições continuam sendo o ponto de partida que a régua sabe relatar.
+ *
+ * Em porcento inteiro, e não em fração, porque é o que se grava e se lê sem
+ * arredondamento acumulado a cada toque.
+ */
+@JvmInline
+value class Zoom(val porcento: Int = 100) {
+
+    /** Somado e já contido nos limites, para o bloco nunca sumir nem estourar. */
+    fun mais(delta: Int) = Zoom((porcento + delta).coerceIn(MINIMO, MAXIMO))
+
+    /** O multiplicador que o layout usa. */
+    val fator: Float get() = porcento / 100f
+
+    val natural: Boolean get() = porcento == PADRAO
+
+    companion object {
+        const val PADRAO = 100
+
+        /** Quanto o botão simples anda, em pontos percentuais. */
+        const val PASSO = 5
+
+        /** Quanto o botão duplo anda. */
+        const val SALTO = 25
+
+        /**
+         * Até onde vai o estica-e-encolhe.
+         *
+         * Um quarto do tamanho escolhido ainda se lê; menos que isso seria um
+         * borrão que o motorista não teria como desfazer sem adivinhar. O teto
+         * de três vezes é onde o maior dos tamanhos prontos já passa da tela —
+         * daí para cima só se ganharia recorte.
+         */
+        const val MINIMO = 25
+        const val MAXIMO = 300
+    }
+}
+
+/**
  * Onde uma janela do painel realmente caiu, em pixels.
  *
  * Não é ajuste: é o que a janela mediu de si mesma depois de desenhada. Existe
@@ -279,6 +324,18 @@ data class MedidaDaJanela(
     val y: Int,
     val largura: Int,
     val altura: Int,
+    /**
+     * A cor que a janela pediu para o fundo, na hora de desenhar.
+     *
+     * Vem da janela e não da configuração de propósito: as duas deveriam dizer
+     * a mesma coisa, e quando não dizem é exatamente isso que se precisa saber.
+     * Um fundo escolhido preto que chega aqui como transparente é um ajuste que
+     * não atravessou; um que chega preto e mesmo assim não tapa nada na tela é
+     * outro problema, em outro lugar. Sem este número os dois casos se parecem.
+     */
+    val fundoArgb: Long,
+    /** Se o fundo saiu redondo, como manda a bola do ar, ou reto. */
+    val fundoRedondo: Boolean,
 )
 
 /**
@@ -319,6 +376,8 @@ data class AjustesDoCluster(
     val telaDoCarro: Int? = null,
     val empurraoDosNumeros: Empurrao = Empurrao(),
     val empurraoDoCarro: Empurrao = Empurrao(),
+    val zoomDosNumeros: Zoom = Zoom(),
+    val zoomDoCarro: Zoom = Zoom(),
 ) {
     /**
      * A lista que a tela do painel usa de fato.
@@ -361,6 +420,8 @@ object Cluster {
     private const val EMPURRAO_NUMEROS_Y = "empurraoDosNumerosY"
     private const val EMPURRAO_CARRO_X = "empurraoDoCarroX"
     private const val EMPURRAO_CARRO_Y = "empurraoDoCarroY"
+    private const val ZOOM_NUMEROS = "zoomDosNumeros"
+    private const val ZOOM_CARRO = "zoomDoCarro"
 
     /**
      * O que se grava no lugar de "nenhuma tela".
@@ -477,6 +538,10 @@ object Cluster {
                 .mais(prefs.getInt(EMPURRAO_NUMEROS_X, 0), prefs.getInt(EMPURRAO_NUMEROS_Y, 0)),
             empurraoDoCarro = Empurrao()
                 .mais(prefs.getInt(EMPURRAO_CARRO_X, 0), prefs.getInt(EMPURRAO_CARRO_Y, 0)),
+            // Pelo `mais` de propósito, como os empurrões: é ele que contém nos
+            // limites, e um valor gravado errado não some com o bloco.
+            zoomDosNumeros = Zoom(0).mais(prefs.getInt(ZOOM_NUMEROS, Zoom.PADRAO)),
+            zoomDoCarro = Zoom(0).mais(prefs.getInt(ZOOM_CARRO, Zoom.PADRAO)),
         )
     }
 
@@ -499,6 +564,8 @@ object Cluster {
             .putInt(EMPURRAO_NUMEROS_Y, novo.empurraoDosNumeros.y)
             .putInt(EMPURRAO_CARRO_X, novo.empurraoDoCarro.x)
             .putInt(EMPURRAO_CARRO_Y, novo.empurraoDoCarro.y)
+            .putInt(ZOOM_NUMEROS, novo.zoomDosNumeros.porcento)
+            .putInt(ZOOM_CARRO, novo.zoomDoCarro.porcento)
             .apply()
     }
 
@@ -560,6 +627,31 @@ object Cluster {
                 _ajustes.value.copy(empurraoDosNumeros = _ajustes.value.empurraoDosNumeros.mais(dx, dy))
             JanelaDoPainel.CARRO ->
                 _ajustes.value.copy(empurraoDoCarro = _ajustes.value.empurraoDoCarro.mais(dx, dy))
+        },
+    )
+
+    /**
+     * Estica ou encolhe uma janela, em pontos percentuais sobre o tamanho
+     * escolhido.
+     *
+     * Multiplica o tamanho pronto em vez de trocá-lo, pelo mesmo motivo do
+     * [empurrar]: o tamanho continua sendo o ponto de partida, e trocar de
+     * tamanho depois de esticar mantém o estica.
+     */
+    fun ampliar(janela: JanelaDoPainel, delta: Int) = gravar(
+        when (janela) {
+            JanelaDoPainel.NUMEROS ->
+                _ajustes.value.copy(zoomDosNumeros = _ajustes.value.zoomDosNumeros.mais(delta))
+            JanelaDoPainel.CARRO ->
+                _ajustes.value.copy(zoomDoCarro = _ajustes.value.zoomDoCarro.mais(delta))
+        },
+    )
+
+    /** Volta a janela ao tamanho escolhido, sem estica. */
+    fun tamanhoNatural(janela: JanelaDoPainel) = gravar(
+        when (janela) {
+            JanelaDoPainel.NUMEROS -> _ajustes.value.copy(zoomDosNumeros = Zoom())
+            JanelaDoPainel.CARRO -> _ajustes.value.copy(zoomDoCarro = Zoom())
         },
     )
 

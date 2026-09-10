@@ -7,6 +7,7 @@ import br.com.hugolumazzini.havaltrip.engine.ConsumptionAverage
 import br.com.hugolumazzini.havaltrip.engine.EngineConfig
 import br.com.hugolumazzini.havaltrip.engine.TripEngine
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -78,47 +79,45 @@ class TripEngineTest {
     }
 
     @Test
-    fun `media de consumo e nula enquanto nao houver combustivel queimado`() {
+    fun `media de consumo so e nula nos primeiros metros`() {
+        // Sem distância não há o que dividir; um segundo a 50 km/h são 14 m.
         assertNull(TripMetrics().avgFuelConsumptionKml)
-        val m = engine.accumulate(TripMetrics(), amostra(50.0, injecao = 0.0), 1.0)
-        assertNull(m.avgFuelConsumptionKml)
+        val parada = engine.accumulate(TripMetrics(), amostra(50.0, injecao = 0.0), 1.0)
+        assertTrue(parada.distanceKm < TripMetrics.MIN_KM_PARA_MEDIA)
+        assertNull(parada.avgFuelConsumptionKml)
+
+        // Passados os cem metros já existe número, e sem esperar meio litro:
+        // são segundos de rua, não os 5 a 8 km do piso antigo.
+        var m = TripMetrics()
+        repeat(10) { m = engine.accumulate(m, amostra(50.0, injecao = 6.0), 1.0) }
+        assertTrue(m.distanceKm > TripMetrics.MIN_KM_PARA_MEDIA)
+        assertNotNull(m.avgFuelConsumptionKml)
     }
 
     @Test
-    fun `media de consumo espera juntar combustivel antes de virar numero`() {
+    fun `media de consumo satura em vez de mostrar numero absurdo`() {
         // O caso real: híbrido saindo no elétrico. Anda 5 km injetando quase
-        // nada e a divisão dava 4.000 km/L na tela.
+        // nada, e a divisão solta dava 4.000 km/L na tela.
         var m = TripMetrics()
         repeat(300) { m = engine.accumulate(m, amostra(60.0, injecao = 0.003), 1.0) }
         assertTrue(m.distanceKm > 4.0)
-        assertTrue(m.fuelLitres < TripMetrics.MIN_LITROS_PARA_MEDIA)
-        assertNull(m.avgFuelConsumptionKml)
+        assertTrue(m.distanceKm / m.fuelLitres > 1000.0)
+        assertEquals(TripMetrics.TETO_KML, m.avgFuelConsumptionKml!!, 1e-9)
 
-        // Passado o meio litro, o número aparece — e plausível, não absurdo.
+        // Motor entrando: a média desce do teto para o valor de regime, que é o
+        // que o painel do carro faz. Nada de traço mudo no meio do caminho.
         repeat(600) { m = engine.accumulate(m, amostra(60.0, injecao = 6.0), 1.0) }
         val media = m.avgFuelConsumptionKml!!
-        assertTrue("média fora do plausível: $media", media in 5.0..40.0)
+        assertTrue("média fora do plausível: $media", media in 5.0..TripMetrics.TETO_KML)
     }
 
     @Test
-    fun `a tela sabe dizer quanto falta para a media aparecer`() {
+    fun `trecho puramente eletrico mostra o teto e nao um traco`() {
         var m = TripMetrics()
-        // 5 min a 60 km/h queimando 6 L/h: 5 km e 0,5 L — na fronteira exata.
-        repeat(300) { m = engine.accumulate(m, amostra(60.0, injecao = 6.0), 1.0) }
-        assertEquals(0.0, m.litrosAteAMedia, 1e-9)
-        assertEquals(0.0, m.kmAteAMedia!!, 1e-9)
-
-        // Metade do caminho: 0,25 L queimados, 2,5 km rodados.
-        var meio = TripMetrics()
-        repeat(150) { meio = engine.accumulate(meio, amostra(60.0, injecao = 6.0), 1.0) }
-        assertNull(meio.avgFuelConsumptionKml)
-        assertEquals(0.25, meio.litrosAteAMedia, 1e-9)
-        // No ritmo dela — 10 km/L — faltam 2,5 km.
-        assertEquals(2.5, meio.kmAteAMedia!!, 1e-6)
-
-        // Sem nada queimado não há ritmo do qual estimar quilômetro nenhum.
-        assertEquals(TripMetrics.MIN_LITROS_PARA_MEDIA, TripMetrics().litrosAteAMedia, 1e-9)
-        assertNull(TripMetrics().kmAteAMedia)
+        repeat(120) { m = engine.accumulate(m, amostra(60.0, injecao = 0.0), 1.0) }
+        assertEquals(0.0, m.fuelLitres, 1e-9)
+        // Consumo real infinito. O teto é como se escreve isso num mostrador.
+        assertEquals(TripMetrics.TETO_KML, m.avgFuelConsumptionKml!!, 1e-9)
     }
 
     @Test

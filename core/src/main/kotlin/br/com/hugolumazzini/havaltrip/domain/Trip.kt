@@ -82,42 +82,32 @@ data class TripMetrics(
     val totalTimeS: Double get() = movingTimeS + idleTimeS
 
     /**
-     * Consumo médio da Trip, em km/L. `null` enquanto não houver combustível
-     * queimado — devolver 0.0 aqui mentiria dizendo "o carro não anda nada".
+     * Consumo médio da Trip, em km/L. `null` só nos primeiros metros, antes de
+     * [MIN_KM_PARA_MEDIA] — sem distância não há o que dividir.
      *
-     * Também `null` antes de [MIN_LITROS_PARA_MEDIA]. Uma divisão por um número
-     * quase zero estoura: nos primeiros metros de uma Trip o híbrido anda no
-     * elétrico, o motor não injeta quase nada, e `1 km ÷ 0,00025 L` dá os
-     * 4.000 km/L que apareceram na tela. Não é erro de conta — é conta certa
-     * sobre uma amostra pequena demais para significar alguma coisa. Um traço
-     * enquanto a Trip não junta combustível suficiente é mais honesto que um
-     * número absurdo, e evita que o motorista veja o consumo "despencar" de
-     * 4.000 para 12 como se o carro tivesse piorado.
-     */
-    val avgFuelConsumptionKml: Double? get() =
-        if (fuelLitres >= MIN_LITROS_PARA_MEDIA) distanceKm / fuelLitres else null
-
-    /**
-     * Quanto ainda falta queimar para o consumo médio virar número, em litros.
-     * Zero quando ele já apareceu.
+     * O resultado é limitado a [TETO_KML]. Esse teto é o que faltava: antes a
+     * conta era solta, e nos primeiros metros de uma Trip — em que o híbrido
+     * anda no elétrico e o motor mal injeta — `1 km ÷ 0,00025 L` dava os
+     * 4.000 km/L que apareceram na tela. A reação na época foi esconder a média
+     * até meio litro queimado, o que deixava um traço por 5 a 8 km.
      *
-     * Existe para a tela poder dizer o que está faltando em vez de mostrar um
-     * traço mudo. Num híbrido saindo no elétrico esse traço dura quilômetros, e
-     * sem explicação ele parece defeito.
-     */
-    val litrosAteAMedia: Double get() = (MIN_LITROS_PARA_MEDIA - fuelLitres).coerceAtLeast(0.0)
-
-    /**
-     * Uma estimativa grosseira de quantos km ainda faltam para a média aparecer.
+     * Era a reação errada, e o próprio carro mostra por quê: o contador dele
+     * que zera sozinho depois de horas parado também começa do zero, e mesmo
+     * assim dá média desde o primeiro quilômetro. Ele não espera amostra
+     * nenhuma — ele satura. Nenhum computador de bordo mostra 4.000 km/L,
+     * porque nenhum carro faz 4.000 km/L; acima de um certo ponto o número
+     * deixa de ser medição e vira artefato da divisão.
      *
-     * Usa o próprio ritmo da Trip até aqui, que é justamente o número instável
-     * que ainda não se mostra — serve para dar ordem de grandeza ("uns 4 km"),
-     * não para ser lido como promessa. `null` enquanto não houver nem ritmo.
+     * Limitando, a média aparece desde o início e desce do teto até o valor de
+     * regime, que é exatamente o que o painel do carro faz num arranque em
+     * elétrico. E o motorista vê um número convergindo em vez de um traço mudo.
      */
-    val kmAteAMedia: Double? get() {
-        if (litrosAteAMedia <= EPSILON) return 0.0
-        if (fuelLitres <= EPSILON || distanceKm <= EPSILON) return null
-        return litrosAteAMedia * (distanceKm / fuelLitres)
+    val avgFuelConsumptionKml: Double? get() = when {
+        distanceKm < MIN_KM_PARA_MEDIA -> null
+        // Andou sem queimar nada: trecho puramente elétrico. O consumo real é
+        // infinito, e o teto é justamente como se escreve isso num mostrador.
+        fuelLitres <= EPSILON -> TETO_KML
+        else -> (distanceKm / fuelLitres).coerceAtMost(TETO_KML)
     }
 
     /** Velocidade média, em km/h, contando o tempo parado. `null` sem tempo. */
@@ -147,14 +137,29 @@ data class TripMetrics(
         const val EPSILON = 1e-9
 
         /**
-         * Combustível mínimo para o consumo médio virar número na tela.
+         * Distância mínima para o consumo médio virar número na tela, em km.
          *
-         * Meio litro é da ordem de 5 a 8 km rodados num H6 — o bastante para a
-         * média parar de dançar. Abaixo disso o divisor é pequeno demais e
-         * qualquer arredondamento do sensor vira uma variação enorme no
-         * resultado.
+         * Cem metros, o suficiente para não dividir por uma distância que ainda
+         * é ruído do sensor de roda. Dura segundos, ao contrário do meio litro
+         * que este piso substituiu — ver [TripMetrics.avgFuelConsumptionKml].
          */
-        const val MIN_LITROS_PARA_MEDIA = 0.5
+        const val MIN_KM_PARA_MEDIA = 0.1
+
+        /**
+         * O maior consumo médio que a tela mostra, em km/L.
+         *
+         * Não é um limite de segurança nem um chute redondo: é onde a medição
+         * para de significar alguma coisa. Um H6 em condução leve faz algo em
+         * torno de 20 km/L; acima disso, o que a divisão devolve não é o carro
+         * economizando, é o motor desligado num trecho elétrico ou um divisor
+         * pequeno demais. Todo computador de bordo satura em algum ponto por
+         * essa razão — o do próprio H6 inclusive.
+         *
+         * 30 é uma margem folgada sobre os 20, para não cortar um trecho
+         * genuinamente econômico. Se o painel do carro saturar em outro valor,
+         * é aqui que se acerta: um número só, e os testes acompanham.
+         */
+        const val TETO_KML = 30.0
     }
 }
 

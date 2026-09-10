@@ -54,6 +54,9 @@ import kotlinx.coroutines.launch
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
 import br.com.hugolumazzini.havaltrip.painel.ProjetorDoPainel
 import br.com.hugolumazzini.havaltrip.painel.ShizukuShell
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import br.com.hugolumazzini.havaltrip.Empurrao
 import br.com.hugolumazzini.havaltrip.ItemDoCluster
 import br.com.hugolumazzini.havaltrip.LugarNoPainel
 import br.com.hugolumazzini.havaltrip.TamanhoDoCarro
@@ -532,6 +535,9 @@ private fun PainelDeInstrumentos(estado: TripState) {
             }
         }
 
+        Spacer(Modifier.height(14.dp))
+        AjusteFino(JanelaDoPainel.NUMEROS, ajustes.empurraoDosNumeros)
+
         Spacer(Modifier.height(12.dp))
         BotaoAcao("Ver como fica", onClick = { espiar(ClusterActivity::class.java) })
 
@@ -586,9 +592,119 @@ private fun PainelDeInstrumentos(estado: TripState) {
             }
         }
 
+        Spacer(Modifier.height(14.dp))
+        Text("Fundo do carro", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Na bola do ar o fundo opaco é redondo, do tamanho da bola: é ele que " +
+                "tapa a tela do ar-condicionado por baixo. Transparente deixa os dois " +
+                "desenhos aparecerem um sobre o outro.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            FundoDoCluster.entries.forEach { fundo ->
+                Opcao(fundo.rotulo, ajustes.fundoDoCarro == fundo) { Cluster.usarFundoDoCarro(fundo) }
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        AjusteFino(JanelaDoPainel.CARRO, ajustes.empurraoDoCarro)
+
         Spacer(Modifier.height(12.dp))
         BotaoAcao("Ver como fica o carro", onClick = { espiar(ClusterCarroActivity::class.java) })
     }
+}
+
+/**
+ * O ajuste fino de posição da janela, em setas.
+ *
+ * Por que existe: os lugares prontos acertam o grosso e erram o fio. A faixa da
+ * navegação foi medida numa foto do painel, e no carro o bloco caiu sobre a
+ * estrada desenhada em vez de na tarja vazia acima dela. Sem isto, cada
+ * tentativa de acerto seria um número trocado no código e um APK novo — e quem
+ * enxerga o resultado está sentado no carro, não na frente do editor.
+ *
+ * Setas e não slider: o erro a corrigir é de alguns pixels, e o alvo de um
+ * slider com o dedo, num carro, é muito maior do que isso. A seta dupla anda
+ * [Empurrao.SALTO] para atravessar a tela sem quarenta toques; a simples anda
+ * [Empurrao.PASSO], que é o pixel fino.
+ */
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun AjusteFino(janela: JanelaDoPainel, empurrao: Empurrao) {
+    Text("Ajuste fino da posição", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "Empurra a janela a partir do lugar escolhido acima, para acertar o que " +
+            "o lugar pronto errou por pouco. Use o \"Ver como fica\" para conferir.",
+        style = MaterialTheme.typography.bodySmall,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(8.dp))
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Seta("▲▲", "sobe muito") { Cluster.empurrar(janela, 0, -Empurrao.SALTO) }
+        Seta("▲", "sobe pouco") { Cluster.empurrar(janela, 0, -Empurrao.PASSO) }
+        Seta("▼", "desce pouco") { Cluster.empurrar(janela, 0, Empurrao.PASSO) }
+        Seta("▼▼", "desce muito") { Cluster.empurrar(janela, 0, Empurrao.SALTO) }
+        Seta("◀◀", "esquerda muito") { Cluster.empurrar(janela, -Empurrao.SALTO, 0) }
+        Seta("◀", "esquerda pouco") { Cluster.empurrar(janela, -Empurrao.PASSO, 0) }
+        Seta("▶", "direita pouco") { Cluster.empurrar(janela, Empurrao.PASSO, 0) }
+        Seta("▶▶", "direita muito") { Cluster.empurrar(janela, Empurrao.SALTO, 0) }
+        BotaoAcao(
+            "Desfazer",
+            onClick = { Cluster.centralizar(janela) },
+            habilitado = !empurrao.centrado,
+        )
+    }
+    Spacer(Modifier.height(6.dp))
+    // O número aparece sempre, inclusive zerado: sem ele não há como saber se o
+    // toque pegou, já que quem confere está olhando para a outra tela.
+    Text(
+        if (empurrao.centrado) "No lugar, sem empurrão."
+        else "Empurrado ${rumo(empurrao.x, "para a direita", "para a esquerda")} e " +
+            "${rumo(empurrao.y, "para baixo", "para cima")}.",
+        style = MaterialTheme.typography.bodySmall,
+        color = Cores.TextoApoio,
+    )
+
+    Spacer(Modifier.height(12.dp))
+    Text("Medidas desta janela", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "O que a janela mediu de si mesma. Com ela projetada no painel, muda a " +
+            "cada toque nas setas; com ela fechada, é a última leitura, e não " +
+            "acompanha os ajustes. Depois de acertar a posição, me mande estas " +
+            "linhas: com elas eu corrijo as posições prontas no código, e quem " +
+            "vier depois não precisa ajustar nada.",
+        style = MaterialTheme.typography.bodySmall,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(8.dp))
+    QuadroDeMedidas(janela)
+}
+
+/**
+ * "12 dp para a direita" em vez de "x = 12".
+ *
+ * O sinal do eixo não quer dizer nada para quem está ajustando: negativo é
+ * esquerda numa linha e cima na outra, e obrigar a lembrar disso é transformar
+ * uma conferência de relance em tradução mental.
+ */
+private fun rumo(valor: Int, positivo: String, negativo: String): String =
+    if (valor == 0) "nada" else "${kotlin.math.abs(valor)} dp ${if (valor > 0) positivo else negativo}"
+
+/** Um passo do ajuste fino. Alvo grande porque é tocado com o carro parado, mas às pressas. */
+@Composable
+private fun Seta(simbolo: String, descricao: String, onClick: () -> Unit) {
+    BotaoAcao(simbolo, onClick = onClick, modifier = Modifier.semantics { contentDescription = descricao })
 }
 
 /**

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LocalTextStyle
@@ -31,6 +32,7 @@ import br.com.hugolumazzini.havaltrip.ItemDoCluster
 import br.com.hugolumazzini.havaltrip.CorDoCluster
 import br.com.hugolumazzini.havaltrip.LugarNoPainel
 import br.com.hugolumazzini.havaltrip.TripViewModel
+import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
 import br.com.hugolumazzini.havaltrip.domain.MedidaDoPainel
 import br.com.hugolumazzini.havaltrip.domain.PaletaSport
 import br.com.hugolumazzini.havaltrip.telemetry.PaletaDoImpulse
@@ -100,12 +102,17 @@ fun ClusterScreen(vm: TripViewModel, espiando: Boolean = false) {
         Box(
             Modifier
                 .align(ajustes.lugar.alinhamento())
+                // Depois do `align`, e não antes: o empurrão é a correção sobre
+                // o lugar escolhido, não um lugar concorrente.
+                .offset(x = ajustes.empurraoDosNumeros.x.dp, y = ajustes.empurraoDosNumeros.y.dp)
                 .width(largura)
                 .height(altura)
                 // O fundo é do bloco, e não da janela: a janela é a tela
                 // inteira do painel, e pintá-la inteira apagaria o carro em
                 // vez de tapar só o pedaço que atrapalha.
-                .background(Color(ajustes.fundo.argb)),
+                .background(Color(ajustes.fundo.argb))
+                // Conta à central onde caiu. Ver `QuadroDeMedidas`.
+                .medindo(JanelaDoPainel.NUMEROS, constraints.maxWidth, constraints.maxHeight),
         ) {
             Painel(trip.metrics, estado.live, ajustes, emLinha, tinta(ajustes, paleta))
         }

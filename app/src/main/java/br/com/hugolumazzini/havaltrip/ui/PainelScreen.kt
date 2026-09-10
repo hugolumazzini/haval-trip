@@ -98,7 +98,7 @@ fun PainelScreen(vm: TripViewModel, estado: TripState) {
                         TripFormat.decimal(m.avgFuelConsumptionKml, 1),
                         "km/L",
                         Modifier.weight(1f).fillMaxSize(),
-                        apoio = faltaParaAMedia(m),
+                        apoio = sobreAMedia(m),
                     )
                 }
                 Spacer(Modifier.height(14.dp))
@@ -153,20 +153,13 @@ fun PainelScreen(vm: TripViewModel, estado: TripState) {
 }
 
 /**
- * O que ainda falta para o consumo médio deixar de ser um traço.
+ * O aviso de que a média ainda está no teto da escala.
  *
- * A média só aparece depois de meio litro queimado — abaixo disso a divisão é
- * por um número pequeno demais e o resultado dança de 4.000 a 12 km/L. Dizer
- * quanto falta transforma uma tela que parece quebrada numa tela que está
- * esperando, que é o que ela de fato está fazendo.
+ * Sem ele, um trecho inteiro em elétrico mostraria 30,0 km/L parado, e nada na
+ * tela diria que aquilo é o topo do mostrador e não uma medição. Some sozinho
+ * assim que o motor entra e o número começa a descer.
  */
-private fun faltaParaAMedia(m: TripMetrics): String? {
-    if (m.avgFuelConsumptionKml != null) return null
-    val litros = TripFormat.decimal(m.litrosAteAMedia, 2)
-    val km = m.kmAteAMedia
-    return if (km != null && km > 0.0) {
-        "faltam ${TripFormat.decimal(km, 1)} km neste ritmo ($litros L)"
-    } else {
-        "aparece depois de $litros L queimados"
-    }
+private fun sobreAMedia(m: TripMetrics): String? {
+    val media = m.avgFuelConsumptionKml ?: return null
+    return if (media >= TripMetrics.TETO_KML) "no máximo da escala" else null
 }

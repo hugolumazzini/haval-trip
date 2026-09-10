@@ -216,6 +216,72 @@ enum class TamanhoDoCarro(val rotulo: String, val fracao: Float) {
 }
 
 /**
+ * O empurrãozinho final, em dp, sobre o lugar escolhido.
+ *
+ * Os nove cantos e os dois lugares prontos acertam o grosso, mas não o fio: a
+ * faixa da navegação, por exemplo, saiu de uma foto medida a régua, e no carro
+ * ela caiu em cima da estrada desenhada em vez de na tarja vazia. Sem este
+ * ajuste, corrigir isso seria mudar um número no código e gerar um APK novo a
+ * cada tentativa — e quem vê o resultado é quem está sentado no carro, não quem
+ * escreve o código.
+ *
+ * Em dp e por setas, não por slider: o alvo é de poucos pixels, e slider com o
+ * dedo num carro não acerta poucos pixels. A seta simples anda [PASSO] e a
+ * dupla anda [SALTO], que é o que evita quarenta toques para atravessar o
+ * painel sem tirar de quem ajusta a chance de parar no pixel certo.
+ */
+data class Empurrao(val x: Int = 0, val y: Int = 0) {
+
+    /** Somado e já contido no limite, para o bloco nunca sair da janela. */
+    fun mais(dx: Int, dy: Int) = Empurrao(
+        x = (x + dx).coerceIn(-LIMITE, LIMITE),
+        y = (y + dy).coerceIn(-LIMITE, LIMITE),
+    )
+
+    val centrado: Boolean get() = x == 0 && y == 0
+
+    companion object {
+        /** Quanto a seta simples anda por toque, em dp. */
+        const val PASSO = 6
+
+        /** Quanto a seta dupla anda por toque, em dp. */
+        const val SALTO = 30
+
+        /**
+         * Até onde o empurrão vai, em dp para cada lado.
+         *
+         * 240 é mais da metade da altura do painel: passa do ponto em que o
+         * bloco ainda estaria visível, e portanto nunca é o limite que atrapalha
+         * — só existe para uma preferência gravada errada não jogar a janela
+         * para fora da tela sem o motorista ter como trazê-la de volta.
+         */
+        const val LIMITE = 240
+    }
+}
+
+/**
+ * Onde uma janela do painel realmente caiu, em pixels.
+ *
+ * Não é ajuste: é o que a janela mediu de si mesma depois de desenhada. Existe
+ * porque as posições prontas — a faixa da navegação, a bola do ar — saíram de
+ * fotos medidas contra a área útil da tela, e no carro erraram. Não dá para
+ * corrigi-las às cegas: o painel é da ROM do carro, não há de onde ler as
+ * medidas certas, e cada palpite custa um APK novo.
+ *
+ * Então quem mede é a própria janela, rodando no painel de verdade, e o número
+ * atravessa até a central pelo [Cluster.medidas]. Ver `linhasDaMedida` para
+ * como ele se lê.
+ */
+data class MedidaDaJanela(
+    val janelaLargura: Int,
+    val janelaAltura: Int,
+    val x: Int,
+    val y: Int,
+    val largura: Int,
+    val altura: Int,
+)
+
+/**
  * O que o motorista escolheu para o painel de instrumentos.
  *
  * @param tripId qual contador vai para o painel. `null` significa "o que
@@ -230,6 +296,9 @@ enum class TamanhoDoCarro(val rotulo: String, val fracao: Float) {
  * @param telaDoCarro o mesmo, para a janela do desenho do carro. São dois
  *   campos independentes de propósito: o caso que motivou tudo isto é justamente
  *   o bloco no painel (tela 3) e o carro na bola do ar (tela 1), ao mesmo tempo.
+ * @param empurraoDosNumeros deslocamento fino do bloco de números, em dp, a
+ *   partir do lugar escolhido. Ver [Empurrao].
+ * @param empurraoDoCarro o mesmo, para a janela do carro.
  */
 data class AjustesDoCluster(
     val tripId: String? = null,
@@ -245,8 +314,11 @@ data class AjustesDoCluster(
     val tamanho: TamanhoNoPainel = TamanhoNoPainel.FAIXA,
     val lugarDoCarro: LugarNoPainel = LugarNoPainel.MEIO_CENTRO,
     val tamanhoDoCarro: TamanhoDoCarro = TamanhoDoCarro.MEDIO,
+    val fundoDoCarro: FundoDoCluster = FundoDoCluster.TRANSPARENTE,
     val telaDosNumeros: Int? = null,
     val telaDoCarro: Int? = null,
+    val empurraoDosNumeros: Empurrao = Empurrao(),
+    val empurraoDoCarro: Empurrao = Empurrao(),
 ) {
     /**
      * A lista que a tela do painel usa de fato.
@@ -282,8 +354,13 @@ object Cluster {
     private const val TAMANHO = "tamanho"
     private const val LUGAR_CARRO = "lugarDoCarro"
     private const val TAMANHO_CARRO = "tamanhoDoCarro"
+    private const val FUNDO_CARRO = "fundoDoCarro"
     private const val TELA_NUMEROS = "telaDosNumeros"
     private const val TELA_CARRO = "telaDoCarro"
+    private const val EMPURRAO_NUMEROS_X = "empurraoDosNumerosX"
+    private const val EMPURRAO_NUMEROS_Y = "empurraoDosNumerosY"
+    private const val EMPURRAO_CARRO_X = "empurraoDoCarroX"
+    private const val EMPURRAO_CARRO_Y = "empurraoDoCarroY"
 
     /**
      * O que se grava no lugar de "nenhuma tela".
@@ -297,6 +374,38 @@ object Cluster {
 
     private val _ajustes = MutableStateFlow(AjustesDoCluster())
     val ajustes: StateFlow<AjustesDoCluster> = _ajustes.asStateFlow()
+
+    /**
+     * O que cada janela do painel mediu de si mesma, da última vez que apareceu.
+     *
+     * Aqui e não dentro da janela porque quem precisa ler é a central: a janela
+     * projetada tem dois dedos de altura e fica do outro lado do carro, e texto
+     * de régua nela sairia minúsculo. A janela mede e conta; a tela de
+     * Configuração mostra em tamanho de gente.
+     *
+     * Na memória e não nas preferências, de propósito: é uma leitura do que
+     * está na tela agora, e um valor gravado sobreviveria à janela que o
+     * produziu — a central mostraria com confiança a medida de um ajuste que já
+     * mudou. Vazio quer dizer "essa janela ainda não apareceu", que é uma
+     * resposta honesta e é o que a tela diz.
+     *
+     * As duas Activities do painel e a central são o mesmo processo, então isto
+     * atravessa sem precisar de arquivo nem de aviso.
+     */
+    private val _medidas = MutableStateFlow<Map<JanelaDoPainel, MedidaDaJanela>>(emptyMap())
+    val medidas: StateFlow<Map<JanelaDoPainel, MedidaDaJanela>> = _medidas.asStateFlow()
+
+    /**
+     * A janela conta onde caiu.
+     *
+     * Ignora a repetição porque quem chama é o `onGloballyPositioned`, que
+     * dispara a cada quadro em que algo se move: sem isto, cada animação do
+     * painel viraria uma recomposição da central.
+     */
+    fun anotarMedida(janela: JanelaDoPainel, medida: MedidaDaJanela) {
+        if (_medidas.value[janela] == medida) return
+        _medidas.value = _medidas.value + (janela to medida)
+    }
 
     /**
      * A paleta lida do Impulse, ou o motivo de não ter dado.
@@ -357,8 +466,17 @@ object Cluster {
             tamanhoDoCarro = prefs.getString(TAMANHO_CARRO, null)
                 ?.let { nome -> TamanhoDoCarro.entries.find { it.name == nome } }
                 ?: padrao.tamanhoDoCarro,
+            fundoDoCarro = prefs.getString(FUNDO_CARRO, null)
+                ?.let { nome -> FundoDoCluster.entries.find { it.name == nome } }
+                ?: padrao.fundoDoCarro,
             telaDosNumeros = prefs.getInt(TELA_NUMEROS, SEM_TELA).takeIf { it != SEM_TELA },
             telaDoCarro = prefs.getInt(TELA_CARRO, SEM_TELA).takeIf { it != SEM_TELA },
+            // Passa pelo `mais` de propósito: é ele que contém no limite, e
+            // assim uma preferência adulterada não some com a janela.
+            empurraoDosNumeros = Empurrao()
+                .mais(prefs.getInt(EMPURRAO_NUMEROS_X, 0), prefs.getInt(EMPURRAO_NUMEROS_Y, 0)),
+            empurraoDoCarro = Empurrao()
+                .mais(prefs.getInt(EMPURRAO_CARRO_X, 0), prefs.getInt(EMPURRAO_CARRO_Y, 0)),
         )
     }
 
@@ -374,8 +492,13 @@ object Cluster {
             .putString(TAMANHO, novo.tamanho.name)
             .putString(LUGAR_CARRO, novo.lugarDoCarro.name)
             .putString(TAMANHO_CARRO, novo.tamanhoDoCarro.name)
+            .putString(FUNDO_CARRO, novo.fundoDoCarro.name)
             .putInt(TELA_NUMEROS, novo.telaDosNumeros ?: SEM_TELA)
             .putInt(TELA_CARRO, novo.telaDoCarro ?: SEM_TELA)
+            .putInt(EMPURRAO_NUMEROS_X, novo.empurraoDosNumeros.x)
+            .putInt(EMPURRAO_NUMEROS_Y, novo.empurraoDosNumeros.y)
+            .putInt(EMPURRAO_CARRO_X, novo.empurraoDoCarro.x)
+            .putInt(EMPURRAO_CARRO_Y, novo.empurraoDoCarro.y)
             .apply()
     }
 
@@ -420,6 +543,33 @@ object Cluster {
 
     fun usarTamanhoDoCarro(tamanho: TamanhoDoCarro) =
         gravar(_ajustes.value.copy(tamanhoDoCarro = tamanho))
+
+    fun usarFundoDoCarro(fundo: FundoDoCluster) =
+        gravar(_ajustes.value.copy(fundoDoCarro = fundo))
+
+    /**
+     * Empurra uma das janelas alguns dp a partir do lugar escolhido.
+     *
+     * Some com o lugar? Não: o lugar continua sendo o ponto de partida, e o
+     * empurrão é sempre relativo a ele. Trocar de canto depois de ajustar o fio
+     * mantém o fio, que é o que se espera de um "ajuste fino".
+     */
+    fun empurrar(janela: JanelaDoPainel, dx: Int, dy: Int) = gravar(
+        when (janela) {
+            JanelaDoPainel.NUMEROS ->
+                _ajustes.value.copy(empurraoDosNumeros = _ajustes.value.empurraoDosNumeros.mais(dx, dy))
+            JanelaDoPainel.CARRO ->
+                _ajustes.value.copy(empurraoDoCarro = _ajustes.value.empurraoDoCarro.mais(dx, dy))
+        },
+    )
+
+    /** Desfaz o ajuste fino de uma janela. */
+    fun centralizar(janela: JanelaDoPainel) = gravar(
+        when (janela) {
+            JanelaDoPainel.NUMEROS -> _ajustes.value.copy(empurraoDosNumeros = Empurrao())
+            JanelaDoPainel.CARRO -> _ajustes.value.copy(empurraoDoCarro = Empurrao())
+        },
+    )
 
     /**
      * Põe o carro na bola do ar-condicionado: lugar e tamanho de uma vez, pelo

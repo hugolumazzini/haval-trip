@@ -61,7 +61,10 @@ fun ClusterCarroScreen(vm: TripViewModel, espiando: Boolean = false) {
         Box(
             Modifier
                 .offset(x = ajustes.empurraoDoCarro.x.dp, y = ajustes.empurraoDoCarro.y.dp)
-                .fillMaxHeight(ajustes.tamanhoDoCarro.fracao)
+                // O estica sobre o tamanho escolhido, contido em 1: mais que a
+                // janela inteira o `fillMaxHeight` não aceita, e a caixa
+                // continuaria do mesmo tamanho de qualquer jeito.
+                .fillMaxHeight((ajustes.tamanhoDoCarro.fracao * ajustes.zoomDoCarro.fator).coerceIn(0.05f, 1f))
                 .aspectRatio(if (naBola) 1f else LARGURA_POR_ALTURA)
                 // O fundo é desta caixa, e não da janela: a janela é a tela
                 // inteira, e pintá-la toda apagaria o carro em vez de tapar só o
@@ -72,7 +75,13 @@ fun ClusterCarroScreen(vm: TripViewModel, espiando: Boolean = false) {
                     if (naBola) CircleShape else RectangleShape,
                 )
                 // Conta à central onde caiu. Ver `QuadroDeMedidas`.
-                .medindo(JanelaDoPainel.CARRO, constraints.maxWidth, constraints.maxHeight),
+                .medindo(
+                    JanelaDoPainel.CARRO,
+                    constraints.maxWidth,
+                    constraints.maxHeight,
+                    ajustes.fundoDoCarro.argb,
+                    naBola,
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Diagrama(

@@ -57,6 +57,7 @@ import br.com.hugolumazzini.havaltrip.painel.ShizukuShell
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import br.com.hugolumazzini.havaltrip.Empurrao
+import br.com.hugolumazzini.havaltrip.Zoom
 import br.com.hugolumazzini.havaltrip.ItemDoCluster
 import br.com.hugolumazzini.havaltrip.LugarNoPainel
 import br.com.hugolumazzini.havaltrip.TamanhoDoCarro
@@ -536,7 +537,7 @@ private fun PainelDeInstrumentos(estado: TripState) {
         }
 
         Spacer(Modifier.height(14.dp))
-        AjusteFino(JanelaDoPainel.NUMEROS, ajustes.empurraoDosNumeros)
+        AjusteFino(JanelaDoPainel.NUMEROS, ajustes.empurraoDosNumeros, ajustes.zoomDosNumeros)
 
         Spacer(Modifier.height(12.dp))
         BotaoAcao("Ver como fica", onClick = { espiar(ClusterActivity::class.java) })
@@ -613,7 +614,7 @@ private fun PainelDeInstrumentos(estado: TripState) {
         }
 
         Spacer(Modifier.height(14.dp))
-        AjusteFino(JanelaDoPainel.CARRO, ajustes.empurraoDoCarro)
+        AjusteFino(JanelaDoPainel.CARRO, ajustes.empurraoDoCarro, ajustes.zoomDoCarro)
 
         Spacer(Modifier.height(12.dp))
         BotaoAcao("Ver como fica o carro", onClick = { espiar(ClusterCarroActivity::class.java) })
@@ -636,7 +637,7 @@ private fun PainelDeInstrumentos(estado: TripState) {
  */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-private fun AjusteFino(janela: JanelaDoPainel, empurrao: Empurrao) {
+private fun AjusteFino(janela: JanelaDoPainel, empurrao: Empurrao, zoom: Zoom) {
     Text("Ajuste fino da posição", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
     Spacer(Modifier.height(4.dp))
     Text(
@@ -675,7 +676,40 @@ private fun AjusteFino(janela: JanelaDoPainel, empurrao: Empurrao) {
         color = Cores.TextoApoio,
     )
 
-    Spacer(Modifier.height(12.dp))
+    Spacer(Modifier.height(14.dp))
+    Text("Ajuste fino do tamanho", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "Estica ou encolhe a partir do tamanho escolhido acima, em proporção — " +
+            "os dois lados crescem juntos, então o bloco não deforma. Os tamanhos " +
+            "prontos são degraus largos; isto é o que fica entre um e outro.",
+        style = MaterialTheme.typography.bodySmall,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(8.dp))
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Seta("−−", "bem menor") { Cluster.ampliar(janela, -Zoom.SALTO) }
+        Seta("−", "um pouco menor") { Cluster.ampliar(janela, -Zoom.PASSO) }
+        Seta("+", "um pouco maior") { Cluster.ampliar(janela, Zoom.PASSO) }
+        Seta("++", "bem maior") { Cluster.ampliar(janela, Zoom.SALTO) }
+        BotaoAcao(
+            "Desfazer",
+            onClick = { Cluster.tamanhoNatural(janela) },
+            habilitado = !zoom.natural,
+        )
+    }
+    Spacer(Modifier.height(6.dp))
+    Text(
+        if (zoom.natural) "No tamanho escolhido."
+        else "${zoom.porcento}% do tamanho escolhido.",
+        style = MaterialTheme.typography.bodySmall,
+        color = Cores.TextoApoio,
+    )
+
+    Spacer(Modifier.height(14.dp))
     Text("Medidas desta janela", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
     Spacer(Modifier.height(4.dp))
     Text(

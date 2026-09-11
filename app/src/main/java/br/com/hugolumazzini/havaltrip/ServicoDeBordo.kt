@@ -10,7 +10,9 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import br.com.hugolumazzini.havaltrip.painel.PaginaDoCluster
 import br.com.hugolumazzini.havaltrip.painel.ProjetorDoPainel
+import br.com.hugolumazzini.havaltrip.painel.TecladoDoVolante
 import androidx.core.content.ContextCompat
 
 /**
@@ -44,6 +46,13 @@ class ServicoDeBordo : Service() {
         // ninguém abre o app: o serviço é o único que sobe de qualquer jeito.
         Cluster.iniciar(this)
         ProjetorDoPainel.projetarNaPartida(this, Cluster::telasEscolhidas)
+        // E ouvir o carrossel de bolas do painel. Aqui pelo mesmo motivo: o
+        // aviso de troca de página tem de estar de pé antes de a janela
+        // aparecer, senão ela nasce mostrando na página errada até o motorista
+        // girar o carrossel uma vez.
+        PaginaDoCluster.acompanhar(this)
+        // E a cruzinha do volante, que é como se troca de visão na página.
+        TecladoDoVolante.acompanhar(this)
     }
 
     /**

@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Marcar as luzes no carro</title>
+<!--
+  Para que serve: apontar, no próprio desenho do carro, onde cada luz deve
+  acender. As coordenadas que o app usa são frações do quadro de 794 x 720 —
+  descrever isso em palavras nunca dá certo, e medir na mão dá errado calado.
+
+  Como usar: abrir no navegador, escolher a luz na lista, clicar no carro.
+  Arrastar depois de clicar gira a peça. O texto de baixo é o que me mandar.
+-->
+<style>
+  body {
+    background: #0f1115; color: #e8eaed; margin: 0; padding: 24px;
+    font: 15px/1.5 -apple-system, system-ui, sans-serif;
+    display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; font-weight: 600; }
+  p.dica { color: #9aa0a6; margin: 0 0 16px; max-width: 460px; }
+  #palco { position: relative; cursor: crosshair; touch-action: none; }
+  #palco img { display: block; width: 520px; }
+  #palco canvas { position: absolute; inset: 0; width: 520px; height: 100%; }
+  .lista { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+  .lista button {
+    text-align: left; padding: 9px 12px; border-radius: 9px; cursor: pointer;
+    border: 1px solid #2a2f3a; background: #171a21; color: #e8eaed; font: inherit;
+  }
+  .lista button.ativo { border-color: #2E8BD6; background: #10243a; }
+  .lista button .bolinha {
+    display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+    margin-right: 8px; vertical-align: middle;
+  }
+  .lista button .feito { float: right; color: #6bbf73; }
+  pre {
+    background: #0a0c10; border: 1px solid #2a2f3a; border-radius: 10px;
+    padding: 14px; white-space: pre-wrap; color: #cfd4da; max-width: 460px;
+  }
+  .acoes { display: flex; gap: 8px; margin-bottom: 14px; }
+  .acoes button {
+    padding: 8px 14px; border-radius: 9px; border: 1px solid #2a2f3a;
+    background: #171a21; color: #e8eaed; font: inherit; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="palco">
+  <img id="carro" src="carro.png" alt="Haval H6 visto de cima">
+  <canvas id="tela"></canvas>
+</div>
+
+<div>
+  <h1>Onde cada luz acende</h1>
+  <p class="dica">
+    Escolha a luz e <b>clique</b> no lugar dela no carro. Para inclinar a peça,
+    clique e <b>arraste</b> antes de soltar. Cada luz guarda só o último clique.
+    No fim, copie o texto de baixo e me mande.
+  </p>
+
+  <div class="lista" id="lista"></div>
+
+  <div class="acoes">
+    <button onclick="limpar()">Limpar tudo</button>
+    <button onclick="copiar()">Copiar o texto</button>
+  </div>
+
+  <pre id="saida">(nada marcado ainda)</pre>
+</div>
+
+<script>
+// O quadro em que todas as camadas do carro foram desenhadas. O app trabalha
+// em frações dele, não em pixels, porque o desenho muda de tamanho conforme a
+// tela — é o mesmo 794 x 720 citado no código.
+const QUADRO = { largura: 794, altura: 720 };
+
+const LUZES = [
+  { id: 'farol_baixo_esq',  nome: 'Farol baixo — esquerdo',   cor: '#8FD0FF' },
+  { id: 'farol_baixo_dir',  nome: 'Farol baixo — direito',    cor: '#8FD0FF' },
+  { id: 'seta_dianteira_esq', nome: 'Seta dianteira esquerda', cor: '#FFB300' },
+  { id: 'seta_dianteira_dir', nome: 'Seta dianteira direita',  cor: '#FFB300' },
+  { id: 'seta_traseira_esq',  nome: 'Seta traseira esquerda',  cor: '#FF8F00' },
+  { id: 'seta_traseira_dir',  nome: 'Seta traseira direita',   cor: '#FF8F00' },
+  { id: 'lanterna_esq', nome: 'Lanterna traseira esquerda', cor: '#FF3B2F' },
+  { id: 'lanterna_dir', nome: 'Lanterna traseira direita',  cor: '#FF3B2F' },
+  { id: 'neblina_esq',  nome: 'Neblina dianteiro esquerdo', cor: '#FFE082' },
+  { id: 'neblina_dir',  nome: 'Neblina dianteiro direito',  cor: '#FFE082' },
+];
+
+const marcas = {};
+let ativa = LUZES[0].id;
+let arrastando = null;
+
+const img = document.getElementById('carro');
+const tela = document.getElementById('tela');
+const ctx = tela.getContext('2d');
+
+function montarLista() {
+  const lista = document.getElementById('lista');
+  lista.innerHTML = '';
+  LUZES.forEach(luz => {
+    const b = document.createElement('button');
+    b.className = luz.id === ativa ? 'ativo' : '';
+    b.innerHTML = `<span class="bolinha" style="background:${luz.cor}"></span>${luz.nome}` +
+      (marcas[luz.id] ? '<span class="feito">✓</span>' : '');
+    b.onclick = () => { ativa = luz.id; montarLista(); };
+    lista.appendChild(b);
+  });
+}
+
+function ajustarTela() {
+  tela.width = img.clientWidth;
+  tela.height = img.clientHeight;
+  desenhar();
+}
+
+function posicao(evento) {
+  const r = tela.getBoundingClientRect();
+  return {
+    x: (evento.clientX - r.left) / r.width,
+    y: (evento.clientY - r.top) / r.height,
+  };
+}
+
+tela.addEventListener('pointerdown', e => {
+  const p = posicao(e);
+  marcas[ativa] = { x: p.x, y: p.y, angulo: marcas[ativa]?.angulo ?? 0 };
+  arrastando = ativa;
+  tela.setPointerCapture(e.pointerId);
+  desenhar(); montarLista();
+});
+
+tela.addEventListener('pointermove', e => {
+  if (!arrastando) return;
+  const p = posicao(e);
+  const m = marcas[arrastando];
+  const dx = p.x - m.x, dy = p.y - m.y;
+  // Só considera arrasto de verdade: um tremor de dois pixels giraria a peça
+  // para qualquer lado e ninguém entenderia por quê.
+  if (Math.hypot(dx, dy) > 0.01) m.angulo = Math.atan2(dy, dx) * 180 / Math.PI;
+  desenhar();
+});
+
+tela.addEventListener('pointerup', () => { arrastando = null; desenhar(); });
+
+function desenhar() {
+  ctx.clearRect(0, 0, tela.width, tela.height);
+  LUZES.forEach(luz => {
+    const m = marcas[luz.id];
+    if (!m) return;
+    const x = m.x * tela.width, y = m.y * tela.height;
+    const comp = 0.055 * tela.height, esp = 0.016 * tela.width;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(m.angulo * Math.PI / 180);
+    ctx.fillStyle = luz.cor;
+    ctx.shadowColor = luz.cor;
+    ctx.shadowBlur = 18;
+    ctx.beginPath();
+    ctx.roundRect(-comp / 2, -esp / 2, comp, esp, esp / 2);
+    ctx.fill();
+    ctx.restore();
+  });
+  saida();
+}
+
+function saida() {
+  const feitas = LUZES.filter(l => marcas[l.id]);
+  if (!feitas.length) {
+    document.getElementById('saida').textContent = '(nada marcado ainda)';
+    return;
+  }
+  const linhas = feitas.map(l => {
+    const m = marcas[l.id];
+    return `${l.id.padEnd(20)} x=${m.x.toFixed(3)}  y=${m.y.toFixed(3)}  ` +
+      `angulo=${m.angulo.toFixed(0)}°  (px ${Math.round(m.x * QUADRO.largura)},` +
+      `${Math.round(m.y * QUADRO.altura)})`;
+  });
+  document.getElementById('saida').textContent =
+    `quadro ${QUADRO.largura}x${QUADRO.altura}, frações de 0 a 1\n\n` + linhas.join('\n');
+}
+
+function limpar() {
+  Object.keys(marcas).forEach(k => delete marcas[k]);
+  desenhar(); montarLista();
+}
+
+function copiar() {
+  navigator.clipboard.writeText(document.getElementById('saida').textContent);
+}
+
+img.complete ? ajustarTela() : img.onload = ajustarTela;
+window.addEventListener('resize', ajustarTela);
+montarLista();
+</script>
+</body>
+</html>

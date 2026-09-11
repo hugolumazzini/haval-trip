@@ -22,6 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.Cluster
 import br.com.hugolumazzini.havaltrip.LugarNoPainel
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
+import br.com.hugolumazzini.havaltrip.painel.PaginaDoCluster
 import br.com.hugolumazzini.havaltrip.TripViewModel
 
 /**
@@ -50,6 +51,20 @@ fun ClusterCarroScreen(vm: TripViewModel, espiando: Boolean = false) {
     // passa a ser desenhado por nós: é a única forma de tapar o quadrado sem
     // perder o contorno redondo que o painel tinha ali.
     val naBola = ajustes.lugarDoCarro == LugarNoPainel.BOLA_DO_AC
+
+    // Acompanhar o carrossel de bolas do painel. Quem projeta uma janela lá em
+    // cima fica por cima de todas as páginas, e é isso que faz o carro aparecer
+    // sobre a bola de mídia de quem só o queria numa. Se o motorista escolheu
+    // uma página, a janela se apaga nas outras — como o ar do Impulse faz.
+    val pagina by PaginaDoCluster.pagina.collectAsStateWithLifecycle()
+    val paginaEscolhida = ajustes.paginaDoCarro
+    // `pagina == null` é "o painel ainda não contou nenhuma". Nesse caso
+    // aparece: sumir por falta de informação seria uma janela em branco sem
+    // explicação, e o motorista não teria como distinguir isso de um defeito.
+    val naPaginaCerta = paginaEscolhida == null || pagina == null || pagina == paginaEscolhida
+    // A espiada na central mostra sempre: lá o que se quer ver é o ajuste, e um
+    // retângulo vazio porque o painel está noutra página não ensina nada.
+    if (!espiando && !naPaginaCerta) return
 
     // Mesmo arranjo da tela dos números: a janela pode ser o painel inteiro, e
     // é aqui que se diz em que canto dela o carro aparece e de que tamanho.
@@ -142,10 +157,10 @@ fun ClusterCarroScreen(vm: TripViewModel, espiando: Boolean = false) {
 }
 
 /** O bloco do carro é um pouco mais largo que alto: os pneus e as pressões ao lado. */
-private const val LARGURA_POR_ALTURA = 1.15f
+internal const val LARGURA_POR_ALTURA = 1.15f
 
 /** Altura do desenho como fração da tapa. Ver o comentário no lugar em que é usada. */
-private const val DENTRO_DA_BOLA = 0.58f
+internal const val DENTRO_DA_BOLA = 0.58f
 
 /**
  * Quanto a tapa preta é maior que o anel azul.
@@ -155,13 +170,13 @@ private const val DENTRO_DA_BOLA = 0.58f
  * Aumentar mais não custa nada de aparência — em volta é preto —, mas comeria
  * área útil da bola quando o motorista encolhe a janela.
  */
-private const val FOLGA_DA_TAPA = 1.28f
+internal const val FOLGA_DA_TAPA = 1.28f
 
 /** Canto da tapa: arredondado só o bastante para não ficar uma aresta viva. */
-private val CANTO_DA_TAPA = 10.dp
+internal val CANTO_DA_TAPA = 10.dp
 
 /** Grossura do anel, em fração do diâmetro, medida no contorno original. */
-private const val GROSSURA_DO_ANEL = 0.022f
+internal const val GROSSURA_DO_ANEL = 0.022f
 
 /** O azul do contorno da bola do ar no painel do H6. */
-private val AZUL_DO_PAINEL = Color(0xFF2E8BD6)
+internal val AZUL_DO_PAINEL = Color(0xFF2E8BD6)

@@ -21,6 +21,7 @@ data class PainelDoVeiculo(
     val tetoSolarAberto: Boolean? = null,
     val pneus: List<Pneu> = emptyList(),
     val unidadeDePressao: Unidade = Unidade.BAR,
+    val luzes: Luzes = Luzes(),
 ) {
     /** O que está aberto agora. Vazio é o estado normal do carro andando. */
     val abertas: List<Abertura> get() = acionados(aberturas)
@@ -85,6 +86,10 @@ data class PainelDoVeiculo(
      * Separa "está tudo fechado" de "não sabemos nada" — que na tela são
      * mensagens diferentes, e confundi-las faria o app garantir uma porta
      * fechada que ele nunca leu.
+     *
+     * As luzes de propósito não contam. Elas chegam por conta própria, e uma
+     * central que só recebesse o farol passaria a exibir "Tudo certo" — uma
+     * garantia sobre portas e cintos que o app não teria como dar.
      */
     val algumaLeitura: Boolean
         get() = aberturas.isNotEmpty() || cintos.isNotEmpty() ||
@@ -92,6 +97,60 @@ data class PainelDoVeiculo(
 
     /** Um item e se ele está acionado (aberto, no caso das portas). */
     data class Estado<T>(val oQue: T, val acionado: Boolean)
+
+    /**
+     * As luzes de fora: farol e setas.
+     *
+     * Não são aviso — farol aceso à noite é o certo, e seta ligada é o
+     * motorista fazendo o que deve. Por isso não entram em [avisos] nem tiram o
+     * "Tudo certo": são só estado, para acender no desenho do carro.
+     *
+     * Tudo é `Boolean?` e não `Boolean` porque nenhuma destas propriedades vem
+     * de fábrica na ponte do HavalShisuku — quem não marcou a caixinha dele
+     * nunca recebe nada, e "não sei" precisa ser diferente de "apagado" para o
+     * desenho não afirmar que o farol está desligado sem nunca o ter lido.
+     */
+    data class Luzes(
+        val baixo: Boolean? = null,
+        val alto: Boolean? = null,
+        val neblinaDianteira: Boolean? = null,
+        val neblinaTraseira: Boolean? = null,
+        /** A luz de posição — o "meia-luz", que acende a lanterna sem o farol. */
+        val posicao: Boolean? = null,
+        val setaEsquerda: Boolean? = null,
+        val setaDireita: Boolean? = null,
+        val pisca: Boolean? = null,
+    ) {
+        /** Se há farol de qualquer tipo aceso. Neblina conta: é luz para fora. */
+        val algumFarol: Boolean
+            get() = baixo == true || alto == true ||
+                neblinaDianteira == true || neblinaTraseira == true
+
+        /**
+         * Se as lanternas de trás estão acesas.
+         *
+         * Deduzido, e não lido: o carro não publica a lanterna traseira como
+         * propriedade. Mas ela não tem interruptor próprio — acende junto com a
+         * luz de posição e com o farol, e não existe H6 andando de farol aceso
+         * e lanterna apagada. Deduzir aqui é mais honesto que deixar o desenho
+         * mudo sobre a traseira inteira.
+         */
+        val tras: Boolean get() = algumFarol || posicao == true
+
+        /**
+         * O pisca-alerta acende as duas setas, mesmo que o carro publique as
+         * duas em zero — em alguns firmwares só o `hazard` muda.
+         */
+        val esquerdaAcesa: Boolean get() = setaEsquerda == true || pisca == true
+        val direitaAcesa: Boolean get() = setaDireita == true || pisca == true
+
+        /** Se alguma das propriedades de luz chegou. Ver [PainelDoVeiculo.algumaLeitura]. */
+        val algumaLeitura: Boolean
+            get() = listOf(
+                baixo, alto, neblinaDianteira, neblinaTraseira, posicao,
+                setaEsquerda, setaDireita, pisca,
+            ).any { it != null }
+    }
 
     /**
      * Um pneu: pressão em bar e temperatura em grau, do jeito que o carro manda.
@@ -201,6 +260,14 @@ data class PainelDoVeiculo(
             tetoSolar: String? = null,
             pneus: String? = null,
             unidadePneus: String? = null,
+            farolBaixo: String? = null,
+            farolAlto: String? = null,
+            neblinaDianteira: String? = null,
+            neblinaTraseira: String? = null,
+            posicao: String? = null,
+            setaEsquerda: String? = null,
+            setaDireita: String? = null,
+            pisca: String? = null,
         ): PainelDoVeiculo {
             return PainelDoVeiculo(
                 aberturas = combinar(Abertura.entries, portas),
@@ -210,6 +277,16 @@ data class PainelDoVeiculo(
                 tetoSolarAberto = ligado(tetoSolar),
                 pneus = lerPneus(pneus),
                 unidadeDePressao = unidadeDePressao(unidadePneus),
+                luzes = Luzes(
+                    baixo = ligado(farolBaixo),
+                    alto = ligado(farolAlto),
+                    neblinaDianteira = ligado(neblinaDianteira),
+                    neblinaTraseira = ligado(neblinaTraseira),
+                    posicao = ligado(posicao),
+                    setaEsquerda = ligado(setaEsquerda),
+                    setaDireita = ligado(setaDireita),
+                    pisca = ligado(pisca),
+                ),
             )
         }
 

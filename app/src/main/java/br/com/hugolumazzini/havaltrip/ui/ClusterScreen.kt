@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -131,12 +133,13 @@ fun ClusterScreen(vm: TripViewModel, espiando: Boolean = false) {
 fun LugarNoPainel.alinhamento(): Alignment = BiasAlignment(horizontal, vertical)
 
 @Composable
-private fun Painel(
+internal fun Painel(
     m: TripMetrics,
     live: VehicleLive,
     ajustes: AjustesDoCluster,
     emLinha: Boolean,
     tinta: Tinta,
+    colunas: Int = 1,
 ) {
     val itens = ajustes.ItensSeguros
 
@@ -149,8 +152,15 @@ private fun Painel(
         // lado dela. Sem a largura nessa conta, quatro itens com a letra no
         // "Maior" saíam pela borda e o número aparecia cortado no painel — que
         // é pior do que um número pequeno, porque parece um valor errado.
-        val altura: Dp = if (emLinha) maxHeight else maxHeight / itens.size
-        val largura: Dp = if (emLinha) maxWidth / itens.size else maxWidth
+        // Empilhado, os dados podem vir em mais de uma coluna. Seis dados numa
+        // coluna só dão uma fatia de um sexto da altura, e como o tamanho da
+        // letra sai do menor lado da fatia, o número encolhe até não se ler de
+        // relance — que é o único jeito de se ler algo dirigindo. Em duas
+        // colunas a mesma fatia fica três vezes mais alta.
+        val emColunas = if (emLinha) 1 else colunas.coerceAtLeast(1)
+        val linhas = if (emLinha) 1 else (itens.size + emColunas - 1) / emColunas
+        val altura: Dp = maxHeight / linhas
+        val largura: Dp = if (emLinha) maxWidth / itens.size else maxWidth / emColunas
 
         val leituras = itens.map { it to it.leitura(m, live) }
 
@@ -180,13 +190,28 @@ private fun Painel(
                 }
             }
         } else {
+            // Por linhas, e não por colunas: assim o segundo dado fica ao lado
+            // do primeiro, e não seis posições abaixo dele. A ordem em que o
+            // motorista escolheu os dados é a ordem de leitura, da esquerda
+            // para a direita.
             Column(
                 Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.SpaceEvenly,
-                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                leituras.forEach { (item, leitura) ->
-                    Bloco(item, leitura, tamanho, tinta, emLinha, Modifier.weight(1f))
+                leituras.chunked(emColunas).forEach { fila ->
+                    Row(
+                        Modifier.fillMaxWidth().weight(1f),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        fila.forEach { (item, leitura) ->
+                            Bloco(item, leitura, tamanho, tinta, emLinha, Modifier.weight(1f))
+                        }
+                        // A última fila pode vir incompleta — cinco dados em
+                        // duas colunas. O vazio segura o lugar para o dado
+                        // sozinho não pular para o meio da bola.
+                        repeat(emColunas - fila.size) { Spacer(Modifier.weight(1f)) }
+                    }
                 }
             }
         }

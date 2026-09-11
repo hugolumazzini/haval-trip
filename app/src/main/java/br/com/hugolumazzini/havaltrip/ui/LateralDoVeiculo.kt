@@ -5,6 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,6 +32,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.hugolumazzini.havaltrip.R
@@ -90,41 +92,69 @@ fun LateralDoVeiculo(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
  * decorar a sigla.
  */
 @Composable
-fun Diagrama(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
+fun Diagrama(
+    painel: PainelDoVeiculo,
+    modifier: Modifier = Modifier,
+    legenda: Boolean = true,
+) {
     val pneus = painel.pneus.associateBy { it.roda }
 
-    Column(modifier.fillMaxWidth()) {
-        Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-            // Manda a altura disponível, não a largura: assim o carro encolhe
-            // para caber e nunca invade o espaço dos avisos.
-            CarroEmCamadas(painel, Modifier.fillMaxHeight().aspectRatio(VITRINE))
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        // O corpo da pressão sai da altura do desenho, e não é mais fixo em 26.
+        // Fixo, o número nascia do mesmo tamanho na faixa da central e na janela do
+        // painel, que tem um terço da altura — e ali ficava ilegível a um braço de
+        // distância. Preso à altura, ele acompanha inclusive o botão de + e − do
+        // ajuste fino, que é o que o motorista tem na mão para resolver isso.
+        val corpo = (maxHeight.value * PRESSAO_NA_ALTURA).coerceIn(13f, 34f).sp
 
-            // As pressões por cima, cada uma na altura da sua roda. Ficam ao
-            // lado do pneu desenhado, e não numa lista em cima e outra
-            // embaixo, porque assim não é preciso decorar sigla nenhuma para
-            // saber de que roda é o número.
-            // Não a faixa inteira: os números encostados nas bordas do cartão
-            // ficavam longe demais das rodas a que se referem. Sobra recortada
-            // dos dois lados até quase tocar a lataria — mas só até "quase",
-            // porque as portas abertas avançam para fora do contorno do carro e
-            // passariam por baixo do número se ele avançasse mais.
-            Column(
-                Modifier.fillMaxHeight(0.80f).fillMaxWidth(APROXIMACAO),
-                verticalArrangement = Arrangement.SpaceBetween,
-            ) {
-                LinhaDePneus(painel, pneus, Roda.DIANTEIRA_ESQ, Roda.DIANTEIRA_DIR)
-                LinhaDePneus(painel, pneus, Roda.TRASEIRA_ESQ, Roda.TRASEIRA_DIR)
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                // Manda a altura disponível, não a largura: assim o carro encolhe
+                // para caber e nunca invade o espaço dos avisos.
+                CarroEmCamadas(painel, Modifier.fillMaxHeight().aspectRatio(VITRINE))
+
+                // As pressões por cima, cada uma na altura da sua roda. Ficam ao
+                // lado do pneu desenhado, e não numa lista em cima e outra
+                // embaixo, porque assim não é preciso decorar sigla nenhuma para
+                // saber de que roda é o número.
+                // Não a faixa inteira: os números encostados nas bordas do cartão
+                // ficavam longe demais das rodas a que se referem. Sobra recortada
+                // dos dois lados até quase tocar a lataria — mas só até "quase",
+                // porque as portas abertas avançam para fora do contorno do carro e
+                // passariam por baixo do número se ele avançasse mais.
+                Column(
+                    Modifier.fillMaxHeight(0.80f).fillMaxWidth(APROXIMACAO),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    LinhaDePneus(painel, pneus, Roda.DIANTEIRA_ESQ, Roda.DIANTEIRA_DIR, corpo)
+                    LinhaDePneus(painel, pneus, Roda.TRASEIRA_ESQ, Roda.TRASEIRA_DIR, corpo)
+                }
+            }
+            // A legenda da unidade fica de fora na janela do painel: lá o espaço é
+            // curto e a unidade não muda de uma leitura para a outra, então a linha
+            // só tirava altura do desenho.
+            if (legenda) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "pressão em ${painel.unidadeDePressao.rotulo}",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                    color = Cores.TextoApoio,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "pressão em ${painel.unidadeDePressao.rotulo}",
-            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-            color = Cores.TextoApoio,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
+        }
 }
+
+/**
+ * Corpo da pressão como fração da altura do desenho, em dp.
+ *
+ * O 0,11 sai do que já estava certo: na faixa da central o desenho tem cerca de
+ * 240 dp de altura e a pressão em 26 sp era do tamanho pedido. Os limites
+ * impedem os dois extremos — número maior que o carro numa janela minúscula, e
+ * número gigante numa tela cheia.
+ */
+private const val PRESSAO_NA_ALTURA = 0.11f
 
 @Composable
 private fun LinhaDePneus(
@@ -132,13 +162,14 @@ private fun LinhaDePneus(
     pneus: Map<Roda, PainelDoVeiculo.Pneu>,
     esquerda: Roda,
     direita: Roda,
+    corpo: TextUnit,
 ) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        ValorDePneu(painel, pneus[esquerda], Alignment.Start)
+        ValorDePneu(painel, pneus[esquerda], Alignment.Start, corpo)
         // Alinhado à direita para que seja a borda interna — a que fica virada
         // para o carro — a encostar na roda, e não a de fora. Sem isto, "9,9" e
         // "33,9" parariam a distâncias diferentes do pneu.
-        ValorDePneu(painel, pneus[direita], Alignment.End)
+        ValorDePneu(painel, pneus[direita], Alignment.End, corpo)
     }
 }
 
@@ -147,6 +178,7 @@ private fun ValorDePneu(
     painel: PainelDoVeiculo,
     pneu: PainelDoVeiculo.Pneu?,
     lado: Alignment.Horizontal,
+    corpo: TextUnit,
 ) {
     // Traço, e não zero, quando o sensor não respondeu: um pneu que marca zero
     // seria motivo para parar o carro, e essa não é a informação.
@@ -160,8 +192,8 @@ private fun ValorDePneu(
             // distância da tela. No `titleMedium` padrão ela ficava do tamanho
             // do texto de apoio e obrigava a aproximar o rosto.
             style = MaterialTheme.typography.titleMedium.copy(
-                fontSize = 26.sp,
-                lineHeight = 30.sp,
+                fontSize = corpo,
+                lineHeight = corpo * 1.15f,
             ),
             // O próprio número muda de cor: o pneu não tem peça no desenho para
             // acender, e é aqui que o olho já está quando procura a pressão.
@@ -176,7 +208,10 @@ private fun ValorDePneu(
         pneu?.temperaturaC?.let {
             Text(
                 "${TripFormat.decimal(it, 0)}°",
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
+                // A temperatura acompanha a pressão pela metade: ela é apoio, e
+                // nas janelas pequenas do painel um corpo fixo passaria a
+                // competir com o número que interessa.
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = corpo * 0.5f),
                 color = Cores.TextoApoio,
             )
         }

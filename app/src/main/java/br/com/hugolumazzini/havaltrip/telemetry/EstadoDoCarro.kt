@@ -30,10 +30,22 @@ class EstadoDoCarro(private val diario: DiarioDeCampo) {
      */
     private val travadas = ConcurrentHashMap<String, String>()
 
+    /**
+     * Quando algum valor mudou de verdade pela última vez.
+     *
+     * É o relógio do vigia da linha direta: releitura repetida não conta, porque
+     * o serviço do carro pode continuar respondendo depois de ter parado de
+     * receber novidade — foi assim que os dados congelaram no painel sem que
+     * nada parecesse errado.
+     */
+    @Volatile
+    var ultimaMudancaMs: Long = System.currentTimeMillis()
+        private set
+
     /** Guarda o valor cru e espelha no diário de campo. */
     fun registrar(chave: String, valor: String) {
         if (travadas.containsKey(chave)) return
-        cache[chave] = valor
+        if (cache.put(chave, valor) != valor) ultimaMudancaMs = System.currentTimeMillis()
         diario.registrar(chave, valor)
     }
 
@@ -129,6 +141,21 @@ class EstadoDoCarro(private val diario: DiarioDeCampo) {
      * contar viagem. Os valores crus continuam indo inteiros para o
      * diagnóstico, que é onde se confere o que cada código significa.
      */
+    /**
+     * A mesma decisão da ignição, com os valores e o critério que a produziram.
+     *
+     * Serve à tela de diagnóstico e ao relatório: no carro, "começou a contar
+     * tempo só de ligar a central" só vira conserto quando se sabe qual dos
+     * cinco critérios disse que sim.
+     */
+    fun vereditoDaIgnicao(): LeituraDaIgnicao.Veredito = LeituraDaIgnicao.explicar(
+        prontoParaAndar = cache[HavalTelemetrySource.CHAVE_PRONTO_PARA_ANDAR],
+        motor = cache[HavalTelemetrySource.CHAVE_MOTOR],
+        rotacao = cache[HavalTelemetrySource.CHAVE_ROTACAO],
+        modoEnergia = cache[HavalTelemetrySource.CHAVE_MODO_ENERGIA],
+        velocidadeKmh = numero(HavalTelemetrySource.CHAVE_VELOCIDADE) ?: 0.0,
+    )
+
     private fun ignicao(velocidadeKmh: Double): IgnitionState = LeituraDaIgnicao.ler(
         prontoParaAndar = cache[HavalTelemetrySource.CHAVE_PRONTO_PARA_ANDAR],
         motor = cache[HavalTelemetrySource.CHAVE_MOTOR],

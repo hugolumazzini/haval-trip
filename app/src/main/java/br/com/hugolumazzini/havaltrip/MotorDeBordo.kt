@@ -76,6 +76,12 @@ class MotorDeBordo private constructor(private val app: Application) {
 
     val state: StateFlow<TripState> = manager.state
 
+    /** A decisão da ignição com o critério que a tomou, para o diagnóstico. */
+    fun vereditoDaIgnicao() = estadoDoCarro.vereditoDaIgnicao()
+
+    /** Quando o carro disse algo diferente pela última vez. Ver `EstadoDoCarro`. */
+    val ultimaMudancaMs: Long get() = estadoDoCarro.ultimaMudancaMs
+
     val painelDoVeiculo: StateFlow<PainelDoVeiculo> = diario.atual
         .map { estadoDoCarro.painelDoVeiculo() }
         .distinctUntilChanged()

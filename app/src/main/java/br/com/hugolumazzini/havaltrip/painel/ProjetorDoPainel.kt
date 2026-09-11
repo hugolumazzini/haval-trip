@@ -61,6 +61,15 @@ data class TelaDoCarro(val id: Int, val nome: String, val largura: Int, val altu
  */
 object ProjetorDoPainel {
 
+    /**
+     * Quanto esperar, na partida, antes de trazer as nossas janelas para a frente.
+     *
+     * Meio minuto é para caber a subida do outro app: a central liga tudo junto
+     * e o Impulse leva o seu tempo até projetar. Insistir cedo demais é insistir
+     * antes de ele passar na frente, que é o mesmo que não insistir.
+     */
+    private const val REFORCO_MS = 30_000L
+
     /** Como foi a última tentativa de projetar, por janela. */
     sealed interface Resultado {
         data object Nunca : Resultado
@@ -114,7 +123,22 @@ object ProjetorDoPainel {
      *
      * Chamar de fora da thread principal.
      */
-    fun projetar(context: Context, janela: JanelaDoPainel, telaId: Int): Resultado {
+    /**
+     * @param insistir refaz o `am start` mesmo com a janela já na tela.
+     *
+     * É o que a traz para a frente. O Impulse projeta pelo mesmo caminho que
+     * nós, e nesse modo de janela quem chamou `am start` por último fica por
+     * cima — daí o painel dele aparecer sobre o nosso quando ele se projeta
+     * depois. Não há truque para "ficar sempre em cima": há a ordem. Sem
+     * insistir, um pedido de projeção de janela que já está lá não mexeria na
+     * ordem e o botão pareceria não fazer nada.
+     */
+    fun projetar(
+        context: Context,
+        janela: JanelaDoPainel,
+        telaId: Int,
+        insistir: Boolean = false,
+    ): Resultado {
         marcar(janela, Resultado.Projetando)
 
         val situacao = ShizukuShell.situacao()
@@ -129,7 +153,7 @@ object ProjetorDoPainel {
         // nosso, e matá-lo levaria junto a outra janela, o serviço que conta a
         // viagem e o que ainda não foi gravado em disco.
         val jaEstaLa = pilhaDaJanela(janela, telaId)
-        if (jaEstaLa == null) {
+        if (jaEstaLa == null || insistir) {
             ShizukuShell.rodar(
                 "am start -n $PACOTE/${janela.activity} --display $telaId --windowingMode 5",
             ) ?: return marcar(janela, Resultado.Falhou("o Shizuku recusou o comando"))
@@ -170,6 +194,16 @@ object ProjetorDoPainel {
             Thread {
                 escolhas().forEach { (janela, tela) ->
                     if (tela != null) runCatching { projetar(aplicacao, janela, tela) }
+                }
+                // O reforço, e o motivo dele é a ordem de quem sobe: o Impulse
+                // projeta as janelas dele na mesma partida, e a última chamada a
+                // `am start` é a que fica por cima. Como não há como saber quem
+                // termina primeiro, insistimos uma vez depois que a poeira
+                // baixou. Uma só — reprojetar em laço seria uma queda de braço
+                // com o outro app, piscando o painel inteiro.
+                Thread.sleep(REFORCO_MS)
+                escolhas().forEach { (janela, tela) ->
+                    if (tela != null) runCatching { projetar(aplicacao, janela, tela, insistir = true) }
                 }
             }.start()
         }

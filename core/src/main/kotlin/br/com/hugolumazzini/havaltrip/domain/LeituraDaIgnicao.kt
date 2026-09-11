@@ -52,17 +52,67 @@ object LeituraDaIgnicao {
         rotacao: String?,
         modoEnergia: String?,
         velocidadeKmh: Double,
-    ): IgnitionState {
-        val ligado = when {
-            numero(prontoParaAndar)?.let { it > 0.0 } == true -> true
-            numero(rotacao)?.let { it > 0.0 } == true -> true
-            numero(motor)?.let { it !in MOTOR_DESLIGADO } == true -> true
-            velocidadeKmh >= TripMetrics.MOVING_THRESHOLD_KMH -> true
-            numero(modoEnergia)?.let { it >= MODO_ENERGIA_LIGADO } == true -> true
-            else -> false
+    ): IgnitionState = explicar(prontoParaAndar, motor, rotacao, modoEnergia, velocidadeKmh).estado
+
+    /**
+     * A mesma decisão, dizendo **quem** a tomou.
+     *
+     * Existe por um defeito relatado no carro: com a central ligada e a chave
+     * fora, a viagem começava a contar tempo. São cinco critérios, e sem saber
+     * qual deles disse "ligado" o conserto vira adivinhação — mexer no critério
+     * errado quebraria o híbrido parado no semáforo, que é o caso que esta regra
+     * nasceu para proteger.
+     *
+     * O veredito e o motivo saem juntos da mesma passagem, e não de duas contas
+     * parecidas: uma explicação que discorda do que o app fez seria pior que
+     * nenhuma.
+     */
+    fun explicar(
+        prontoParaAndar: String?,
+        motor: String?,
+        rotacao: String?,
+        modoEnergia: String?,
+        velocidadeKmh: Double,
+    ): Veredito {
+        val criterio = when {
+            numero(prontoParaAndar)?.let { it > 0.0 } == true -> Criterio.PRONTO_PARA_ANDAR
+            numero(rotacao)?.let { it > 0.0 } == true -> Criterio.ROTACAO
+            numero(motor)?.let { it !in MOTOR_DESLIGADO } == true -> Criterio.MOTOR
+            velocidadeKmh >= TripMetrics.MOVING_THRESHOLD_KMH -> Criterio.VELOCIDADE
+            numero(modoEnergia)?.let { it >= MODO_ENERGIA_LIGADO } == true -> Criterio.MODO_ENERGIA
+            else -> Criterio.NENHUM
         }
-        return if (ligado) IgnitionState.ON else IgnitionState.OFF
+        return Veredito(
+            estado = if (criterio == Criterio.NENHUM) IgnitionState.OFF else IgnitionState.ON,
+            criterio = criterio,
+            prontoParaAndar = prontoParaAndar,
+            motor = motor,
+            rotacao = rotacao,
+            modoEnergia = modoEnergia,
+            velocidadeKmh = velocidadeKmh,
+        )
     }
+
+    /** Qual dos critérios decidiu. [NENHUM] é o carro desligado. */
+    enum class Criterio(val rotulo: String) {
+        PRONTO_PARA_ANDAR("driving_ready_state > 0"),
+        ROTACAO("engine_speed > 0"),
+        MOTOR("engine_state fora de -1, 0 e 15"),
+        VELOCIDADE("o carro está se movendo"),
+        MODO_ENERGIA("power_mode >= $MODO_ENERGIA_LIGADO"),
+        NENHUM("nenhum critério deu ligado"),
+    }
+
+    /** A decisão com os valores que a produziram, para a tela de diagnóstico. */
+    data class Veredito(
+        val estado: IgnitionState,
+        val criterio: Criterio,
+        val prontoParaAndar: String?,
+        val motor: String?,
+        val rotacao: String?,
+        val modoEnergia: String?,
+        val velocidadeKmh: Double,
+    )
 
     private fun numero(valor: String?): Double? = valor?.trim()?.toDoubleOrNull()
 }

@@ -225,6 +225,10 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun pedirTudoAoCarro() = motor.pedirTudoAoCarro()
 
+    fun vereditoDaIgnicao() = motor.vereditoDaIgnicao()
+
+    val ultimaMudancaMs: Long get() = motor.ultimaMudancaMs
+
     /** Todo problema de dado se resolve lá, não aqui. */
     fun abrirShisuku() = HavalTelemetrySource.abrirShisuku(getApplication())
 

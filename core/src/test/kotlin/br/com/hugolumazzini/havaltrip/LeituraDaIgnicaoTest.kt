@@ -60,6 +60,43 @@ class LeituraDaIgnicaoTest {
     }
 
     @Test
+    fun `a explicacao nomeia o criterio que decidiu`() {
+        // É o que a tela de diagnóstico mostra no carro. Sem isto, "ligou
+        // sozinho" não diz em qual das cinco regras mexer.
+        val hibridoNoSemaforo = LeituraDaIgnicao.explicar("1", "0", "0", "2", 0.0)
+        assertEquals(IgnitionState.ON, hibridoNoSemaforo.estado)
+        assertEquals(LeituraDaIgnicao.Criterio.PRONTO_PARA_ANDAR, hibridoNoSemaforo.criterio)
+
+        val soAMultimidia = LeituraDaIgnicao.explicar("0", "0", "0", "1", 0.0)
+        assertEquals(IgnitionState.OFF, soAMultimidia.estado)
+        assertEquals(LeituraDaIgnicao.Criterio.NENHUM, soAMultimidia.criterio)
+
+        // O suspeito do defeito relatado: central ligada, chave fora, e o carro
+        // publicando um power_mode que a convenção do Android diz ser "ON".
+        val centralLigada = LeituraDaIgnicao.explicar(null, null, null, "2", 0.0)
+        assertEquals(LeituraDaIgnicao.Criterio.MODO_ENERGIA, centralLigada.criterio)
+    }
+
+    @Test
+    fun `a explicacao nunca discorda do veredito`() {
+        val casos = listOf<Array<String?>>(
+            arrayOf("1", "0", "0", "2"),
+            arrayOf("0", "15", "0", "1"),
+            arrayOf(null, null, "780", null),
+            arrayOf(null, "2", null, null),
+            arrayOf("", "sim", null, "ACC"),
+        )
+        casos.forEach { (pronto, motor, rotacao, energia) ->
+            listOf(0.0, 42.0).forEach { velocidade ->
+                assertEquals(
+                    LeituraDaIgnicao.ler(pronto, motor, rotacao, energia, velocidade),
+                    LeituraDaIgnicao.explicar(pronto, motor, rotacao, energia, velocidade).estado,
+                )
+            }
+        }
+    }
+
+    @Test
     fun `valor ilegivel nao liga nada`() {
         assertEquals(IgnitionState.OFF, ler(pronto = "", motor = "sim", energia = "ACC"))
     }

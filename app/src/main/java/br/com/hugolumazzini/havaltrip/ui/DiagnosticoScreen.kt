@@ -29,6 +29,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.Envio
 import br.com.hugolumazzini.havaltrip.Fonte
 import br.com.hugolumazzini.havaltrip.TripViewModel
+import br.com.hugolumazzini.havaltrip.domain.IgnitionState
+import br.com.hugolumazzini.havaltrip.telemetry.DiarioDeCampo
 import br.com.hugolumazzini.havaltrip.telemetry.HavalTelemetrySource
 import br.com.hugolumazzini.havaltrip.telemetry.ShizukuTelemetrySource
 import br.com.hugolumazzini.havaltrip.ui.theme.Cores
@@ -116,6 +118,9 @@ fun DiagnosticoScreen(vm: TripViewModel) {
             )
         }
 
+        Spacer(Modifier.height(12.dp))
+        PorQueAIgnicaoEstaAssim(vm, leituras, simulando = !fonteReal)
+
         if (envio !is Envio.Parado) {
             Spacer(Modifier.height(10.dp))
             ResultadoDoEnvio(envio, contexto, onTentarDeNovo = vm::enviarRelatorio)
@@ -198,6 +203,72 @@ fun DiagnosticoScreen(vm: TripViewModel) {
  * Ele é lido de dentro do carro, provavelmente com o celular na mão — daí o
  * tamanho e o botão de copiar, em vez de um texto pequeno de status.
  */
+/**
+ * Por que o app acha que o carro está ligado — ou desligado — agora.
+ *
+ * Nasceu de um defeito relatado no carro: com a central ligada e a chave fora, a
+ * viagem começava a contar tempo. A regra tem cinco critérios, e o conserto
+ * depende de saber **qual deles** disse que sim: mexer no critério errado
+ * quebraria o híbrido parado no semáforo, que é o caso que a regra existe para
+ * proteger.
+ *
+ * A linha da idade responde a outra queixa, a dos dados congelados: um valor
+ * parado há minutos com a chave girada é linha morta, e não carro quieto.
+ */
+@Composable
+private fun PorQueAIgnicaoEstaAssim(
+    vm: TripViewModel,
+    // Não é usada aqui dentro: entra para amarrar a recomposição à chegada de
+    // valores novos. Sem ela o cartão nasceria certo e envelheceria calado.
+    @Suppress("UNUSED_PARAMETER") leituras: Map<String, DiarioDeCampo.Leitura>,
+    simulando: Boolean,
+) {
+    val veredito = vm.vereditoDaIgnicao()
+    val ligado = veredito.estado == IgnitionState.ON
+    val paradoHaS = (System.currentTimeMillis() - vm.ultimaMudancaMs) / 1000
+
+    Cartao {
+        Column {
+            Text("POR QUE A IGNIÇÃO ESTÁ ASSIM", style = EstiloRotulo)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (ligado) "LIGADA — ${veredito.criterio.rotulo}" else "DESLIGADA — nenhum critério deu ligado",
+                style = MaterialTheme.typography.titleMedium,
+                color = if (ligado) Cores.Confirmacao else Cores.TextoApoio,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "driving_ready_state=${ou(veredito.prontoParaAndar)} · " +
+                    "engine_speed=${ou(veredito.rotacao)} · " +
+                    "engine_state=${ou(veredito.motor)} · " +
+                    "power_mode=${ou(veredito.modoEnergia)} · " +
+                    "velocidade=${veredito.velocidadeKmh}",
+                style = MaterialTheme.typography.bodySmall,
+                color = Cores.TextoApoio,
+            )
+            if (simulando) {
+                // Sem isto o cartão mentiria na bancada: no simulador a ignição
+                // vem do botão "Ligar ignição", e estas cinco chaves nunca são
+                // publicadas — ele diria "DESLIGADA" com a viagem contando.
+                Text(
+                    "Com o simulador ligado estas chaves não existem: " +
+                        "quem manda na ignição é o botão do painel.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Cores.Atencao,
+                )
+            }
+            Text(
+                "último valor diferente do carro há ${paradoHaS}s",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (paradoHaS > 90) Cores.Atencao else Cores.TextoApoio,
+            )
+        }
+    }
+}
+
+/** Chave que o carro não publicou aparece como travessão, não como vazio. */
+private fun ou(valor: String?): String = valor?.takeIf { it.isNotBlank() } ?: "—"
+
 @Composable
 private fun ResultadoDoEnvio(envio: Envio, contexto: Context, onTentarDeNovo: () -> Unit) {
     when (envio) {

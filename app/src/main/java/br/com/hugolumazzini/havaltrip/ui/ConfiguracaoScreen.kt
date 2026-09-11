@@ -819,7 +819,15 @@ private fun Projecao(janela: JanelaDoPainel, escolhida: Int?) {
                 // Fora da thread principal: abre um processo pelo Shizuku e
                 // espera por ele. Na principal, isso congelaria a tela.
                 escopo.launch(Dispatchers.IO) {
-                    ProjetorDoPainel.projetar(contexto, janela, escolhida ?: return@launch)
+                    // `insistir`: quem toca no botão quer a janela lá e à vista.
+                    // Sem isso, com ela já projetada o toque não mexeria na
+                    // ordem — e é justamente a ordem que decide quem aparece.
+                    ProjetorDoPainel.projetar(
+                        contexto,
+                        janela,
+                        escolhida ?: return@launch,
+                        insistir = true,
+                    )
                     // Uma tentativa pode revelar que o Shizuku caiu no meio-tempo.
                     releituras++
                 }
@@ -827,6 +835,17 @@ private fun Projecao(janela: JanelaDoPainel, escolhida: Int?) {
         )
         BotaoAcao("Recolher", onClick = { ProjetorDoPainel.recolher(janela) })
     }
+
+    Spacer(Modifier.height(6.dp))
+    Text(
+        "Se o painel do Impulse aparecer por cima desta janela: os dois apps usam o " +
+            "mesmo caminho, e quem projeta por último fica em cima. Toque em " +
+            "\"Projetar\" de novo para trazer a nossa para a frente. Na partida do " +
+            "carro isso é feito sozinho, meio minuto depois de ligar — que é o tempo " +
+            "de o Impulse terminar de subir.",
+        style = MaterialTheme.typography.bodySmall,
+        color = Cores.TextoApoio,
+    )
 
     val recado = recadoDaProjecao(situacao, resultados[janela])
     if (recado != null) {

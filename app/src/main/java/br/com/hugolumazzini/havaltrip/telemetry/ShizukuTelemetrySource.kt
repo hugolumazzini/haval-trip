@@ -112,12 +112,46 @@ class ShizukuTelemetrySource(
         Shizuku.addBinderDeadListener(aoMorrerBinder)
 
         launch {
+            var ultimaTentativaMs = 0L
             while (isActive) {
                 delay(intervaloMs)
+                val conectado = _situacao.value is Situacao.Conectado
                 // Uma releitura periódica cobre o valor que muda sem o serviço
                 // avisar. Sai barato e evita um painel congelado numa chave
                 // solitária que não dispara callback.
-                servico?.let { s -> if (_situacao.value is Situacao.Conectado) lerTudoAgora(s) }
+                val leu = servico?.takeIf { conectado }?.let { lerTudoAgora(it) } ?: false
+
+                // O vigia. Dois jeitos de a linha morrer sem ninguém perceber:
+                // o serviço do carro reinicia e o nosso ponteiro fica apontando
+                // para um morto — aí `fetchDatas` estoura e `leu` é falso —, ou
+                // ele continua respondendo mas com o ouvinte perdido, e então
+                // nada mais muda de valor, para sempre. Foi este segundo caso no
+                // carro: o painel congelou e nem fechar o app resolvia, porque o
+                // serviço de bordo mantém o processo de pé e a reconexão só
+                // acontecia ao criar o processo.
+                val agora = System.currentTimeMillis()
+                val parado = agora - estado.ultimaMudancaMs > SEM_NOVIDADE_MS
+                val precisaReconectar = !conectado || !leu || parado
+                if (precisaReconectar && agora - ultimaTentativaMs >= ESPERA_ENTRE_TENTATIVAS_MS) {
+                    ultimaTentativaMs = agora
+                    if (parado && conectado) {
+                        Log.w(TAG, "Sem novidade do carro há ${SEM_NOVIDADE_MS / 1000}s: religando")
+                    }
+                    // Larga o ouvinte antigo antes: registrar duas vezes deixa o
+                    // serviço mandando em dobro, e é o registro velho — o que
+                    // não funciona mais — que ficaria valendo.
+                    runCatching { servico?.unRegisterDataChangedListener(PACOTE, ouvinte) }
+                    servico = null
+                    // Só religa; não pede autorização de novo. O vigia roda
+                    // sozinho a viagem inteira, e pedir permissão em laço
+                    // encheria a tela do motorista de caixas de diálogo.
+                    when {
+                        !Shizuku.pingBinder() -> _situacao.value = Situacao.SemShizuku
+                        !autorizado() -> _situacao.value = Situacao.PrecisaAutorizar
+                        else -> conectar()
+                    }
+                }
+
                 estado.publicarFita()
                 trySend(estado.montarAmostra())
             }
@@ -149,14 +183,14 @@ class ShizukuTelemetrySource(
      * O serviço só avisa quando um valor **muda**. Com o carro parado na
      * garagem nada mudaria, e a tela nasceria vazia sem nada estar errado.
      */
-    private fun lerTudoAgora(servico: IIntelligentVehicleControlService) {
+    private fun lerTudoAgora(servico: IIntelligentVehicleControlService): Boolean =
         runCatching {
             val chaves = HavalTelemetrySource.CHAVES.toTypedArray()
             servico.fetchDatas(chaves).forEachIndexed { i, valor ->
                 if (valor != null) estado.registrar(chaves[i], valor)
             }
-        }.onFailure { Log.w(TAG, "Não deu para ler tudo de uma vez", it) }
-    }
+            true
+        }.onFailure { Log.w(TAG, "Não deu para ler tudo de uma vez", it) }.getOrDefault(false)
 
     /** Pede o serviço ao sistema e o embrulha no privilégio do Shizuku. */
     private fun abrirServico(): IIntelligentVehicleControlService? = runCatching {
@@ -170,6 +204,19 @@ class ShizukuTelemetrySource(
 
     companion object {
         private const val PACOTE = "br.com.hugolumazzini.havaltrip"
+
+        /**
+         * Quanto tempo sem nenhum valor **mudar** já é suspeita de linha morta.
+         *
+         * Um minuto e meio é folgado de propósito: o carro parado e desligado
+         * também fica sem novidade, e a religada dele não custa nada — desfaz e
+         * refaz o registro do ouvinte. O que não se pode é ficar do outro lado,
+         * congelado a viagem inteira, que foi o que aconteceu.
+         */
+        private const val SEM_NOVIDADE_MS = 90_000L
+
+        /** Piso entre duas religadas, para o vigia não virar um laço de reconexão. */
+        private const val ESPERA_ENTRE_TENTATIVAS_MS = 60_000L
 
         /**
          * `android.os.ServiceManager` por reflexão.

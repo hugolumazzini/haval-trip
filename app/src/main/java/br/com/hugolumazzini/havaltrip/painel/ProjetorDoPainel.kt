@@ -26,11 +26,23 @@ private const val PACOTE = "br.com.hugolumazzini.havaltrip"
 enum class JanelaDoPainel(val rotulo: String, val activity: String) {
     NUMEROS("Bloco de números", "$PACOTE.ClusterActivity"),
     CARRO("Carro visto de cima", "$PACOTE.ClusterCarroActivity"),
+
+    /**
+     * A página com várias visões, navegada pela cruzinha do volante.
+     *
+     * Diferente das outras duas: aqui a janela é a página inteira do painel, e
+     * o que muda dentro dela é a visão — o carro, cada contador — em vez de o
+     * motorista ter uma janelinha para cada coisa. Ver `ClusterMenuScreen`.
+     */
+    MENU("Página com visões", "$PACOTE.ClusterMenuActivity"),
 }
 
 /** Uma tela do carro, do jeito que o Android a enxerga. */
 data class TelaDoCarro(val id: Int, val nome: String, val largura: Int, val altura: Int) {
-    val descricao: String get() = "Tela $id — $largura x $altura"
+    val descricao: String get() = if (central) "Central (tela 0)" else "Tela $id — $largura x $altura"
+
+    /** A tela grande, a do próprio app. Ver [ProjetorDoPainel.telas]. */
+    val central: Boolean get() = id == 0
 }
 
 /**
@@ -96,10 +108,13 @@ object ProjetorDoPainel {
     val pedidosDeFechar: SharedFlow<JanelaDoPainel> = _pedidosDeFechar.asSharedFlow()
 
     /**
-     * As telas em que dá para projetar, tirando a da central.
+     * Todas as telas em que dá para projetar, a da central inclusive.
      *
-     * A tela 0 fica de fora porque é onde o app já está: mandar uma janela do
-     * painel para lá seria abrir a mesma coisa por cima da tela grande.
+     * A tela 0 é a do próprio app, e no uso normal não serve: manda a janela do
+     * painel para cima da tela grande. Mas aparece na lista de propósito — é o
+     * único jeito de o motorista ver a janela nascer numa central em que o
+     * painel não aceita, e assim separar "o app não projeta" de "esta tela não
+     * deixa". "Recolher" desfaz.
      *
      * Não precisa de Shizuku — o `DisplayManager` é API pública. Só *usar* a
      * tela precisa de privilégio.
@@ -107,7 +122,11 @@ object ProjetorDoPainel {
     fun telas(context: Context): List<TelaDoCarro> = runCatching {
         val dm = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
         dm.displays
-            .filter { it.displayId != 0 }
+            // Todas, inclusive a 0. Ela estava de fora porque projetar na tela
+            // do próprio app não serve para nada no uso normal — mas serve para
+            // conferir: numa central em que a lista vem vazia, ou em que o
+            // painel não aceita, é a única forma de ver a janela nascer e saber
+            // que o problema é a tela, e não o app. "Recolher" desfaz.
             .map { TelaDoCarro(it.displayId, it.name ?: "sem nome", it.mode.physicalWidth, it.mode.physicalHeight) }
             .sortedBy { it.id }
     }.onFailure { Log.w(TAG, "não deu para listar as telas", it) }.getOrDefault(emptyList())

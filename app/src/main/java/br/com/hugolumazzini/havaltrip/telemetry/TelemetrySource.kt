@@ -93,6 +93,19 @@ class SimulatedTelemetrySource(
             "{2.29707,26.0,2.3657,25.0,2.33825,25.0,2.2559,25.0}",
         )
         alvo.registrar(HavalTelemetrySource.CHAVE_UNIDADE_PNEUS, "1")
+
+        // E as luzes: farol baixo aceso o tempo todo, e a seta trocando de lado
+        // a cada dez segundos. Não imita motorista nenhum — imita o que precisa
+        // ser conferido na bancada, que é os dois lados acenderem e apagarem.
+        alvo.registrar(HavalTelemetrySource.CHAVE_FAROL_BAIXO, "1")
+        alvo.registrar(HavalTelemetrySource.CHAVE_FAROL_ALTO, "0")
+        alvo.registrar(HavalTelemetrySource.CHAVE_NEBLINA_DIANTEIRA, "0")
+        alvo.registrar(HavalTelemetrySource.CHAVE_NEBLINA_TRASEIRA, "0")
+        alvo.registrar(HavalTelemetrySource.CHAVE_LUZ_DE_POSICAO, "1")
+        val fase = (segundosNoTrecho / 10) % 3
+        alvo.registrar(HavalTelemetrySource.CHAVE_SETA_ESQ, if (fase == 1) "1" else "0")
+        alvo.registrar(HavalTelemetrySource.CHAVE_SETA_DIR, if (fase == 2) "1" else "0")
+        alvo.registrar(HavalTelemetrySource.CHAVE_PISCA_ALERTA, "0")
     }
 
     private fun avancar(deltaS: Double) {

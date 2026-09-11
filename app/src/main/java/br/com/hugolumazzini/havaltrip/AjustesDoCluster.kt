@@ -356,6 +356,9 @@ data class MedidaDaJanela(
  * @param empurraoDosNumeros deslocamento fino do bloco de números, em dp, a
  *   partir do lugar escolhido. Ver [Empurrao].
  * @param empurraoDoCarro o mesmo, para a janela do carro.
+ * @param paginaDoCarro em qual página do carrossel de bolas do painel a janela
+ *   do carro aparece. `null` é "em todas", que é como sempre foi. Ver
+ *   [br.com.hugolumazzini.havaltrip.painel.PaginaDoCluster].
  */
 data class AjustesDoCluster(
     val tripId: String? = null,
@@ -378,6 +381,19 @@ data class AjustesDoCluster(
     val empurraoDoCarro: Empurrao = Empurrao(),
     val zoomDosNumeros: Zoom = Zoom(),
     val zoomDoCarro: Zoom = Zoom(),
+    val paginaDoCarro: Int? = null,
+    val telaDoMenu: Int? = null,
+    val paginaDoMenu: Int? = null,
+    val empurraoDoMenu: Empurrao = Empurrao(),
+    val zoomDoMenu: Zoom = Zoom(),
+    /**
+     * Se a página se encaixa no recorte redondo da bola do ar.
+     *
+     * Ligado por padrão porque é o caso que existe: a página que sobra no
+     * carrossel é justamente a da bola vazia. Desligado, a visão usa o painel
+     * inteiro — que só serve a quem projetar numa tela sem esse recorte.
+     */
+    val menuNaBola: Boolean = true,
 ) {
     /**
      * A lista que a tela do painel usa de fato.
@@ -422,6 +438,13 @@ object Cluster {
     private const val EMPURRAO_CARRO_Y = "empurraoDoCarroY"
     private const val ZOOM_NUMEROS = "zoomDosNumeros"
     private const val ZOOM_CARRO = "zoomDoCarro"
+    private const val PAGINA_CARRO = "paginaDoCarro"
+    private const val TELA_MENU = "telaDoMenu"
+    private const val PAGINA_MENU = "paginaDoMenu"
+    private const val EMPURRAO_MENU_X = "empurraoDoMenuX"
+    private const val EMPURRAO_MENU_Y = "empurraoDoMenuY"
+    private const val ZOOM_MENU = "zoomDoMenu"
+    private const val MENU_NA_BOLA = "menuNaBola"
 
     /**
      * O que se grava no lugar de "nenhuma tela".
@@ -430,6 +453,9 @@ object Cluster {
      * 0 é a tela da central, um valor legítimo. -1 não é tela nenhuma.
      */
     private const val SEM_TELA = -1
+
+    /** O mesmo truque para "em qualquer página": 0 é a página padrão do carro. */
+    private const val QUALQUER_PAGINA = -1
 
     private lateinit var prefs: android.content.SharedPreferences
 
@@ -542,6 +568,15 @@ object Cluster {
             // limites, e um valor gravado errado não some com o bloco.
             zoomDosNumeros = Zoom(0).mais(prefs.getInt(ZOOM_NUMEROS, Zoom.PADRAO)),
             zoomDoCarro = Zoom(0).mais(prefs.getInt(ZOOM_CARRO, Zoom.PADRAO)),
+            paginaDoCarro = prefs.getInt(PAGINA_CARRO, QUALQUER_PAGINA)
+                .takeIf { it != QUALQUER_PAGINA },
+            telaDoMenu = prefs.getInt(TELA_MENU, SEM_TELA).takeIf { it != SEM_TELA },
+            paginaDoMenu = prefs.getInt(PAGINA_MENU, QUALQUER_PAGINA)
+                .takeIf { it != QUALQUER_PAGINA },
+            empurraoDoMenu = Empurrao()
+                .mais(prefs.getInt(EMPURRAO_MENU_X, 0), prefs.getInt(EMPURRAO_MENU_Y, 0)),
+            zoomDoMenu = Zoom(0).mais(prefs.getInt(ZOOM_MENU, Zoom.PADRAO)),
+            menuNaBola = prefs.getBoolean(MENU_NA_BOLA, true),
         )
     }
 
@@ -566,6 +601,13 @@ object Cluster {
             .putInt(EMPURRAO_CARRO_Y, novo.empurraoDoCarro.y)
             .putInt(ZOOM_NUMEROS, novo.zoomDosNumeros.porcento)
             .putInt(ZOOM_CARRO, novo.zoomDoCarro.porcento)
+            .putInt(PAGINA_CARRO, novo.paginaDoCarro ?: QUALQUER_PAGINA)
+            .putInt(TELA_MENU, novo.telaDoMenu ?: SEM_TELA)
+            .putInt(PAGINA_MENU, novo.paginaDoMenu ?: QUALQUER_PAGINA)
+            .putInt(EMPURRAO_MENU_X, novo.empurraoDoMenu.x)
+            .putInt(EMPURRAO_MENU_Y, novo.empurraoDoMenu.y)
+            .putInt(ZOOM_MENU, novo.zoomDoMenu.porcento)
+            .putBoolean(MENU_NA_BOLA, novo.menuNaBola)
             .apply()
     }
 
@@ -615,6 +657,21 @@ object Cluster {
         gravar(_ajustes.value.copy(fundoDoCarro = fundo))
 
     /**
+     * Em qual página do carrossel do painel a janela do carro aparece.
+     *
+     * `null` é "em todas", que é o comportamento antigo e continua sendo o
+     * padrão: prender a janela a uma página numa central onde o aviso de página
+     * não chega faria o carro sumir para sempre, sem o motorista saber por quê.
+     */
+    fun usarPaginaDoCarro(pagina: Int?) = gravar(_ajustes.value.copy(paginaDoCarro = pagina))
+
+    /** O mesmo, para a janela do menu. Ver [usarPaginaDoCarro]. */
+    fun usarPaginaDoMenu(pagina: Int?) = gravar(_ajustes.value.copy(paginaDoMenu = pagina))
+
+    /** Encaixar a página no recorte redondo da bola, ou usar o painel inteiro. */
+    fun encaixarMenuNaBola(sim: Boolean) = gravar(_ajustes.value.copy(menuNaBola = sim))
+
+    /**
      * Empurra uma das janelas alguns dp a partir do lugar escolhido.
      *
      * Some com o lugar? Não: o lugar continua sendo o ponto de partida, e o
@@ -627,6 +684,8 @@ object Cluster {
                 _ajustes.value.copy(empurraoDosNumeros = _ajustes.value.empurraoDosNumeros.mais(dx, dy))
             JanelaDoPainel.CARRO ->
                 _ajustes.value.copy(empurraoDoCarro = _ajustes.value.empurraoDoCarro.mais(dx, dy))
+            JanelaDoPainel.MENU ->
+                _ajustes.value.copy(empurraoDoMenu = _ajustes.value.empurraoDoMenu.mais(dx, dy))
         },
     )
 
@@ -644,6 +703,8 @@ object Cluster {
                 _ajustes.value.copy(zoomDosNumeros = _ajustes.value.zoomDosNumeros.mais(delta))
             JanelaDoPainel.CARRO ->
                 _ajustes.value.copy(zoomDoCarro = _ajustes.value.zoomDoCarro.mais(delta))
+            JanelaDoPainel.MENU ->
+                _ajustes.value.copy(zoomDoMenu = _ajustes.value.zoomDoMenu.mais(delta))
         },
     )
 
@@ -652,6 +713,7 @@ object Cluster {
         when (janela) {
             JanelaDoPainel.NUMEROS -> _ajustes.value.copy(zoomDosNumeros = Zoom())
             JanelaDoPainel.CARRO -> _ajustes.value.copy(zoomDoCarro = Zoom())
+            JanelaDoPainel.MENU -> _ajustes.value.copy(zoomDoMenu = Zoom())
         },
     )
 
@@ -660,6 +722,7 @@ object Cluster {
         when (janela) {
             JanelaDoPainel.NUMEROS -> _ajustes.value.copy(empurraoDosNumeros = Empurrao())
             JanelaDoPainel.CARRO -> _ajustes.value.copy(empurraoDoCarro = Empurrao())
+            JanelaDoPainel.MENU -> _ajustes.value.copy(empurraoDoMenu = Empurrao())
         },
     )
 
@@ -679,6 +742,7 @@ object Cluster {
         when (janela) {
             JanelaDoPainel.NUMEROS -> _ajustes.value.copy(telaDosNumeros = tela)
             JanelaDoPainel.CARRO -> _ajustes.value.copy(telaDoCarro = tela)
+            JanelaDoPainel.MENU -> _ajustes.value.copy(telaDoMenu = tela)
         },
     )
 
@@ -692,5 +756,6 @@ object Cluster {
     fun telasEscolhidas(): Map<JanelaDoPainel, Int?> = mapOf(
         JanelaDoPainel.NUMEROS to _ajustes.value.telaDosNumeros,
         JanelaDoPainel.CARRO to _ajustes.value.telaDoCarro,
+        JanelaDoPainel.MENU to _ajustes.value.telaDoMenu,
     )
 }

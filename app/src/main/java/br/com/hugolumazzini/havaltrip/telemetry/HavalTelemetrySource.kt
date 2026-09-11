@@ -120,6 +120,49 @@ class HavalTelemetrySource(
         const val CHAVE_TETO_SOLAR = "car.basic.sunroof_status"
         const val CHAVE_PNEUS = "car.basic.tpms_status"
 
+        /**
+         * As luzes de fora, para acender no desenho do carro.
+         *
+         * Nenhuma delas entra em conta nenhuma, e nenhuma é aviso: farol aceso
+         * à noite é o certo. É estado para o motorista ver de relance — em
+         * especial a seta, que é o que se esquece ligada depois de uma
+         * ultrapassagem.
+         */
+        const val CHAVE_FAROL_BAIXO = "car.basic.low_beam_light_status"
+        const val CHAVE_FAROL_ALTO = "car.basic.high_beam_light_status"
+        const val CHAVE_NEBLINA_DIANTEIRA = "car.basic.front_fog_light_status"
+        const val CHAVE_NEBLINA_TRASEIRA = "car.basic.rear_fog_light_status"
+
+        /**
+         * A luz de posição, o "meia-luz". É por ela que a lanterna traseira
+         * acende no desenho quando o farol ainda está apagado: a lanterna em si
+         * o carro não publica. Ver `PainelDoVeiculo.Luzes.tras`.
+         */
+        const val CHAVE_LUZ_DE_POSICAO = "car.basic.low_light_status"
+
+        /**
+         * A **alavanca** da seta, e não a lâmpada.
+         *
+         * O carro publica as duas coisas: `left_turn_light_status` é a lâmpada,
+         * que apaga e acende umas duas vezes por segundo, e
+         * `left_turn_switch_status` é a posição da alavanca, que fica firme
+         * enquanto a seta estiver ligada. Seguir a lâmpada faria o desenho
+         * piscar no ritmo dos broadcasts, que não é o ritmo do carro: um aviso
+         * atrasado ou perdido no caminho deixaria a seta acesa na tela com a do
+         * carro apagada, e vice-versa. Quem pisca na tela é o app, com relógio
+         * próprio — ver `Luzes` em `LateralDoVeiculo`.
+         */
+        const val CHAVE_SETA_ESQ = "car.basic.left_turn_switch_status"
+        const val CHAVE_SETA_DIR = "car.basic.right_turn_switch_status"
+        /**
+         * O pisca-alerta. Aqui não há escolha: o carro publica só a lâmpada,
+         * não existe `hazard_switch_status`. Enquanto o pisca estiver ligado
+         * esta chave alterna entre 1 e 0 no ritmo dele, então as setas na tela
+         * vão piscar em compasso duplo — o nosso e o do carro. Fica de pé o que
+         * importa (as duas acesas, e não uma), e é a melhor leitura disponível.
+         */
+        const val CHAVE_PISCA_ALERTA = "car.basic.hazard_light_status"
+
         /** Código da unidade das pressões. Ainda não decifrado; vai cru para o diagnóstico. */
         const val CHAVE_UNIDADE_PNEUS = "car.basic.tpms_units"
 
@@ -161,6 +204,14 @@ class HavalTelemetrySource(
             CHAVE_UNIDADE_PNEUS,
             "car.basic.tpms_warning",
             "car.basic.door_lock_status",
+            CHAVE_FAROL_BAIXO,
+            CHAVE_FAROL_ALTO,
+            CHAVE_NEBLINA_DIANTEIRA,
+            CHAVE_NEBLINA_TRASEIRA,
+            CHAVE_LUZ_DE_POSICAO,
+            CHAVE_SETA_ESQ,
+            CHAVE_SETA_DIR,
+            CHAVE_PISCA_ALERTA,
         )
 
         /**

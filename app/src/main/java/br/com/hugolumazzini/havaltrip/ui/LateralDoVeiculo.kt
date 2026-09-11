@@ -1,5 +1,9 @@
 package br.com.hugolumazzini.havaltrip.ui
 
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -22,6 +26,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,7 +34,9 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.TextUnit
@@ -288,6 +295,210 @@ private fun Cintos(semCinto: List<Assento>, modifier: Modifier = Modifier) {
 }
 
 /**
+ * Onde cada luz acende, em fração do quadro de 794 × 720, com a inclinação da
+ * peça em graus.
+ *
+ * Não são números calculados: foram marcados clicando em cima do próprio
+ * desenho, com a ferramenta em `ferramentas/marcar-luzes`. As duas tentativas
+ * anteriores partiram de simetria — um deslocamento a partir do meio do carro,
+ * o mesmo dos dois lados — e as duas erraram, porque o H6 visto de cima não é
+ * simétrico no quadro e as quinas dianteiras e traseiras caem em ângulos
+ * diferentes. Aqui cada peça tem o lugar dela e ponto.
+ *
+ * Se o conjunto de imagens do carro um dia mudar de enquadramento, esta tabela
+ * inteira sai do lugar junto — é o mesmo risco que [CAMADA_DA_PORTA] já corre,
+ * e a mesma ferramenta refaz.
+ */
+private data class PontoDeLuz(val x: Float, val y: Float, val angulo: Float)
+
+private val FAROL = listOf(
+    PontoDeLuz(0.402f, 0.117f, -40f),
+    PontoDeLuz(0.596f, 0.118f, 32f),
+)
+
+private val SETA_DIANTEIRA = listOf(
+    PontoDeLuz(0.367f, 0.162f, -73f),
+    PontoDeLuz(0.627f, 0.157f, 67f),
+)
+
+/**
+ * A seta de trás, que existe no carro e faltava no desenho.
+ *
+ * Acende junto com a da frente, sempre: no H6 é o mesmo circuito, e mostrar só
+ * a dianteira faria o desenho contradizer quem estivesse olhando o carro.
+ */
+private val SETA_TRASEIRA = listOf(
+    PontoDeLuz(0.373f, 0.822f, 60f),
+    PontoDeLuz(0.621f, 0.827f, -69f),
+)
+
+private val LANTERNA = listOf(
+    PontoDeLuz(0.422f, 0.865f, 13f),
+    PontoDeLuz(0.574f, 0.868f, 162f),
+)
+
+private val NEBLINA = listOf(
+    PontoDeLuz(0.440f, 0.089f, -16f),
+    PontoDeLuz(0.555f, 0.092f, -168f),
+)
+
+/** A cápsula de luz: comprida no sentido do carro e fina. */
+private const val LUZ_COMPRIMENTO = 0.055f
+private const val LUZ_ESPESSURA = 0.016f
+
+/**
+ * Meio segundo aceso, meio apagado.
+ *
+ * O ritmo é nosso, não o do carro: seguimos a alavanca da seta, que fica firme,
+ * e não a lâmpada — ver `CHAVE_SETA_ESQ`. Uma tela que piscasse pelo broadcast
+ * ficaria acesa quando o carro estivesse apagado toda vez que um aviso se
+ * atrasasse, e o motorista não tem como saber qual dos dois mentiu.
+ */
+private const val PISCADA_MS = 500
+
+/** Amarelo de seta. Não é o âmbar de aviso: seta ligada não é problema nenhum. */
+private val AMARELO_DA_SETA = Color(0xFFFFB300)
+
+/**
+ * Azul-claro de xênon, e não branco.
+ *
+ * O farol de verdade é branco, mas o carro do desenho também é — e luz branca
+ * sobre lataria branca não aparece de jeito nenhum, com halo ou sem. O azul
+ * frio é a licença mínima que torna a peça visível e continua se lendo como
+ * farol, que é justamente o tom que os faróis de LED puxam à noite.
+ */
+private val AZUL_DO_FAROL = Color(0xFF8FD0FF)
+
+/** Amarelo quente do neblina, que é a cor com que ele acende de verdade. */
+private val AMARELO_DO_NEBLINA = Color(0xFFFFE082)
+
+/** Vermelho de lanterna traseira — a luz de posição de trás, não freio. */
+private val VERMELHO_DA_LANTERNA = Color(0xFFFF3B2F)
+
+/**
+ * Farol, neblina, lanternas e setas por cima do carro desenhado.
+ *
+ * Não há camada pronta para nenhum deles nos conjuntos de imagem da central,
+ * então são cápsulas desenhadas à mão sobre as coordenadas de [FAROL] e
+ * companhia — como já era o caso dos cintos, e com a mesma ressalva: se um dia
+ * vier a camada, isto sai.
+ *
+ * Cada luz acende **na peça em que ela existe no carro**. É o que dispensa
+ * legenda: o olho reconhece a posição antes de reconhecer a cor.
+ *
+ * Nada disto acende quando a propriedade não chegou. Ver [PainelDoVeiculo.Luzes].
+ */
+@Composable
+private fun Luzes(luzes: PainelDoVeiculo.Luzes, modifier: Modifier = Modifier) {
+    if (!luzes.algumaLeitura) return
+
+    // Uma piscada só para os quatro cantos: com relógios separados, o
+    // pisca-alerta acenderia as setas em contratempo, e no carro elas acendem
+    // juntas.
+    val relogio = rememberInfiniteTransition(label = "seta")
+    val acesa by relogio.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            // `keyframes` com dois degraus, e não um `tween`: a seta do carro
+            // liga e desliga, não some devagar. Um esmaecimento suave seria
+            // outra coisa acontecendo na tela.
+            animation = keyframes {
+                durationMillis = PISCADA_MS * 2
+                1f at 0
+                1f at PISCADA_MS - 1
+                0f at PISCADA_MS
+            },
+        ),
+        label = "piscada",
+    )
+
+    Canvas(modifier) {
+        // A mesma conta do `ContentScale.Crop` refeita à mão, como em [Cintos]:
+        // a altura manda e a sobra de largura sai centrada para fora.
+        val escala = size.height / 720f
+        val largura = 794f * escala
+        val x0 = (size.width - largura) / 2f
+
+        val comprimento = LUZ_COMPRIMENTO * size.height
+        val espessura = LUZ_ESPESSURA * largura
+
+        /**
+         * Uma peça acesa: a cápsula e o halo em volta.
+         *
+         * O halo é metade do efeito. Sem ele a cápsula é um adesivo colorido
+         * colado na lataria; com ele o desenho tem o borrão que uma lâmpada faz
+         * em volta de si, e é isso que se lê como "está ligada".
+         */
+        fun acender(ponto: PontoDeLuz, cor: Color, forca: Float, tamanho: Float = 1f) {
+            if (forca <= 0f) return
+            val centro = Offset(x0 + ponto.x * largura, ponto.y * size.height)
+            val comp = comprimento * tamanho
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(cor.copy(alpha = 0.55f), Color.Transparent),
+                    center = centro,
+                    radius = comp,
+                ),
+                radius = comp,
+                center = centro,
+                alpha = forca,
+            )
+            rotate(degrees = ponto.angulo, pivot = centro) {
+                drawRoundRect(
+                    color = cor,
+                    topLeft = Offset(centro.x - comp / 2f, centro.y - espessura / 2f),
+                    size = Size(comp, espessura),
+                    cornerRadius = CornerRadius(espessura / 2f),
+                    alpha = forca,
+                )
+            }
+        }
+
+        // O farol. O alto desenha a mesma peça maior, que é a única diferença
+        // entre os dois que dá para mostrar numa vista de cima.
+        if (luzes.baixo == true || luzes.alto == true) {
+            val tamanho = if (luzes.alto == true) 1.45f else 1.1f
+            FAROL.forEach { acender(it, AZUL_DO_FAROL, forca = 1f, tamanho = tamanho) }
+        }
+
+        if (luzes.neblinaDianteira == true) {
+            NEBLINA.forEach { acender(it, AMARELO_DO_NEBLINA, forca = 1f) }
+        }
+
+        // A lanterna traseira acompanha o farol, porque é assim no carro: não há
+        // como andar de farol aceso e lanterna apagada. Ela não tem propriedade
+        // própria — o que existe é a luz de posição, e é dela que o vermelho de
+        // trás sai quando só o "meia-luz" está ligado. Ver `Luzes.tras`.
+        //
+        // O neblina de trás não ganha peça própria porque no H6 ele fica dentro
+        // da mesma lanterna: acende a mesma luz, mais forte e maior.
+        if (luzes.tras || luzes.neblinaTraseira == true) {
+            val neblina = luzes.neblinaTraseira == true
+            LANTERNA.forEach {
+                acender(
+                    it,
+                    VERMELHO_DA_LANTERNA,
+                    forca = if (neblina) 1f else 0.9f,
+                    tamanho = if (neblina) 1.3f else 1f,
+                )
+            }
+        }
+
+        // E as setas por último, piscando: no carro elas dividem o bloco óptico
+        // com o farol, e é por cima dele que aparecem.
+        if (luzes.esquerdaAcesa) {
+            acender(SETA_DIANTEIRA[0], AMARELO_DA_SETA, acesa)
+            acender(SETA_TRASEIRA[0], AMARELO_DA_SETA, acesa)
+        }
+        if (luzes.direitaAcesa) {
+            acender(SETA_DIANTEIRA[1], AMARELO_DA_SETA, acesa)
+            acender(SETA_TRASEIRA[1], AMARELO_DA_SETA, acesa)
+        }
+    }
+}
+
+/**
  * Quanto da faixa as pressões ocupam. Menos que 1 aproxima os números do carro;
  * o limite é a porta aberta, que sai da silhueta e não pode ficar por baixo do
  * texto.
@@ -420,6 +631,11 @@ private fun CarroEmCamadas(painel: PainelDoVeiculo, modifier: Modifier = Modifie
         // E os cintos por cima de tudo: são os únicos que ficam dentro do carro,
         // e nenhuma peça pode passar na frente deles.
         Cintos(painel.semCinto, Modifier.fillMaxSize())
+
+        // As luzes por último: o feixe do farol sai para fora da lataria e a
+        // seta encosta na borda, então qualquer camada desenhada depois passaria
+        // por cima justamente da parte que interessa.
+        Luzes(painel.luzes, Modifier.fillMaxSize())
     }
 }
 

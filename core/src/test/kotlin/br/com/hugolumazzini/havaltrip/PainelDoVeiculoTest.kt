@@ -172,4 +172,33 @@ class PainelDoVeiculoTest {
         val p = PainelDoVeiculo.ler(pneus = "{2.3,1.0}")
         assertTrue(p.pneusMurchos.isEmpty())
     }
+
+    @Test
+    fun `luz que nao chegou nao vira luz apagada`() {
+        // Sem o Shisuku configurado nenhuma propriedade de luz chega. Dizer
+        // "farol apagado" nesse caso seria afirmar o que ninguem leu.
+        val p = PainelDoVeiculo.ler(portas = "{0,0,0,0,0,0}")
+        assertNull(p.luzes.baixo)
+        assertFalse(p.luzes.algumaLeitura)
+        assertFalse(p.luzes.algumFarol)
+    }
+
+    @Test
+    fun `pisca-alerta acende os dois lados mesmo com as setas em zero`() {
+        // Ha firmware em que so o hazard muda. Seguir apenas as duas setas
+        // deixaria o carro com o pisca ligado e nada aceso na tela.
+        val p = PainelDoVeiculo.ler(setaEsquerda = "0", setaDireita = "0", pisca = "1")
+        assertTrue(p.luzes.esquerdaAcesa)
+        assertTrue(p.luzes.direitaAcesa)
+    }
+
+    @Test
+    fun `farol aceso nao e aviso e nao tira o tudo certo`() {
+        // Andar de farol aceso a noite e o certo: nao pode aparecer na lista de
+        // avisos nem apagar o "Tudo certo" do carro inteiro fechado.
+        val p = PainelDoVeiculo.ler(portas = "{0,0,0,0,0,0}", farolBaixo = "1")
+        assertTrue(p.luzes.algumFarol)
+        assertTrue(p.avisos.isEmpty())
+        assertTrue(p.tudoCerto)
+    }
 }

@@ -95,6 +95,15 @@ class EstadoDoCarro(private val diario: DiarioDeCampo) {
         tetoSolar = cache[HavalTelemetrySource.CHAVE_TETO_SOLAR],
         pneus = cache[HavalTelemetrySource.CHAVE_PNEUS],
         unidadePneus = cache[HavalTelemetrySource.CHAVE_UNIDADE_PNEUS],
+        farolBaixo = cache[HavalTelemetrySource.CHAVE_FAROL_BAIXO],
+        farolAlto = cache[HavalTelemetrySource.CHAVE_FAROL_ALTO],
+        neblinaDianteira = cache[HavalTelemetrySource.CHAVE_NEBLINA_DIANTEIRA],
+        neblinaTraseira = cache[HavalTelemetrySource.CHAVE_NEBLINA_TRASEIRA],
+        posicao = cache[HavalTelemetrySource.CHAVE_LUZ_DE_POSICAO],
+        // A alavanca, não a lâmpada: ver [HavalTelemetrySource.CHAVE_SETA_ESQ].
+        setaEsquerda = cache[HavalTelemetrySource.CHAVE_SETA_ESQ],
+        setaDireita = cache[HavalTelemetrySource.CHAVE_SETA_DIR],
+        pisca = cache[HavalTelemetrySource.CHAVE_PISCA_ALERTA],
     )
 
     fun montarAmostra(): TelemetrySample {

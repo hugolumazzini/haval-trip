@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,6 +44,8 @@ import br.com.hugolumazzini.havaltrip.FundoDoCluster
 import br.com.hugolumazzini.havaltrip.ClusterActivity
 import br.com.hugolumazzini.havaltrip.ESPIANDO
 import br.com.hugolumazzini.havaltrip.ClusterCarroActivity
+import br.com.hugolumazzini.havaltrip.ClusterMenuActivity
+import br.com.hugolumazzini.havaltrip.AjustesDoCluster
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,6 +55,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
+import br.com.hugolumazzini.havaltrip.painel.PaginaDoCluster
+import br.com.hugolumazzini.havaltrip.painel.TecladoDoVolante
 import br.com.hugolumazzini.havaltrip.painel.ProjetorDoPainel
 import br.com.hugolumazzini.havaltrip.painel.ShizukuShell
 import androidx.compose.ui.semantics.contentDescription
@@ -614,11 +619,210 @@ private fun PainelDeInstrumentos(estado: TripState) {
         }
 
         Spacer(Modifier.height(14.dp))
+        PaginaDoPainel(ajustes.paginaDoCarro)
+
+        Spacer(Modifier.height(14.dp))
         AjusteFino(JanelaDoPainel.CARRO, ajustes.empurraoDoCarro, ajustes.zoomDoCarro)
 
         Spacer(Modifier.height(12.dp))
         BotaoAcao("Ver como fica o carro", onClick = { espiar(ClusterCarroActivity::class.java) })
+
+        Spacer(Modifier.height(18.dp))
+        PaginaComVisoes(ajustes, ::espiar)
     }
+}
+
+/**
+ * A terceira janela: uma página do painel inteira, com visões que se trocam no
+ * volante.
+ *
+ * ## Solto e página, e por que os dois existem
+ *
+ * "Solto" é o que as duas seções acima fazem: janelinhas fixas num canto do
+ * painel, por cima de qualquer página. Serve para quem quer o número sempre à
+ * vista.
+ *
+ * "Página" é outra ideia: uma coisa de cada vez, do tamanho do painel, e nada
+ * quando o motorista está noutra página. Serve para quem tem uma bola sobrando
+ * — a que o Impulse deixou vazia — e quer usá-la como o carro usa as dele.
+ *
+ * As duas podem estar ligadas ao mesmo tempo. Não se atrapalham: são janelas
+ * diferentes, com telas e páginas próprias.
+ */
+@Composable
+private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Unit) {
+    val agora by PaginaDoCluster.pagina.collectAsStateWithLifecycle()
+    val ouvindoPagina by PaginaDoCluster.ligado.collectAsStateWithLifecycle()
+    val ouvindoTeclas by TecladoDoVolante.ligado.collectAsStateWithLifecycle()
+
+    Text("Página com visões", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "Uma página inteira do painel, em vez de janelinhas soltas. As páginas do " +
+            "painel se trocam com as setas para os lados, no volante; dentro desta, " +
+            "para cima e para baixo trocam a visão: primeiro o carro, depois um " +
+            "contador para cada Trip. Aponte esta janela para a tela do painel " +
+            "inteira e escolha em qual página ela aparece — de preferência a bola " +
+            "que ficou vazia.",
+        style = MaterialTheme.typography.bodySmall,
+        color = Cores.TextoApoio,
+    )
+
+    Spacer(Modifier.height(14.dp))
+    Projecao(JanelaDoPainel.MENU, ajustes.telaDoMenu)
+
+    Spacer(Modifier.height(14.dp))
+    Text("Página do painel", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        when {
+            !ouvindoPagina ->
+                "Esta central não avisa quando a página do painel muda, então esta " +
+                    "janela ficaria por cima de todas elas. Nesse caso, prefira o " +
+                    "carro solto."
+            agora == null ->
+                "Gire o carrossel do painel uma vez, no volante: o número da página " +
+                    "aparece aqui."
+            else ->
+                "O painel está na página $agora. Pare na bola vazia e toque em " +
+                    "\"só nesta página\"."
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(8.dp))
+    FlowRowSimples {
+        Opcao("Em todas as páginas", ajustes.paginaDoMenu == null) { Cluster.usarPaginaDoMenu(null) }
+        val alvo = agora
+        if (ouvindoPagina && alvo != null) {
+            Opcao("Só na página $alvo", ajustes.paginaDoMenu == alvo) {
+                Cluster.usarPaginaDoMenu(alvo)
+            }
+        }
+        val presa = ajustes.paginaDoMenu
+        if (presa != null && presa != agora) {
+            Opcao("Só na página $presa", true) { Cluster.usarPaginaDoMenu(presa) }
+        }
+    }
+    AvisoDaPagina(ajustes.paginaDoMenu)
+
+    Spacer(Modifier.height(14.dp))
+    Text("Formato", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "A bola que sobrou é um recorte redondo pequeno, não a tela toda. " +
+            "Encaixado, tudo cabe dentro dela; no painel inteiro, o conteúdo se " +
+            "espalha — e aí só serve se a página que você escolheu não tiver esse " +
+            "recorte.",
+        style = MaterialTheme.typography.bodySmall,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(8.dp))
+    FlowRowSimples {
+        Opcao("Encaixar na bola", ajustes.menuNaBola) { Cluster.encaixarMenuNaBola(true) }
+        Opcao("Painel inteiro", !ajustes.menuNaBola) { Cluster.encaixarMenuNaBola(false) }
+    }
+
+    Spacer(Modifier.height(10.dp))
+    Text(
+        if (ouvindoTeclas) {
+            "A cruzinha do volante está sendo lida: para cima e para baixo trocam a " +
+                "visão enquanto esta página estiver na frente."
+        } else {
+            "A cruzinha do volante não está sendo lida nesta central. A página ainda " +
+                "funciona, mas fica travada na primeira visão."
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = if (ouvindoTeclas) Cores.TextoApoio else Cores.Atencao,
+    )
+
+    Spacer(Modifier.height(12.dp))
+    BotaoAcao("Ver como fica a página", onClick = { espiar(ClusterMenuActivity::class.java) })
+}
+
+/**
+ * Em qual página do carrossel do painel o carro aparece.
+ *
+ * ## Por que isto é preciso
+ *
+ * O painel do H6 tem um carrossel de páginas — a padrão do carro, a de mídia, a
+ * do telefone —, e a nossa janela é projetada por cima de todas: ela não sabe
+ * que a página mudou e continua lá. Quem quer ocupar a bola que o Impulse deixa
+ * vazia precisa exatamente do contrário — aparecer numa página só, e sumir nas
+ * outras, como o ar-condicionado dele some.
+ *
+ * ## Por que o número é lido aqui, e não escolhido numa lista
+ *
+ * Porque nós não sabemos qual número é qual bola. A central manda um inteiro
+ * quando a página troca, e o único ponto firme é que a página padrão do carro é
+ * a 0. Então em vez de adivinhar nomes, esta tela mostra o número que está
+ * chegando **agora**: o motorista gira o carrossel até a bola que quer, olha o
+ * número aqui e toca em "prender". É a régua de novo — quem tem a informação
+ * está sentado no carro.
+ */
+@Composable
+private fun PaginaDoPainel(escolhida: Int?) {
+    val agora by PaginaDoCluster.pagina.collectAsStateWithLifecycle()
+    val ouvindo by PaginaDoCluster.ligado.collectAsStateWithLifecycle()
+
+    Text("Página do painel", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        when {
+            !ouvindo ->
+                "Esta central não está avisando quando a página do painel muda, " +
+                    "então o carro aparece em todas elas. Não há o que ajustar aqui."
+            agora == null ->
+                "Gire o carrossel do painel uma vez, no volante: assim que a página " +
+                    "mudar, o número dela aparece aqui."
+            else ->
+                "O painel está na página $agora. Gire o carrossel até a bola em que " +
+                    "você quer o carro e toque em \"só nesta página\"."
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(8.dp))
+    FlowRowSimples {
+        Opcao("Em todas as páginas", escolhida == null) { Cluster.usarPaginaDoCarro(null) }
+        val alvo = agora
+        if (ouvindo && alvo != null) {
+            Opcao("Só na página $alvo", escolhida == alvo) { Cluster.usarPaginaDoCarro(alvo) }
+        }
+        // A escolha já gravada continua visível mesmo quando o painel está
+        // noutra página; sem isto, quem prendeu o carro na página 2 e girou o
+        // carrossel veria "Em todas" como única opção e acharia que perdeu o
+        // ajuste.
+        if (escolhida != null && escolhida != agora) {
+            Opcao("Só na página $escolhida", true) { Cluster.usarPaginaDoCarro(escolhida) }
+        }
+    }
+    AvisoDaPagina(escolhida)
+}
+
+/**
+ * O aviso de que a página escolhida já tem dono.
+ *
+ * Aviso, e não impedimento: quem não usa o Impulse pode querer a página dele, e
+ * a numeração pode não ser a mesma em toda central. Ver
+ * [PaginaDoCluster.aviso].
+ */
+@Composable
+private fun AvisoDaPagina(pagina: Int?) {
+    val aviso = PaginaDoCluster.aviso(pagina) ?: return
+    Spacer(Modifier.height(6.dp))
+    Text(aviso, style = MaterialTheme.typography.bodySmall, color = Cores.Atencao)
+}
+
+/** Uma fila de chips que quebra a linha. Só para não repetir os dois espaçamentos. */
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun FlowRowSimples(conteudo: @Composable FlowRowScope.() -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        content = conteudo,
+    )
 }
 
 /**
@@ -782,7 +986,10 @@ private fun Projecao(janela: JanelaDoPainel, escolhida: Int?) {
     Text(
         "No H6 o painel de instrumentos costuma ser a tela 3. \"Nenhuma\" deixa a " +
             "janela desligada — é o que usar se preferir continuar configurando " +
-            "esta janela pelo Impulse.",
+            "esta janela pelo Impulse. A central aparece na lista só para teste: " +
+            "projetar nela abre a janela por cima desta tela, e \"Recolher\" " +
+            "devolve — serve para confirmar que a janela funciona quando o painel " +
+            "não aceita.",
         style = MaterialTheme.typography.bodySmall,
         color = Cores.TextoApoio,
     )

@@ -103,6 +103,12 @@ class EstadoDoCarro(private val diario: DiarioDeCampo) {
         // A alavanca, não a lâmpada: ver [HavalTelemetrySource.CHAVE_SETA_ESQ].
         setaEsquerda = cache[HavalTelemetrySource.CHAVE_SETA_ESQ],
         setaDireita = cache[HavalTelemetrySource.CHAVE_SETA_DIR],
+        // A lâmpada, para as centrais que não publicam a alavanca. Dois nomes
+        // para a mesma coisa, e vale o primeiro que tiver chegado.
+        lampadaEsquerda = cache[HavalTelemetrySource.CHAVE_SETA_ESQ_LAMPADA]
+            ?: cache[HavalTelemetrySource.CHAVE_SETA_ESQ_INDICADOR],
+        lampadaDireita = cache[HavalTelemetrySource.CHAVE_SETA_DIR_LAMPADA]
+            ?: cache[HavalTelemetrySource.CHAVE_SETA_DIR_INDICADOR],
         pisca = cache[HavalTelemetrySource.CHAVE_PISCA_ALERTA],
     )
 

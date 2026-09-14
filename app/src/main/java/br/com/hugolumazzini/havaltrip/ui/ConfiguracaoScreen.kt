@@ -56,6 +56,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
 import br.com.hugolumazzini.havaltrip.painel.PaginaDoCluster
+import br.com.hugolumazzini.havaltrip.painel.TeclaDoVolante
 import br.com.hugolumazzini.havaltrip.painel.TecladoDoVolante
 import br.com.hugolumazzini.havaltrip.painel.ProjetorDoPainel
 import br.com.hugolumazzini.havaltrip.painel.ShizukuShell
@@ -735,6 +736,32 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
         style = MaterialTheme.typography.bodySmall,
         color = if (ouvindoTeclas) Cores.TextoApoio else Cores.Atencao,
     )
+
+    // O contador das teclas cruas. Sem ele, "apertei e não aconteceu nada" pode
+    // ser o registro que falhou, a central que não avisa ninguém, ou um código
+    // diferente do que esperamos — três consertos diferentes, e nenhum jeito de
+    // saber qual. Com ele, o volante vira um teste que se faz sentado no carro.
+    if (ouvindoTeclas) {
+        val quantas by TecladoDoVolante.quantasChegaram.collectAsStateWithLifecycle()
+        val codigo by TecladoDoVolante.ultimoCodigo.collectAsStateWithLifecycle()
+        Spacer(Modifier.height(6.dp))
+        Text(
+            when {
+                quantas == 0 ->
+                    "Nenhuma tecla chegou ainda. Aperte a cruzinha do volante: se este " +
+                        "número não mexer, a central não nos manda as teclas."
+                else ->
+                    "Teclas recebidas: $quantas. A última veio com o código $codigo" +
+                        if (TeclaDoVolante.de(codigo ?: -1) == null) {
+                            " — que este app ainda não conhece. Me mande esse número."
+                        } else {
+                            "."
+                        }
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
+    }
 
     Spacer(Modifier.height(12.dp))
     BotaoAcao("Ver como fica a página", onClick = { espiar(ClusterMenuActivity::class.java) })

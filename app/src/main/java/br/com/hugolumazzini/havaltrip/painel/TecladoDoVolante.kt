@@ -91,11 +91,32 @@ object TecladoDoVolante {
     /** Se as teclas estão mesmo chegando nesta central. */
     val ligado: StateFlow<Boolean> = _ligado.asStateFlow()
 
+    private val _ultimoCodigo = MutableStateFlow<Int?>(null)
+
+    /**
+     * O último código cru que a central mandou, mesmo os que não entendemos.
+     *
+     * Sem isto, "apertei e não aconteceu nada" não se distingue de "chegou um
+     * código que [TeclaDoVolante.de] joga fora", e as duas se consertam de
+     * formas opostas. Aparece na Configuração exatamente por isso.
+     */
+    val ultimoCodigo: StateFlow<Int?> = _ultimoCodigo.asStateFlow()
+
+    private val _quantasChegaram = MutableStateFlow(0)
+
+    /** Quantas teclas a central já mandou desde que o app abriu. */
+    val quantasChegaram: StateFlow<Int> = _quantasChegaram.asStateFlow()
+
     private val ouvinte = object : IInputListener.Stub() {
         override fun dispatchKeyEvent(evento: KeyEvent?) {
             // Só a descida. O serviço manda o par descer/soltar como qualquer
             // teclado, e reagir aos dois andaria duas visões por toque.
             if (evento == null || evento.action != KeyEvent.ACTION_DOWN) return
+            // Anotar antes de filtrar: o código que não reconhecemos é
+            // justamente o que precisamos ver para reconhecer depois.
+            _ultimoCodigo.value = evento.keyCode
+            _quantasChegaram.value++
+            Log.w(TAG, "tecla do volante: código ${evento.keyCode}")
             TeclaDoVolante.de(evento.keyCode)?.let { _teclas.tryEmit(it) }
         }
     }

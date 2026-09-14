@@ -103,6 +103,7 @@ object PaginaDoCluster {
             _ligado.value = runCatching { servico.registerCallback(ouvinte); true }
                 .onFailure { Log.w(TAG, "o serviço do painel recusou o registro", it) }
                 .getOrDefault(false)
+            if (_ligado.value) perguntarAPagina(servico)
         }
 
         override fun onServiceDisconnected(nome: ComponentName?) {
@@ -111,6 +112,33 @@ object PaginaDoCluster {
             // ou sumir por causa de um problema nosso, não de um gesto dele.
             _ligado.value = false
         }
+    }
+
+    /**
+     * Pergunta em que página o painel já está, em vez de esperar ele mudar.
+     *
+     * Era o buraco do teste no carro. O registro só traz **troca** de página: se
+     * o motorista abre o app e não gira o carrossel, nada chega, [pagina] fica
+     * `null` e a janela — que sem saber a página se mostra em todas — aparece
+     * por cima do painel nativo. Era exatamente o "ficou por cima" que apareceu
+     * no carro, e não um registro que falhou.
+     *
+     * São duas tentativas porque não se sabe qual das duas esta central atende:
+     * `getMsgData` devolve o valor na hora, e `getMsg` pede ao serviço que
+     * reemita a mensagem pelo caminho normal, caindo no [ouvinte]. Chamar as
+     * duas não custa nada e cobre as duas famílias de central.
+     */
+    private fun perguntarAPagina(servico: IClusterService) {
+        runCatching { servico.getMsgData(MSG_PAGINA)?.intValue }
+            .onSuccess { atual ->
+                if (atual != null) {
+                    _pagina.value = atual
+                    Log.w(TAG, "o painel já estava na página $atual")
+                }
+            }
+            .onFailure { Log.w(TAG, "o serviço não soube dizer a página atual", it) }
+        runCatching { servico.getMsg(MSG_PAGINA) }
+            .onFailure { Log.w(TAG, "o serviço não reemitiu a página", it) }
     }
 
     /**

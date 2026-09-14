@@ -1,4 +1,4 @@
-<!doctype html>
+a <!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
@@ -54,14 +54,16 @@
 <div>
   <h1>Onde cada luz acende</h1>
   <p class="dica">
-    Escolha a luz e <b>clique</b> no lugar dela no carro. Para inclinar a peça,
-    clique e <b>arraste</b> antes de soltar. Cada luz guarda só o último clique.
-    No fim, copie o texto de baixo e me mande.
+    O carro já começa com as luzes <b>onde o app desenha hoje</b>. Para corrigir
+    alguma, escolha a luz e <b>clique</b> no lugar certo; para inclinar a peça,
+    clique e <b>arraste</b> antes de soltar. No fim, copie o texto de baixo e me
+    mande — pode mandar só as linhas que você mexeu.
   </p>
 
   <div class="lista" id="lista"></div>
 
   <div class="acoes">
+    <button onclick="restaurar()">Voltar ao do app</button>
     <button onclick="limpar()">Limpar tudo</button>
     <button onclick="copiar()">Copiar o texto</button>
   </div>
@@ -86,9 +88,30 @@ const LUZES = [
   { id: 'lanterna_dir', nome: 'Lanterna traseira direita',  cor: '#FF3B2F' },
   { id: 'neblina_esq',  nome: 'Neblina dianteiro esquerdo', cor: '#FFE082' },
   { id: 'neblina_dir',  nome: 'Neblina dianteiro direito',  cor: '#FFE082' },
+  // Redondo, e não em faixa: no H6 o neblina de trás é uma lâmpada única no
+  // meio do para-choque, e o app o desenha como ponto. `redondo` só muda o
+  // desenho aqui — o ângulo dele não vale nada, porque círculo não tem lado.
+  { id: 'neblina_traseiro', nome: 'Neblina traseiro (meio)', cor: '#FF3B2F', redondo: true },
 ];
 
-const marcas = {};
+// Onde o app desenha hoje. Começar do que já existe, em vez de da tela em
+// branco, é o que torna a ferramenta útil na segunda vez: quase sempre o que
+// se quer é corrigir um ponto, e remarcar os outros dez à mão os pioraria.
+const MARCAS_DO_APP = {
+  farol_baixo_esq:    { x: 0.402, y: 0.117, angulo: -40 },
+  farol_baixo_dir:    { x: 0.596, y: 0.118, angulo: 32 },
+  seta_dianteira_esq: { x: 0.367, y: 0.162, angulo: -73 },
+  seta_dianteira_dir: { x: 0.627, y: 0.157, angulo: 67 },
+  seta_traseira_esq:  { x: 0.373, y: 0.822, angulo: 60 },
+  seta_traseira_dir:  { x: 0.621, y: 0.827, angulo: -69 },
+  lanterna_esq:       { x: 0.422, y: 0.865, angulo: 13 },
+  lanterna_dir:       { x: 0.574, y: 0.868, angulo: 162 },
+  neblina_esq:        { x: 0.440, y: 0.089, angulo: -16 },
+  neblina_dir:        { x: 0.555, y: 0.092, angulo: -168 },
+  neblina_traseiro:   { x: 0.498, y: 0.876, angulo: 0 },
+};
+
+const marcas = { ...MARCAS_DO_APP };
 let ativa = LUZES[0].id;
 let arrastando = null;
 
@@ -158,7 +181,11 @@ function desenhar() {
     ctx.shadowColor = luz.cor;
     ctx.shadowBlur = 18;
     ctx.beginPath();
-    ctx.roundRect(-comp / 2, -esp / 2, comp, esp, esp / 2);
+    if (luz.redondo) {
+      ctx.arc(0, 0, esp * 0.62, 0, Math.PI * 2);
+    } else {
+      ctx.roundRect(-comp / 2, -esp / 2, comp, esp, esp / 2);
+    }
     ctx.fill();
     ctx.restore();
   });
@@ -183,6 +210,13 @@ function saida() {
 
 function limpar() {
   Object.keys(marcas).forEach(k => delete marcas[k]);
+  desenhar(); montarLista();
+}
+
+/** Desfaz a bagunça de uma sessão sem obrigar a recarregar a página. */
+function restaurar() {
+  Object.keys(marcas).forEach(k => delete marcas[k]);
+  Object.assign(marcas, JSON.parse(JSON.stringify(MARCAS_DO_APP)));
   desenhar(); montarLista();
 }
 

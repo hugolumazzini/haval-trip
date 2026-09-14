@@ -119,6 +119,16 @@ data class PainelDoVeiculo(
         val posicao: Boolean? = null,
         val setaEsquerda: Boolean? = null,
         val setaDireita: Boolean? = null,
+        /**
+         * A lâmpada da seta, quando a alavanca não é publicada.
+         *
+         * O H6 do teste não publica `..._turn_switch_status` — farol, lanterna e
+         * neblina acenderam no desenho e a seta não. Como cada central escolhe
+         * um dos três nomes da mesma coisa, o app pergunta os três e usa o que
+         * responder; ver as chaves em `HavalTelemetrySource`.
+         */
+        val lampadaEsquerda: Boolean? = null,
+        val lampadaDireita: Boolean? = null,
         val pisca: Boolean? = null,
     ) {
         /** Se há farol de qualquer tipo aceso. Neblina conta: é luz para fora. */
@@ -141,14 +151,16 @@ data class PainelDoVeiculo(
          * O pisca-alerta acende as duas setas, mesmo que o carro publique as
          * duas em zero — em alguns firmwares só o `hazard` muda.
          */
-        val esquerdaAcesa: Boolean get() = setaEsquerda == true || pisca == true
-        val direitaAcesa: Boolean get() = setaDireita == true || pisca == true
+        val esquerdaAcesa: Boolean
+            get() = setaEsquerda == true || lampadaEsquerda == true || pisca == true
+        val direitaAcesa: Boolean
+            get() = setaDireita == true || lampadaDireita == true || pisca == true
 
         /** Se alguma das propriedades de luz chegou. Ver [PainelDoVeiculo.algumaLeitura]. */
         val algumaLeitura: Boolean
             get() = listOf(
                 baixo, alto, neblinaDianteira, neblinaTraseira, posicao,
-                setaEsquerda, setaDireita, pisca,
+                setaEsquerda, setaDireita, lampadaEsquerda, lampadaDireita, pisca,
             ).any { it != null }
     }
 
@@ -267,6 +279,8 @@ data class PainelDoVeiculo(
             posicao: String? = null,
             setaEsquerda: String? = null,
             setaDireita: String? = null,
+            lampadaEsquerda: String? = null,
+            lampadaDireita: String? = null,
             pisca: String? = null,
         ): PainelDoVeiculo {
             return PainelDoVeiculo(
@@ -285,6 +299,8 @@ data class PainelDoVeiculo(
                     posicao = ligado(posicao),
                     setaEsquerda = ligado(setaEsquerda),
                     setaDireita = ligado(setaDireita),
+                    lampadaEsquerda = ligado(lampadaEsquerda),
+                    lampadaDireita = ligado(lampadaDireita),
                     pisca = ligado(pisca),
                 ),
             )

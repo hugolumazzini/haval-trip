@@ -193,6 +193,17 @@ class PainelDoVeiculoTest {
     }
 
     @Test
+    fun `a lampada acende a seta quando a alavanca nao e publicada`() {
+        // O caso do carro de verdade: farol e lanterna acenderam e a seta nao,
+        // porque esta central nao publica `turn_switch_status`. Se este teste
+        // cair, a seta some do desenho de novo e so se descobre dirigindo.
+        val p = PainelDoVeiculo.ler(lampadaEsquerda = "1")
+        assertTrue(p.luzes.esquerdaAcesa)
+        assertFalse(p.luzes.direitaAcesa)
+        assertTrue(p.luzes.algumaLeitura)
+    }
+
+    @Test
     fun `farol aceso nao e aviso e nao tira o tudo certo`() {
         // Andar de farol aceso a noite e o certo: nao pode aparecer na lista de
         // avisos nem apagar o "Tudo certo" do carro inteiro fechado.

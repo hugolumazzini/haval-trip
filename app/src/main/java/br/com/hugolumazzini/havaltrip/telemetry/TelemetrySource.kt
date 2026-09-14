@@ -102,9 +102,12 @@ class SimulatedTelemetrySource(
         alvo.registrar(HavalTelemetrySource.CHAVE_NEBLINA_DIANTEIRA, "0")
         alvo.registrar(HavalTelemetrySource.CHAVE_NEBLINA_TRASEIRA, "0")
         alvo.registrar(HavalTelemetrySource.CHAVE_LUZ_DE_POSICAO, "1")
+        // Só a lâmpada, e não a alavanca: é o carro do teste, que não publica
+        // `turn_switch_status`. O simulador tem de imitar o carro difícil, não o
+        // fácil — senão a bancada aprova um desenho que no H6 não acende.
         val fase = (segundosNoTrecho / 10) % 3
-        alvo.registrar(HavalTelemetrySource.CHAVE_SETA_ESQ, if (fase == 1) "1" else "0")
-        alvo.registrar(HavalTelemetrySource.CHAVE_SETA_DIR, if (fase == 2) "1" else "0")
+        alvo.registrar(HavalTelemetrySource.CHAVE_SETA_ESQ_LAMPADA, if (fase == 1) "1" else "0")
+        alvo.registrar(HavalTelemetrySource.CHAVE_SETA_DIR_LAMPADA, if (fase == 2) "1" else "0")
         alvo.registrar(HavalTelemetrySource.CHAVE_PISCA_ALERTA, "0")
     }
 

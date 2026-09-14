@@ -154,6 +154,29 @@ class HavalTelemetrySource(
          */
         const val CHAVE_SETA_ESQ = "car.basic.left_turn_switch_status"
         const val CHAVE_SETA_DIR = "car.basic.right_turn_switch_status"
+
+        /**
+         * A lâmpada da seta, e a terceira forma de perguntar a mesma coisa.
+         *
+         * O teste no carro mostrou o que o raciocínio acima não previa: farol,
+         * lanterna e neblina acenderam, e a seta não — ou seja, a alavanca
+         * simplesmente não é publicada nesta central, embora exista no catálogo
+         * de propriedades. Como há três nomes para o mesmo estado e nenhum é
+         * garantido, pedimos os três e acende quem responder.
+         *
+         * Seguir a lâmpada tem o defeito já descrito — ela chega piscando, no
+         * ritmo dos avisos e não no do carro —, mas `Luzes.esquerdaAcesa` trata
+         * as três como "a seta está ligada" e quem pisca na tela continua sendo
+         * o relógio do app. Uma lâmpada que chega apagada no meio da piscada faz
+         * a seta sumir por um instante; é bem melhor do que não aparecer nunca.
+         */
+        const val CHAVE_SETA_ESQ_LAMPADA = "car.basic.left_turn_light_status"
+        const val CHAVE_SETA_DIR_LAMPADA = "car.basic.right_turn_light_status"
+
+        /** O mesmo, com o nome que algumas centrais usam — repare no `T` grande. */
+        const val CHAVE_SETA_ESQ_INDICADOR = "car.basic.left_turn_Indicator_light_status"
+        const val CHAVE_SETA_DIR_INDICADOR = "car.basic.right_turn_Indicator_light_status"
+
         /**
          * O pisca-alerta. Aqui não há escolha: o carro publica só a lâmpada,
          * não existe `hazard_switch_status`. Enquanto o pisca estiver ligado
@@ -211,6 +234,10 @@ class HavalTelemetrySource(
             CHAVE_LUZ_DE_POSICAO,
             CHAVE_SETA_ESQ,
             CHAVE_SETA_DIR,
+            CHAVE_SETA_ESQ_LAMPADA,
+            CHAVE_SETA_DIR_LAMPADA,
+            CHAVE_SETA_ESQ_INDICADOR,
+            CHAVE_SETA_DIR_INDICADOR,
             CHAVE_PISCA_ALERTA,
         )
 

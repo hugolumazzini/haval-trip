@@ -342,6 +342,16 @@ private val NEBLINA = listOf(
     PontoDeLuz(0.555f, 0.092f, -168f),
 )
 
+/**
+ * O neblina de trás, no meio do para-choque.
+ *
+ * Um ponto só, e não um par: no H6 ele é uma lâmpada única, e antes o desenho
+ * o fingia acendendo as duas lanternas mais fortes — o que mostrava a luz
+ * errada no lugar errado. O ângulo não é usado: quem o desenha é `acenderPonto`,
+ * e círculo não tem lado.
+ */
+private val NEBLINA_TRASEIRA = PontoDeLuz(0.498f, 0.876f, 0f)
+
 /** A cápsula de luz: comprida no sentido do carro e fina. */
 private const val LUZ_COMPRIMENTO = 0.055f
 private const val LUZ_ESPESSURA = 0.016f
@@ -455,6 +465,31 @@ private fun Luzes(luzes: PainelDoVeiculo.Luzes, modifier: Modifier = Modifier) {
             }
         }
 
+        /**
+         * Uma lâmpada redonda, e não uma faixa.
+         *
+         * O neblina de trás é uma lâmpada só, pequena, e desenhá-lo com a mesma
+         * cápsula comprida das outras luzes o fazia parecer uma barra atravessada
+         * no para-choque. Aqui a peça é um ponto, com o mesmo halo em volta —
+         * é o halo que faz ler como "acesa", não o tamanho.
+         */
+        fun acenderPonto(ponto: PontoDeLuz, cor: Color, forca: Float) {
+            if (forca <= 0f) return
+            val centro = Offset(x0 + ponto.x * largura, ponto.y * size.height)
+            val raio = espessura * 0.62f
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(cor.copy(alpha = 0.55f), Color.Transparent),
+                    center = centro,
+                    radius = raio * 3.2f,
+                ),
+                radius = raio * 3.2f,
+                center = centro,
+                alpha = forca,
+            )
+            drawCircle(color = cor, radius = raio, center = centro, alpha = forca)
+        }
+
         // O farol. O alto desenha a mesma peça maior, que é a única diferença
         // entre os dois que dá para mostrar numa vista de cima.
         if (luzes.baixo == true || luzes.alto == true) {
@@ -471,18 +506,13 @@ private fun Luzes(luzes: PainelDoVeiculo.Luzes, modifier: Modifier = Modifier) {
         // própria — o que existe é a luz de posição, e é dela que o vermelho de
         // trás sai quando só o "meia-luz" está ligado. Ver `Luzes.tras`.
         //
-        // O neblina de trás não ganha peça própria porque no H6 ele fica dentro
-        // da mesma lanterna: acende a mesma luz, mais forte e maior.
-        if (luzes.tras || luzes.neblinaTraseira == true) {
-            val neblina = luzes.neblinaTraseira == true
-            LANTERNA.forEach {
-                acender(
-                    it,
-                    VERMELHO_DA_LANTERNA,
-                    forca = if (neblina) 1f else 0.9f,
-                    tamanho = if (neblina) 1.3f else 1f,
-                )
-            }
+        if (luzes.tras) {
+            LANTERNA.forEach { acender(it, VERMELHO_DA_LANTERNA, forca = 0.9f) }
+        }
+
+        // O neblina de trás, no meio do para-choque: uma lâmpada só, redonda.
+        if (luzes.neblinaTraseira == true) {
+            acenderPonto(NEBLINA_TRASEIRA, VERMELHO_DA_LANTERNA, forca = 1f)
         }
 
         // E as setas por último, piscando: no carro elas dividem o bloco óptico

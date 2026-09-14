@@ -63,7 +63,12 @@ import br.com.hugolumazzini.havaltrip.ui.theme.Cores
  * [Cluster], escolhido na tela de configuração da central.
  */
 @Composable
-fun ClusterScreen(vm: TripViewModel, espiando: Boolean = false) {
+fun ClusterScreen(
+    vm: TripViewModel,
+    espiando: Boolean = false,
+    /** Conferência do resumo de despedida sem precisar desligar o carro. */
+    forcarDespedida: Boolean = false,
+) {
     val estado by vm.state.collectAsStateWithLifecycle()
     val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
     val paleta by Cluster.paleta.collectAsStateWithLifecycle()
@@ -74,11 +79,45 @@ fun ClusterScreen(vm: TripViewModel, espiando: Boolean = false) {
         ?: estado.selectedTrip
         ?: return
 
+    // O carro acabou de ser desligado: em vez dos números de dirigir, o resumo
+    // da viagem que terminou. Não é uma tela a mais para o motorista escolher —
+    // é a última imagem que vai ficar congelada no painel a noite toda, e por
+    // isso ela se decide sozinha. Ver [Despedida].
+    val despedindo = lembrarDespedida(estado.live.ignition) || forcarDespedida
+    // Na conferência mostra mesmo sem viagem andada, senão quem acabou de
+    // instalar o app abriria a prévia e não veria nada.
+    val viagem = Despedida.viagemQueAcabou(estado.trips) ?: trip
+    val despedida = despedindo && (forcarDespedida || Despedida.valeMostrar(viagem))
+
     // A janela que o Impulse deu pode ser a tela inteira do painel: dar a ela
     // os extremos dos sliders é fácil, acertar 733x7 com o dedo não é. Por isso
     // o conteúdo se encaixa num pedaço dela, no canto escolhido na configuração
     // — o resto continua transparente, mostrando o painel do carro.
     BoxWithConstraints(Modifier.fillMaxSize().background(fundo(espiando))) {
+        // A despedida não mora na caixa dimensionada: ela toma a janela inteira.
+        // O bloco de números é pequeno de propósito, para não tapar o painel do
+        // carro enquanto se dirige; quando o carro desliga não há mais painel
+        // atrás para preservar, e o resumo é a única coisa na tela. Espremê-lo
+        // no mesmo retângulo seria guardar espaço para ninguém.
+        if (despedida) {
+            DespedidaDaViagem(
+                viagem.metrics,
+                estado.live,
+                tinta(ajustes, paleta),
+                Modifier
+                    .fillMaxSize()
+                    .background(Color(ajustes.fundo.argb))
+                    .medindo(
+                        JanelaDoPainel.NUMEROS,
+                        constraints.maxWidth,
+                        constraints.maxHeight,
+                        ajustes.fundo.argb,
+                        false,
+                    ),
+            )
+            return@BoxWithConstraints
+        }
+
         val itens = ajustes.ItensSeguros.size
 
         // A fração pedida, antes de qualquer piso. É ela que decide o formato,

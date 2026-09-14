@@ -42,6 +42,7 @@ import br.com.hugolumazzini.havaltrip.CorDoCluster
 import br.com.hugolumazzini.havaltrip.telemetry.PaletaDoImpulse
 import br.com.hugolumazzini.havaltrip.FundoDoCluster
 import br.com.hugolumazzini.havaltrip.ClusterActivity
+import br.com.hugolumazzini.havaltrip.DESPEDIDA
 import br.com.hugolumazzini.havaltrip.ESPIANDO
 import br.com.hugolumazzini.havaltrip.ClusterCarroActivity
 import br.com.hugolumazzini.havaltrip.ClusterMenuActivity
@@ -547,6 +548,23 @@ private fun PainelDeInstrumentos(estado: TripState) {
 
         Spacer(Modifier.height(12.dp))
         BotaoAcao("Ver como fica", onClick = { espiar(ClusterActivity::class.java) })
+
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "Quando o carro é desligado, esta janela troca sozinha para um resumo " +
+                "da viagem que acabou — distância, tempo, média e gasto. Ele fica " +
+                "congelado no painel, que é o que o painel faz com a última imagem.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(8.dp))
+        BotaoAcao("Ver a despedida", onClick = {
+            contexto.startActivity(
+                Intent(contexto, ClusterActivity::class.java)
+                    .putExtra(ESPIANDO, true)
+                    .putExtra(DESPEDIDA, true),
+            )
+        })
 
         Spacer(Modifier.height(18.dp))
         Text("O carro no painel", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)

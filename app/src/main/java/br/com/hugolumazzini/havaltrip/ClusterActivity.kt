@@ -41,9 +41,10 @@ class ClusterActivity : ComponentActivity() {
         // Espiando é a conferência aqui na central, com o botão Voltar à mão;
         // recolher é para a janela que está lá no painel, fora de alcance.
         if (!espiando) fecharQuandoPedirem(JanelaDoPainel.NUMEROS)
+        val despedida = intent.getBooleanExtra(DESPEDIDA, false)
         setContent {
             HavalTripTheme {
-                ClusterScreen(vm, espiando = espiando)
+                ClusterScreen(vm, espiando = espiando, forcarDespedida = despedida)
             }
         }
     }
@@ -60,3 +61,13 @@ class ClusterActivity : ComponentActivity() {
  * painel de carro atrás para aparecer pela transparência.
  */
 const val ESPIANDO = "espiando"
+
+/**
+ * Extra que manda mostrar o resumo de despedida mesmo com o carro ligado.
+ *
+ * A despedida só acontece de verdade no instante em que a ignição cai, e essa
+ * é a pior hora possível para descobrir que ela ficou torta na janela que o
+ * motorista escolheu — ele está descendo do carro. Com isto dá para conferir o
+ * desenho sentado na garagem, com o motor ligado.
+ */
+const val DESPEDIDA = "despedida"

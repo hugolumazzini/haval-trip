@@ -38,6 +38,14 @@
     <queries>
         <package android:name="br.com.redesurftank.havalshisuku" />
         <package android:name="moe.shizuku.privileged.api" />
+        <!--
+            O app de veículo da central, de onde vêm as artes do H6. Na central
+            (Android 9) esta declaração é inócua — o filtro de visibilidade só
+            existe do Android 11 em diante —, mas sem ela o inventário diria
+            "não instalado" em qualquer aparelho mais novo, que é exatamente o
+            engano que a bancada de testes produziria. Ver `ImagensDaCentral`.
+        -->
+        <package android:name="com.beantechs.vehiclecenter" />
     </queries>
 
     <application

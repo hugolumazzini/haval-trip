@@ -116,6 +116,17 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                 cor = Cores.SuperficieSelecionada,
                 corTexto = Cores.Destaque,
             )
+            // Coleta de uma vez só: lista que imagens do veículo a própria
+            // central guarda, para saber se dá para desenhar o H6 em outros
+            // ângulos sem inventar arte nova. Não tem a ver com telemetria,
+            // por isso não entra no relatório de sempre.
+            BotaoAcao(
+                texto = "Listar imagens do carro",
+                onClick = vm::enviarInventarioDeImagens,
+                habilitado = envio !is Envio.Enviando,
+                cor = Cores.SuperficieSelecionada,
+                corTexto = Cores.Destaque,
+            )
         }
 
         Spacer(Modifier.height(12.dp))

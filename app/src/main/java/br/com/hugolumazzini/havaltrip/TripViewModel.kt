@@ -1,6 +1,7 @@
 package br.com.hugolumazzini.havaltrip
 
 import android.app.Application
+import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.hugolumazzini.havaltrip.atualizacao.Atualizacao
@@ -11,13 +12,16 @@ import br.com.hugolumazzini.havaltrip.engine.TripState
 import br.com.hugolumazzini.havaltrip.services.TripComparison
 import br.com.hugolumazzini.havaltrip.services.TripComparisonResult
 import br.com.hugolumazzini.havaltrip.telemetry.HavalTelemetrySource
+import br.com.hugolumazzini.havaltrip.telemetry.ImagensDaCentral
 import br.com.hugolumazzini.havaltrip.telemetry.Relatorio
 import br.com.hugolumazzini.havaltrip.telemetry.ShizukuTelemetrySource
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Qual tela está em foco. Navegação simples: são cinco, e nenhuma aninha. */
 sealed interface Tela {
@@ -258,6 +262,44 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
             val completo = montar(Int.MAX_VALUE)
             val arquivo = runCatching { Relatorio.salvar(getApplication(), completo) }.getOrNull()
             _envio.value = Relatorio.enviar(montar(Relatorio.MAX_EVENTOS_ENVIADOS)).fold(
+                onSuccess = { Envio.Pronto(it) },
+                onFailure = {
+                    Envio.Falhou(
+                        motivo = it.message ?: it::class.java.simpleName,
+                        arquivo = arquivo?.absolutePath ?: "não foi possível gravar",
+                    )
+                },
+            )
+        }
+    }
+
+    /**
+     * Levanta o que a central guarda de arte do veículo e manda pelo mesmo link.
+     *
+     * Botão separado do relatório de telemetria, e não uma seção a mais nele,
+     * porque são perguntas de prazos diferentes: a telemetria se coleta a cada
+     * viagem, o inventário se coleta **uma vez** e a resposta vale para sempre.
+     * Misturar os dois engordaria todo diagnóstico futuro com uma lista que já
+     * foi lida. Ver [ImagensDaCentral].
+     */
+    fun enviarInventarioDeImagens() {
+        if (_envio.value is Envio.Enviando) return
+        _envio.value = Envio.Enviando
+        viewModelScope.launch {
+            val contexto = getApplication<Application>()
+            // Fora da thread da tela: abrir um APK de sistema e medir centenas
+            // de imagens leva segundos, e travar o painel enquanto isso, dentro
+            // do carro, pareceria o app ter morrido.
+            val texto = withContext(Dispatchers.IO) {
+                buildString {
+                    appendLine("=== HAVAL TRIP — inventário de imagens da central ===")
+                    appendLine("Central: ${Build.MANUFACTURER} ${Build.MODEL} — Android ${Build.VERSION.RELEASE}")
+                    appendLine()
+                    append(ImagensDaCentral.inventario(contexto))
+                }
+            }
+            val arquivo = runCatching { Relatorio.salvar(contexto, texto) }.getOrNull()
+            _envio.value = Relatorio.enviar(texto).fold(
                 onSuccess = { Envio.Pronto(it) },
                 onFailure = {
                     Envio.Falhou(

@@ -42,6 +42,13 @@ object Relatorio {
         fonte: Fonte,
         shisuku: Boolean,
         maxEventos: Int = Int.MAX_VALUE,
+        /**
+         * O inventário das artes do veículo, quando pedido. Vem pronto de fora
+         * porque depende do `Context`, que o relatório não tem — e porque é uma
+         * pergunta de uma vez só: uma vez sabido o que a central guarda, não há
+         * por que reenviar a lista em todo diagnóstico. Ver [ImagensDaCentral].
+         */
+        imagens: String = "",
     ): String {
         // Sem isto, os últimos instantes antes do toque no botão ficariam de
         // fora: a fita da tela só alcança a viva de meio em meio segundo.
@@ -117,6 +124,8 @@ object Relatorio {
             sb.appendLine("trip ${it.id} (${it.label}): ${it.metrics.distanceKm} km, ${it.metrics.fuelLitres} L, ${it.status}")
         }
         sb.appendLine()
+
+        if (imagens.isNotEmpty()) sb.append(imagens)
 
         // A fita guarda 10 mil eventos, que em texto passam de meio megabyte —
         // mais do que os sites de paste aceitam. Cortam-se os mais antigos, e

@@ -102,21 +102,52 @@ object TecladoDoVolante {
      */
     val ultimoCodigo: StateFlow<Int?> = _ultimoCodigo.asStateFlow()
 
+    private val _ultimaAcao = MutableStateFlow<Int?>(null)
+
+    /**
+     * Se o último aviso foi uma tecla descendo (0) ou sendo solta (1).
+     *
+     * Distingue "o volante está mudo" de "o volante fala, e nós é que estávamos
+     * descartando o que ele diz" — que foi o defeito. Ver [viDescida].
+     */
+    val ultimaAcao: StateFlow<Int?> = _ultimaAcao.asStateFlow()
+
     private val _quantasChegaram = MutableStateFlow(0)
 
     /** Quantas teclas a central já mandou desde que o app abriu. */
     val quantasChegaram: StateFlow<Int> = _quantasChegaram.asStateFlow()
 
+    /**
+     * Se esta central manda a descida da tecla, e não só o soltar.
+     *
+     * Um teclado comum manda o par — descer e soltar —, e reagir aos dois
+     * andaria duas visões por toque; por isso a primeira versão ouvia só a
+     * descida. No carro isso deixou o volante mudo: não dá para saber, de fora,
+     * o que este serviço manda, e descartar o que ele mandava foi o mesmo que
+     * não estar ouvindo.
+     *
+     * Agora quem decide é o que chega. Enquanto nenhuma descida tiver aparecido,
+     * o soltar vale por toque; na primeira descida, o soltar passa a ser
+     * ignorado para sempre e o par volta a contar uma vez só.
+     */
+    private var viDescida = false
+
     private val ouvinte = object : IInputListener.Stub() {
         override fun dispatchKeyEvent(evento: KeyEvent?) {
-            // Só a descida. O serviço manda o par descer/soltar como qualquer
-            // teclado, e reagir aos dois andaria duas visões por toque.
-            if (evento == null || evento.action != KeyEvent.ACTION_DOWN) return
-            // Anotar antes de filtrar: o código que não reconhecemos é
-            // justamente o que precisamos ver para reconhecer depois.
+            if (evento == null) return
+            // Anotado antes de qualquer filtro: o evento que este código
+            // descarta é justamente o que precisa aparecer no diagnóstico
+            // quando "apertei e não aconteceu nada".
             _ultimoCodigo.value = evento.keyCode
+            _ultimaAcao.value = evento.action
             _quantasChegaram.value++
-            Log.w(TAG, "tecla do volante: código ${evento.keyCode}")
+            Log.w(TAG, "tecla do volante: código ${evento.keyCode}, ação ${evento.action}")
+
+            if (evento.action == KeyEvent.ACTION_DOWN) {
+                viDescida = true
+            } else if (viDescida || evento.action != KeyEvent.ACTION_UP) {
+                return
+            }
             TeclaDoVolante.de(evento.keyCode)?.let { _teclas.tryEmit(it) }
         }
     }

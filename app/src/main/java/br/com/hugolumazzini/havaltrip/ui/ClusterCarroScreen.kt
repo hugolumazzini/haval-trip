@@ -180,3 +180,38 @@ internal const val GROSSURA_DO_ANEL = 0.022f
 
 /** O azul do contorno da bola do ar no painel do H6. */
 internal val AZUL_DO_PAINEL = Color(0xFF2E8BD6)
+
+/**
+ * Onde a bola do ar fica no painel, medida no painel de verdade.
+ *
+ * ## De onde saem estes números
+ *
+ * Não de cálculo: de uma régua. As contas anteriores partiam da geometria que
+ * o Impulse usa para recortar o círculo — centro x=1630, y=430, raio 226 num
+ * display de 1920x860 — e no carro a janela caía fora do lugar, porque a área
+ * que o painel entrega ao app não é o display inteiro: é 1912x712, e as
+ * proporções não sobrevivem à diferença.
+ *
+ * Estes vieram do caminho oposto e curto: a janela do carro foi arrastada à
+ * mão até encaixar na bola, e a régua que toda janela desenha informou onde
+ * ela parou — bloco de 599x599 em x=1332, y=133, numa janela de 1912x712.
+ * Divididos pela janela, viram estas frações, que é a forma de a medida
+ * continuar valendo se a área útil mudar de tamanho.
+ *
+ * O lado é fração da **altura** porque a bola é redonda: ela cresce com a
+ * dimensão menor, e num painel deitado essa é a altura.
+ */
+internal object BolaDoPainel {
+    /** Centro do círculo, em fração da largura e da altura da janela. */
+    const val CENTRO_X = 1631.5f / 1912f
+    const val CENTRO_Y = 432.5f / 712f
+
+    /**
+     * Lado da tapa preta, em fração da altura da janela.
+     *
+     * É a tapa, e não o anel: 599 foi o que a régua mediu do bloco inteiro, e
+     * o bloco inteiro é a tapa. O anel sai dela pela [FOLGA_DA_TAPA], como nas
+     * duas telas que a desenham.
+     */
+    const val LADO = 599f / 712f
+}

@@ -772,6 +772,7 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
     if (ouvindoTeclas) {
         val quantas by TecladoDoVolante.quantasChegaram.collectAsStateWithLifecycle()
         val codigo by TecladoDoVolante.ultimoCodigo.collectAsStateWithLifecycle()
+        val acao by TecladoDoVolante.ultimaAcao.collectAsStateWithLifecycle()
         Spacer(Modifier.height(6.dp))
         Text(
             when {
@@ -780,6 +781,7 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
                         "número não mexer, a central não nos manda as teclas."
                 else ->
                     "Teclas recebidas: $quantas. A última veio com o código $codigo" +
+                        acao?.let { " (${if (it == 0) "descendo" else "soltando"})" }.orEmpty() +
                         if (TeclaDoVolante.de(codigo ?: -1) == null) {
                             " — que este app ainda não conhece. Me mande esse número."
                         } else {

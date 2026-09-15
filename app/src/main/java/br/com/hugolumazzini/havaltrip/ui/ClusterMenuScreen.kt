@@ -154,26 +154,28 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
             // a página é inteira de propósito. A régua existe para o motorista
             // relatar onde uma janelinha caiu, e esta não cai em lugar nenhum.
             .background(fundo(espiando)),
-        // Na bola, a página inteira não é nossa: o que se vê é o recorte
-        // redondo, encostado à direita. Fora dela, é.
-        contentAlignment =
-            if (ajustes.menuNaBola) LugarNoPainel.BOLA_DO_AC.alinhamento() else Alignment.Center,
+        // Na bola o conteúdo é posicionado pelo centro medido, e não por um
+        // canto: ver [BolaDoPainel]. O alinhamento de canto era o que punha a
+        // bola no lugar errado — ele encosta o bloco na borda, e a bola do
+        // painel não está encostada em borda nenhuma.
+        contentAlignment = if (ajustes.menuNaBola) Alignment.TopStart else Alignment.Center,
     ) {
         val visao = visoes[indice]
         val cor = tinta(ajustes, paleta)
 
         if (ajustes.menuNaBola) {
-            // A mesma geometria da janela do carro na bola, e de propósito: é
-            // uma medida já acertada dentro do carro, e refazê-la aqui a olho
-            // seria começar de novo o que já custou uma viagem para ajustar.
+            // A medida que o motorista acertou à mão no painel, em frações da
+            // janela. Ver [BolaDoPainel].
+            val lado = maxHeight * (BolaDoPainel.LADO * ajustes.zoomDoMenu.fator).coerceIn(0.05f, 1f)
             Box(
                 Modifier
-                    .offset(x = ajustes.empurraoDoMenu.x.dp, y = ajustes.empurraoDoMenu.y.dp)
-                    .fillMaxHeight(
-                        (TamanhoDoCarro.BOLA_DO_AC.fracao * ajustes.zoomDoMenu.fator * FOLGA_DA_TAPA)
-                            .coerceIn(0.05f, 1f),
+                    // Pelo centro: o canto de um quadrado que muda de tamanho
+                    // com o zoom não é lugar nenhum, o centro da bola é.
+                    .offset(
+                        x = maxWidth * BolaDoPainel.CENTRO_X - lado / 2 + ajustes.empurraoDoMenu.x.dp,
+                        y = maxHeight * BolaDoPainel.CENTRO_Y - lado / 2 + ajustes.empurraoDoMenu.y.dp,
                     )
-                    .aspectRatio(1f)
+                    .size(lado)
                     // A tapa preta: cobre o alerta de cinto do painel, que é um
                     // quadrado maior que o círculo. Ver `ClusterCarroScreen`.
                     .background(Color(0xFF000000), RoundedCornerShape(CANTO_DA_TAPA)),

@@ -24,8 +24,10 @@ import androidx.compose.ui.graphics.asImageBitmap
  * Cada quadro tem por volta de 700x600, o que dá 1,7 MB **aberto na memória**
  * — as 113 fotos inteiras seriam quase 200 MB e derrubariam o app na hora. Por
  * isso duas reduções: só [QUADROS_NA_VOLTA] quadros da volta entram (o olho
- * não distingue 113 passos em dois segundos) e cada um entra pela metade do
- * tamanho, que ainda é o dobro do que a janela do painel mostra.
+ * não distingue 113 passos em dois segundos e meio) e cada um é aberto já
+ * pequeno, no tamanho em que a janela do painel vai mostrá-lo — ver
+ * [LARGURA_MAXIMA]. A volta inteira fica em torno de 3 MB, que é menos do que
+ * o app já gasta com o desenho de cima.
  */
 object CarroDaCentral {
 
@@ -38,11 +40,21 @@ object CarroDaCentral {
     /**
      * Quantas dessas fotos a animação usa de fato.
      *
-     * Uma volta em pouco mais de dois segundos com 24 passos já sai lisa o
-     * bastante, e custa um sexto da memória de carregar tudo. Ver a nota sobre
-     * memória em [CarroDaCentral].
+     * Dezoito passos numa volta de dois segundos e meio dão sete quadros por
+     * segundo — o bastante para o olho ler "girando", e um sexto do custo de
+     * carregar as 113. Ver a nota sobre memória em [CarroDaCentral].
      */
-    const val QUADROS_NA_VOLTA = 24
+    const val QUADROS_NA_VOLTA = 18
+
+    /**
+     * De quantos pixels de largura cada foto é guardada, no máximo.
+     *
+     * A janela do painel é uma tira, e o carro ocupa metade dela: passar disso
+     * é guardar detalhe que nenhuma tela mostra e pagar memória por ele. Neste
+     * tamanho a volta inteira cabe em cerca de 3 MB, contra os 200 MB das 113
+     * fotos no tamanho original.
+     */
+    const val LARGURA_MAXIMA = 360
 
     /**
      * A variante do carro, do jeito que a central nomeia as artes.
@@ -81,6 +93,22 @@ object CarroDaCentral {
             familiasPresentes(context).firstOrNull()
         }
 
+    /**
+     * Por quanto dividir o lado da foto para ela caber em [LARGURA_MAXIMA].
+     *
+     * Medir antes de abrir custa quase nada — o `inJustDecodeBounds` lê só o
+     * cabeçalho do arquivo — e evita o que seria o desperdício de verdade:
+     * abrir a foto inteira na memória para depois desenhá-la pequena. O
+     * `inSampleSize` só entende potências de 2, então o laço dobra até chegar.
+     */
+    private fun reducao(recursos: android.content.res.Resources, id: Int): Int {
+        val opcoes = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        runCatching { recursos.openRawResource(id).use { BitmapFactory.decodeStream(it, null, opcoes) } }
+        var fator = 1
+        while (opcoes.outWidth / fator > LARGURA_MAXIMA) fator *= 2
+        return fator
+    }
+
     /** `b01_malaysia_hev_skylight_00042` — cinco dígitos, sempre. */
     private fun nomeDoQuadro(familia: Familia, quadro: Int): String =
         familia.prefixo + quadro.toString().padStart(5, '0')
@@ -107,8 +135,7 @@ object CarroDaCentral {
             if (id == 0) return@mapNotNull null
             runCatching {
                 val opcoes = BitmapFactory.Options().apply {
-                    // Metade do lado, um quarto da memória. Ver [CarroDaCentral].
-                    inSampleSize = 2
+                    inSampleSize = reducao(recursos, id)
                     // Sem isto o Android reescalaria cada foto para a densidade
                     // da tela do app, que não tem nada a ver com a da central.
                     inScaled = false

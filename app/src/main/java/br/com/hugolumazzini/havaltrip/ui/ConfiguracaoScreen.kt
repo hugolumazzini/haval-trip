@@ -1026,7 +1026,8 @@ private fun CarroDaDespedidaEscolha(ajustes: AjustesDoCluster) {
         } else {
             "A central guarda ${CarroDaCentral.QUADROS_NO_CARRO} fotos do H6 dando uma " +
                 "volta completa. A despedida pode usar essas fotos no lugar do desenho " +
-                "visto de cima. É experimental: o desenho continua sendo o padrão."
+                "visto de cima — só ${CarroDaCentral.QUADROS_NA_VOLTA} delas, já reduzidas, " +
+                "para não pesar na central. É experimental: o desenho continua sendo o padrão."
         },
         style = MaterialTheme.typography.bodySmall,
         color = Cores.TextoApoio,

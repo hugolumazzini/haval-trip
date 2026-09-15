@@ -6,6 +6,7 @@ import br.com.hugolumazzini.havaltrip.domain.VehicleLive
 import br.com.hugolumazzini.havaltrip.format.TripFormat
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
 import br.com.hugolumazzini.havaltrip.painel.ProjetorDoPainel
+import br.com.hugolumazzini.havaltrip.telemetry.CarroDaCentral
 import br.com.hugolumazzini.havaltrip.telemetry.PaletaDoImpulse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -360,6 +361,22 @@ data class MedidaDaJanela(
  *   do carro aparece. `null` é "em todas", que é como sempre foi. Ver
  *   [br.com.hugolumazzini.havaltrip.painel.PaginaDoCluster].
  */
+/**
+ * O carro que aparece na tela de despedida.
+ *
+ * [DESENHADO] é o de sempre: a vista de cima montada das camadas do diagrama,
+ * que entra na vaga e para. [GIRANDO] é o H6 fotografado da própria central,
+ * dando uma volta completa — ver [CarroDaCentral].
+ *
+ * São dois porque o giro pode simplesmente não estar disponível: ele depende do
+ * app de veículo da central, que nem toda central tem igual. Quando não está, a
+ * despedida cai sozinha no desenho, e ninguém fica sem despedida.
+ */
+enum class CarroDaDespedida(val rotulo: String) {
+    DESENHADO("Desenhado, de cima"),
+    GIRANDO("Foto da central, girando"),
+}
+
 data class AjustesDoCluster(
     val tripId: String? = null,
     val itens: List<ItemDoCluster> = listOf(
@@ -394,6 +411,15 @@ data class AjustesDoCluster(
      * inteiro — que só serve a quem projetar numa tela sem esse recorte.
      */
     val menuNaBola: Boolean = true,
+    /**
+     * Qual carro aparece na despedida.
+     *
+     * Desenhado por padrão, de propósito: é o que já funciona em qualquer
+     * central, não depende de nenhum outro app estar instalado e não gasta
+     * memória. O giro é a experiência — ver [CarroDaDespedida].
+     */
+    val carroDaDespedida: CarroDaDespedida = CarroDaDespedida.DESENHADO,
+    val familiaDoCarro: CarroDaCentral.Familia = CarroDaCentral.Familia.AUTO,
 ) {
     /**
      * A lista que a tela do painel usa de fato.
@@ -445,6 +471,8 @@ object Cluster {
     private const val EMPURRAO_MENU_Y = "empurraoDoMenuY"
     private const val ZOOM_MENU = "zoomDoMenu"
     private const val MENU_NA_BOLA = "menuNaBola"
+    private const val CARRO_DESPEDIDA = "carroDaDespedida"
+    private const val FAMILIA_CARRO = "familiaDoCarro"
 
     /**
      * O que se grava no lugar de "nenhuma tela".
@@ -577,6 +605,12 @@ object Cluster {
                 .mais(prefs.getInt(EMPURRAO_MENU_X, 0), prefs.getInt(EMPURRAO_MENU_Y, 0)),
             zoomDoMenu = Zoom(0).mais(prefs.getInt(ZOOM_MENU, Zoom.PADRAO)),
             menuNaBola = prefs.getBoolean(MENU_NA_BOLA, true),
+            carroDaDespedida = prefs.getString(CARRO_DESPEDIDA, null)
+                ?.let { nome -> CarroDaDespedida.entries.find { it.name == nome } }
+                ?: padrao.carroDaDespedida,
+            familiaDoCarro = prefs.getString(FAMILIA_CARRO, null)
+                ?.let { nome -> CarroDaCentral.Familia.entries.find { it.name == nome } }
+                ?: padrao.familiaDoCarro,
         )
     }
 
@@ -608,6 +642,8 @@ object Cluster {
             .putInt(EMPURRAO_MENU_Y, novo.empurraoDoMenu.y)
             .putInt(ZOOM_MENU, novo.zoomDoMenu.porcento)
             .putBoolean(MENU_NA_BOLA, novo.menuNaBola)
+            .putString(CARRO_DESPEDIDA, novo.carroDaDespedida.name)
+            .putString(FAMILIA_CARRO, novo.familiaDoCarro.name)
             .apply()
     }
 
@@ -759,6 +795,14 @@ object Cluster {
             menuNaBola = true,
         ),
     )
+
+    /** Qual carro a despedida mostra: o desenho de sempre ou o giro da central. */
+    fun usarCarroDaDespedida(carro: CarroDaDespedida) =
+        gravar(_ajustes.value.copy(carroDaDespedida = carro))
+
+    /** Qual variante do H6 o giro usa. Ver [CarroDaCentral.Familia]. */
+    fun usarFamiliaDoCarro(familia: CarroDaCentral.Familia) =
+        gravar(_ajustes.value.copy(familiaDoCarro = familia))
 
     /** Em que tela cada janela é projetada. `null` é "não projeta sozinha". */
     fun usarTela(janela: JanelaDoPainel, tela: Int?) = gravar(

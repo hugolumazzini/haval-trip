@@ -63,6 +63,8 @@ import br.com.hugolumazzini.havaltrip.painel.ProjetorDoPainel
 import br.com.hugolumazzini.havaltrip.painel.ShizukuShell
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import br.com.hugolumazzini.havaltrip.CarroDaDespedida
+import br.com.hugolumazzini.havaltrip.telemetry.CarroDaCentral
 import br.com.hugolumazzini.havaltrip.Empurrao
 import br.com.hugolumazzini.havaltrip.Zoom
 import br.com.hugolumazzini.havaltrip.ItemDoCluster
@@ -566,6 +568,9 @@ private fun PainelDeInstrumentos(estado: TripState) {
             )
         })
 
+        Spacer(Modifier.height(14.dp))
+        CarroDaDespedidaEscolha(ajustes)
+
         Spacer(Modifier.height(18.dp))
         Text("O carro no painel", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
         Spacer(Modifier.height(4.dp))
@@ -993,6 +998,69 @@ private fun rumo(valor: Int, positivo: String, negativo: String): String =
 @Composable
 private fun Seta(simbolo: String, descricao: String, onClick: () -> Unit) {
     BotaoAcao(simbolo, onClick = onClick, modifier = Modifier.semantics { contentDescription = descricao })
+}
+
+/**
+ * Qual carro aparece na despedida — o desenho, ou o H6 da central girando.
+ *
+ * A lista de variantes só mostra as que **esta** central tem, e a checagem é
+ * feita na hora de abrir a tela: numa central sem o app de veículo, ou sem
+ * essas artes, a opção do giro nem faz sentido, e oferecê-la seria prometer uma
+ * animação que nunca apareceria. Ver [CarroDaCentral].
+ *
+ * A variante é escolhida à mão porque a central guarda todas as versões do
+ * carro, não só a dela: não há como perguntar ao carro qual ele é. "Descobrir
+ * sozinho" chuta pela ordem da lista, e quem sabe o que tem na garagem acerta
+ * em um toque.
+ */
+@Composable
+private fun CarroDaDespedidaEscolha(ajustes: AjustesDoCluster) {
+    val contexto = LocalContext.current
+    val presentes = remember { CarroDaCentral.familiasPresentes(contexto) }
+
+    Text("O carro da despedida", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        if (presentes.isEmpty()) {
+            "Esta central não tem as fotos do carro, então a despedida usa o desenho."
+        } else {
+            "A central guarda ${CarroDaCentral.QUADROS_NO_CARRO} fotos do H6 dando uma " +
+                "volta completa. A despedida pode usar essas fotos no lugar do desenho " +
+                "visto de cima. É experimental: o desenho continua sendo o padrão."
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = Cores.TextoApoio,
+    )
+
+    if (presentes.isEmpty()) return
+
+    Spacer(Modifier.height(8.dp))
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        CarroDaDespedida.entries.forEach { carro ->
+            Opcao(carro.rotulo, ajustes.carroDaDespedida == carro) {
+                Cluster.usarCarroDaDespedida(carro)
+            }
+        }
+    }
+
+    if (ajustes.carroDaDespedida != CarroDaDespedida.GIRANDO) return
+
+    Spacer(Modifier.height(10.dp))
+    Text("Qual é o seu H6", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(8.dp))
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        (listOf(CarroDaCentral.Familia.AUTO) + presentes).forEach { familia ->
+            Opcao(familia.rotulo, ajustes.familiaDoCarro == familia) {
+                Cluster.usarFamiliaDoCarro(familia)
+            }
+        }
+    }
 }
 
 /**

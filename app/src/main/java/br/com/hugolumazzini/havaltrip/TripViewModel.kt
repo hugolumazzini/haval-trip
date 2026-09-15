@@ -295,7 +295,13 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
                     appendLine("=== HAVAL TRIP — inventário de imagens da central ===")
                     appendLine("Central: ${Build.MANUFACTURER} ${Build.MODEL} — Android ${Build.VERSION.RELEASE}")
                     appendLine()
-                    append(ImagensDaCentral.inventario(contexto))
+                    // Se a leitura falhar, o que interessa é justamente o
+                    // motivo: um relatório que chega dizendo "faltou memória"
+                    // resolve o problema, e um app que fecha na cara de quem
+                    // está na garagem não diz nada e ainda perde a viagem.
+                    // Por isso `Throwable`, e não `Exception`.
+                    runCatching { append(ImagensDaCentral.inventario(contexto)) }
+                        .onFailure { appendLine("a leitura falhou: ${it.javaClass.name}: ${it.message}") }
                 }
             }
             val arquivo = runCatching { Relatorio.salvar(contexto, texto) }.getOrNull()

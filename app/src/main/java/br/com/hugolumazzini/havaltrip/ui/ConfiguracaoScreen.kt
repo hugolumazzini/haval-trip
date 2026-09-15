@@ -589,19 +589,21 @@ private fun PainelDeInstrumentos(estado: TripState) {
             LugarNoPainel.Cantos.forEach { lugar ->
                 Opcao(lugar.rotulo, ajustes.lugarDoCarro == lugar) { Cluster.usarLugarDoCarro(lugar) }
             }
-            // Mesmo arranjo da faixa da navegação: um chip só, que já acerta o
-            // tamanho junto, para não existir o meio-termo que precisa de aviso.
-            Opcao(
-                LugarNoPainel.BOLA_DO_AC.rotulo,
-                ajustes.lugarDoCarro == LugarNoPainel.BOLA_DO_AC &&
-                    ajustes.tamanhoDoCarro == TamanhoDoCarro.BOLA_DO_AC,
-            ) { Cluster.usarBolaDoAr() }
+            // O chip "Bola do ar" ficava aqui e foi tirado: era a armadilha.
+            // Ele punha *esta* janela — o desenho do carro, uma visão só — no
+            // recorte redondo, e quem procurava a bola queria a página que
+            // navega pela cruzinha. No carro o resultado foi um carro torto por
+            // cima do painel e setas que não trocavam nada, o que é exatamente
+            // o que a opção prometia não fazer. Agora a bola tem um lugar só,
+            // em "Página com visões", e é a janela certa. A opção antiga
+            // continua gravável em [Cluster.usarBolaDoAr] para quem já a tinha.
         }
         Spacer(Modifier.height(4.dp))
         Text(
-            "\"Bola do ar\" é o recorte redondo que o Impulse abre na tela do ar-" +
-                "condicionado, encostado à direita. Para essa opção, aponte esta " +
-                "janela para a tela 1 inteira (1920 x 860), e não para o painel.",
+            "Para ocupar a bola redonda que sobrou no painel, use \"Página com " +
+                "visões\", mais abaixo: é a janela que troca de visão pela " +
+                "cruzinha do volante. Estes cantos aqui são para o carro solto, " +
+                "fixo por cima de qualquer página.",
             style = MaterialTheme.typography.bodySmall,
             color = Cores.TextoApoio,
         )
@@ -686,6 +688,9 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
         style = MaterialTheme.typography.bodySmall,
         color = Cores.TextoApoio,
     )
+
+    Spacer(Modifier.height(14.dp))
+    BolaDeUmaVez(agora, ouvindoPagina)
 
     Spacer(Modifier.height(14.dp))
     Projecao(JanelaDoPainel.MENU, ajustes.telaDoMenu)
@@ -988,6 +993,64 @@ private fun rumo(valor: Int, positivo: String, negativo: String): String =
 @Composable
 private fun Seta(simbolo: String, descricao: String, onClick: () -> Unit) {
     BotaoAcao(simbolo, onClick = onClick, modifier = Modifier.semantics { contentDescription = descricao })
+}
+
+/**
+ * "Usar esta bola", num botão só: grava tela, página e encaixe e já projeta.
+ *
+ * O atalho para o caminho inteiro que as seções abaixo fazem peça por peça.
+ * Elas continuam aí para quem quiser corrigir uma coisa isolada — mas não são
+ * mais o único jeito, que era o problema. Ver [Cluster.usarBolaDoPainel].
+ *
+ * A tela é escolhida sozinha: a maior que não seja a central. O painel é a
+ * única outra tela grande do H6, e pedir esse número a quem só quer a bola
+ * funcionando é devolver o ajuste em três passos pela porta dos fundos.
+ */
+@Composable
+private fun BolaDeUmaVez(pagina: Int?, ouvindoPagina: Boolean) {
+    val contexto = LocalContext.current
+    val escopo = rememberCoroutineScope()
+    val telas = remember { ProjetorDoPainel.telas(contexto) }
+    val painel = telas.filterNot { it.central }.maxByOrNull { it.largura * it.altura }
+
+    val impedimento = when {
+        !ouvindoPagina -> "Esta central não avisa em que página o painel está, " +
+            "então não dá para prender a janela a uma bola. Use as opções abaixo."
+        pagina == null -> "Gire o carrossel do painel uma vez, no volante, para " +
+            "o app saber em que bola você está."
+        painel == null -> "Nenhuma tela além da central está aparecendo. No carro " +
+            "isso costuma ser painel apagado — tente com o carro ligado."
+        else -> null
+    }
+
+    Text(
+        "O caminho curto",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Cores.TextoCorrido,
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        impedimento ?: "Pare o carrossel na bola que você quer — o painel está na " +
+            "página $pagina — e toque no botão. A janela vai para a ${painel?.descricao?.lowercase()}, " +
+            "encaixada no recorte redondo, e só aparece nessa bola. As setas do " +
+            "volante passam a trocar as visões enquanto ela estiver na frente.",
+        style = MaterialTheme.typography.bodySmall,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(8.dp))
+    BotaoAcao(
+        texto = if (pagina == null) "Usar esta bola" else "Usar a bola da página $pagina",
+        habilitado = impedimento == null,
+        onClick = {
+            val alvo = painel ?: return@BotaoAcao
+            val qual = pagina ?: return@BotaoAcao
+            Cluster.usarBolaDoPainel(qual, alvo.id)
+            // Igual ao botão de projetar: fala com o Shizuku e espera por ele.
+            escopo.launch(Dispatchers.IO) {
+                ProjetorDoPainel.projetar(contexto, JanelaDoPainel.MENU, alvo.id, insistir = true)
+            }
+        },
+    )
 }
 
 /**

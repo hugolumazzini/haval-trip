@@ -53,12 +53,28 @@ object ImagensDaCentral {
      * As maiores são medidas porque arte de carro é pesada; o restante entra
      * só como nome e tamanho, que já basta para reconhecer uma família.
      */
-    private const val QUANTAS_MEDIR = 300
+    private const val QUANTAS_MEDIR = 120
 
     /** Teto de linhas no relatório, para não estourar o site de paste. */
-    private const val MAX_LINHAS = 900
+    private const val MAX_LINHAS = 400
+
+    /**
+     * Quanto tempo a coleta inteira pode levar.
+     *
+     * Na bancada, com um app pequeno, tudo terminava em segundos. O app de
+     * veículo da central é grande, e sem prazo a varredura pode se arrastar a
+     * ponto de a central inteira parecer travada — que foi exatamente o que
+     * aconteceu no primeiro teste no carro. Um inventário incompleto com um
+     * aviso dentro vale infinitamente mais do que uma central presa: o motorista
+     * está na garagem, não numa bancada, e não tem como interromper nada.
+     */
+    private const val PRAZO_MS = 12_000L
+
+    /** Quanto desse prazo a varredura de nomes pode consumir. */
+    private const val PRAZO_NOMES_MS = 6_000L
 
     fun inventario(context: Context): String {
+        val limite = System.currentTimeMillis() + PRAZO_MS
         val sb = StringBuilder()
         sb.appendLine("--- IMAGENS DO CARRO NA CENTRAL ---")
         sb.appendLine("(nomes e medidas; nenhuma imagem é copiada)")
@@ -82,13 +98,13 @@ object ImagensDaCentral {
 
         var restam = MAX_LINHAS
         arquivos.forEach { caminho ->
-            runCatching { restam = listar(caminho, sb, restam) }
+            runCatching { restam = listar(caminho, sb, restam, limite) }
                 .onFailure { sb.appendLine("não foi possível abrir $caminho: ${it.javaClass.simpleName} ${it.message}") }
         }
         if (restam <= 0) {
             sb.appendLine("(lista cortada em $MAX_LINHAS linhas — o resto sai por cabo, se precisar)")
         }
-        nomes(context, sb)
+        nomes(context, sb, minOf(limite, System.currentTimeMillis() + PRAZO_NOMES_MS))
         sb.appendLine(provaDeAcesso(context))
         sb.appendLine()
         return sb.toString()
@@ -112,7 +128,7 @@ object ImagensDaCentral {
         }.getOrDefault(emptyList())
 
     /** Escreve o que couber e devolve quantas linhas ainda sobram. */
-    private fun listar(caminho: String, sb: StringBuilder, limite: Int): Int {
+    private fun listar(caminho: String, sb: StringBuilder, limite: Int, ate: Long): Int {
         var restam = limite
         ZipFile(caminho).use { zip ->
             val imagens = zip.entries().asSequence()
@@ -125,6 +141,10 @@ object ImagensDaCentral {
             // que se está procurando.
             imagens.sortedByDescending { it.size }.forEachIndexed { indice, entrada ->
                 if (restam <= 0) return restam
+                if (System.currentTimeMillis() > ate) {
+                    sb.appendLine("  (lista interrompida no tempo, em $indice de ${imagens.size})")
+                    return 0
+                }
                 val medida = if (indice < QUANTAS_MEDIR) medir(zip, entrada) else null
                 sb.appendLine(
                     "  ${entrada.name}  ${entrada.size / 1024} KB" + (medida?.let { "  $it" } ?: "")
@@ -150,17 +170,27 @@ object ImagensDaCentral {
      * seguidos, que é o fim do bloco. Sem essa parada, seriam dezesseis milhões
      * de tentativas e a coleta não terminaria nunca.
      */
-    private fun nomes(context: Context, sb: StringBuilder) {
+    private fun nomes(context: Context, sb: StringBuilder, ate: Long) {
         val recursos = runCatching { context.packageManager.getResourcesForApplication(ALVO) }
             .getOrElse {
                 sb.appendLine("  não foi possível ler a tabela de recursos: ${it.javaClass.simpleName}")
                 return
             }
         val achados = mutableListOf<String>()
+        var tentativas = 0
+        var noTempo = true
         for (tipo in 1..MAX_TIPOS) {
+            if (!noTempo) break
             var vazios = 0
             for (entrada in 0..MAX_ENTRADAS) {
                 if (achados.size >= MAX_NOMES) break
+                // Cada número inexistente custa uma exceção, e exceção é cara.
+                // O relógio é conferido de poucos em poucos justamente para a
+                // conferência não virar ela mesma o gasto.
+                if (++tentativas % 512 == 0 && System.currentTimeMillis() > ate) {
+                    noTempo = false
+                    break
+                }
                 val id = 0x7f000000 or (tipo shl 16) or entrada
                 val nome = runCatching { recursos.getResourceName(id) }.getOrNull()
                 if (nome == null) {
@@ -175,14 +205,14 @@ object ImagensDaCentral {
                 }
             }
         }
-        sb.appendLine("  nomes de imagem registrados: ${achados.size}")
+        sb.appendLine("  nomes de imagem registrados: ${achados.size}" + if (noTempo) "" else " (varredura cortada no tempo, em $tentativas números)")
         achados.sorted().take(MAX_NOMES).forEach { sb.appendLine("  nome: $it") }
     }
 
     private const val MAX_TIPOS = 40
     private const val MAX_ENTRADAS = 0x1FFF
-    private const val FALHAS_ATE_DESISTIR = 96
-    private const val MAX_NOMES = 1_500
+    private const val FALHAS_ATE_DESISTIR = 64
+    private const val MAX_NOMES = 800
 
     /** Largura por altura, sem carregar a imagem na memória. */
     private fun medir(zip: ZipFile, entrada: ZipEntry): String? = runCatching {

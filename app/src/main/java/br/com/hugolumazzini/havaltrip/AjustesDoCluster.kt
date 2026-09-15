@@ -737,6 +737,29 @@ object Cluster {
         ),
     )
 
+    /**
+     * A bola do painel inteira, num gesto só: tela, página e encaixe.
+     *
+     * Existe porque a versão em três passos não funcionou no carro. Cada peça
+     * estava certa e documentada — aponte a janela para a tela do painel,
+     * descubra o número da página no diagnóstico, ligue o encaixe —, e ainda
+     * assim o resultado foi um carro torto no painel: quem está na garagem
+     * segue o caminho mais curto que a tela oferece, e o mais curto levava à
+     * janela errada. Um ajuste que depende de três telas e de um número
+     * anotado à mão é um ajuste que não existe.
+     *
+     * Aqui é a janela certa — a que navega pela cruzinha — na página em que o
+     * painel está **agora**, que é a que o motorista está olhando enquanto
+     * toca no botão.
+     */
+    fun usarBolaDoPainel(pagina: Int, tela: Int) = gravar(
+        _ajustes.value.copy(
+            telaDoMenu = tela,
+            paginaDoMenu = pagina,
+            menuNaBola = true,
+        ),
+    )
+
     /** Em que tela cada janela é projetada. `null` é "não projeta sozinha". */
     fun usarTela(janela: JanelaDoPainel, tela: Int?) = gravar(
         when (janela) {

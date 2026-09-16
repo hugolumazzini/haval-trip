@@ -72,6 +72,9 @@ fun ClusterScreen(
     val estado by vm.state.collectAsStateWithLifecycle()
     val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
     val paleta by Cluster.paleta.collectAsStateWithLifecycle()
+    // Só a despedida usa: é o carrinho dela que continua reagindo às portas
+    // depois de desligar. Os números não têm desenho de carro.
+    val painelDoCarro by vm.painelDoVeiculo.collectAsStateWithLifecycle()
 
     // A Trip escolhida na configuração; se ela foi apagada desde então, cai na
     // selecionada da central em vez de deixar o painel em branco.
@@ -113,6 +116,7 @@ fun ClusterScreen(
                 viagem.metrics,
                 estado.live,
                 tinta(ajustes, paleta),
+                painelDoCarro,
                 Modifier
                     .fillMaxSize()
                     .background(Color(ajustes.fundo.argb))

@@ -89,6 +89,15 @@ fun ClusterScreen(
     val viagem = Despedida.viagemQueAcabou(estado.trips) ?: trip
     val despedida = despedindo && (forcarDespedida || Despedida.valeMostrar(viagem))
 
+    // Se o resumo é de outra janela, esta some. Ver [Despedida.janelaDoResumo].
+    // Na espiada não: lá o motorista pediu para ver esta tela, e devolver preto
+    // seria responder ao toque dele com um defeito aparente.
+    if (despedindo && !espiando &&
+        Despedida.janelaDoResumo(ajustes) != JanelaDoPainel.NUMEROS
+    ) {
+        return
+    }
+
     // A janela que o Impulse deu pode ser a tela inteira do painel: dar a ela
     // os extremos dos sliders é fácil, acertar 733x7 com o dedo não é. Por isso
     // o conteúdo se encaixa num pedaço dela, no canto escolhido na configuração

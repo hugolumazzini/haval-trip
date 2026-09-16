@@ -66,6 +66,26 @@ fun ClusterCarroScreen(vm: TripViewModel, espiando: Boolean = false) {
     // retângulo vazio porque o painel está noutra página não ensina nada.
     if (!espiando && !naPaginaCerta) return
 
+    // Carro desligado: o painel congela o que estiver na tela, e o que tem de
+    // ficar lá é o resumo da viagem — sozinho. Esta janela se apaga, a menos
+    // que o resumo seja dela. Ver [Despedida.janelaDoResumo].
+    val estado by vm.state.collectAsStateWithLifecycle()
+    val despedindo = lembrarDespedida(estado.live.ignition)
+    if (despedindo && !espiando) {
+        if (Despedida.janelaDoResumo(ajustes) != JanelaDoPainel.CARRO) return
+        val viagem = Despedida.viagemQueAcabou(estado.trips)
+        if (Despedida.valeMostrar(viagem) && viagem != null) {
+            val paleta by Cluster.paleta.collectAsStateWithLifecycle()
+            DespedidaDaViagem(
+                viagem.metrics,
+                estado.live,
+                tinta(ajustes, paleta),
+                Modifier.fillMaxSize().background(Color(ajustes.fundoDoCarro.argb)),
+            )
+        }
+        return
+    }
+
     // Mesmo arranjo da tela dos números: a janela pode ser o painel inteiro, e
     // é aqui que se diz em que canto dela o carro aparece e de que tamanho.
     BoxWithConstraints(

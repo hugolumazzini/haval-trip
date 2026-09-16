@@ -31,11 +31,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -43,19 +41,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import br.com.hugolumazzini.havaltrip.CarroDaDespedida
-import br.com.hugolumazzini.havaltrip.Cluster
+import br.com.hugolumazzini.havaltrip.AjustesDoCluster
 import br.com.hugolumazzini.havaltrip.ItemDoCluster
 import br.com.hugolumazzini.havaltrip.R
+import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
 import br.com.hugolumazzini.havaltrip.domain.IgnitionState
 import br.com.hugolumazzini.havaltrip.domain.Trip
 import br.com.hugolumazzini.havaltrip.domain.TripMetrics
 import br.com.hugolumazzini.havaltrip.domain.VehicleLive
-import br.com.hugolumazzini.havaltrip.telemetry.CarroDaCentral
 import br.com.hugolumazzini.havaltrip.ui.theme.Cores
-import androidx.compose.runtime.collectAsState
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /**
  * O resumo que aparece no painel quando o carro é desligado.
@@ -138,6 +132,29 @@ object Despedida {
     /** Se vale a pena se despedir desta viagem. */
     fun valeMostrar(trip: Trip?): Boolean =
         trip != null && trip.metrics.distanceKm >= DISTANCIA_MINIMA_KM
+
+    /**
+     * Qual das janelas mostra o resumo — e, por consequência, quais se apagam.
+     *
+     * Quando o carro desliga, o painel congela **tudo** o que estiver na tela.
+     * Com três janelas projetadas, o que ficava gravado ali a noite inteira era
+     * o resumo com o desenho do carro e a bola de visões por cima, cada um
+     * pedindo atenção e nenhum fazendo sentido — foi o que a foto no carro
+     * mostrou. Não é problema de camada: é que uma despedida com companhia não
+     * é uma despedida.
+     *
+     * Então uma janela fica com a cena e as outras somem. A escolhida é a
+     * primeira desta ordem que estiver projetada: os números, que é a janela
+     * feita para o resumo; a página, que é grande o bastante para ele; e o
+     * carro, que é a que sobra. Nenhuma projetada quer dizer que só a espiada
+     * na central está em jogo, e aí a dos números responde.
+     */
+    fun janelaDoResumo(ajustes: AjustesDoCluster): JanelaDoPainel = when {
+        ajustes.telaDosNumeros != null -> JanelaDoPainel.NUMEROS
+        ajustes.telaDoMenu != null -> JanelaDoPainel.MENU
+        ajustes.telaDoCarro != null -> JanelaDoPainel.CARRO
+        else -> JanelaDoPainel.NUMEROS
+    }
 }
 
 /**
@@ -248,84 +265,7 @@ internal fun DespedidaDaViagem(
 }
 
 /**
- * O carro da despedida — o desenho de sempre, ou a volta completa fotografada
- * pela central, conforme o ajuste.
- *
- * As fotos não vêm de graça: são duas dúzias de arquivos grandes lidos de outro
- * aplicativo, o que leva um instante e não pode travar a tela. Por isso o
- * desenho aparece primeiro e o giro entra quando as fotos chegam — e, se não
- * chegarem, o desenho fica, que é o carro que sempre coube aqui.
- */
-@Composable
-private fun BoxWithConstraintsScope.CarroSeDespedindo(cena: Float) {
-    val ajustes by Cluster.ajustes.collectAsState()
-    val contexto = LocalContext.current
-    var volta by remember { mutableStateOf<List<ImageBitmap>?>(null) }
-
-    LaunchedEffect(ajustes.carroDaDespedida, ajustes.familiaDoCarro) {
-        volta = if (ajustes.carroDaDespedida != CarroDaDespedida.GIRANDO) {
-            null
-        } else {
-            withContext(Dispatchers.IO) {
-                CarroDaCentral.escolher(contexto, ajustes.familiaDoCarro)
-                    ?.let { familia -> CarroDaCentral.volta(contexto, familia) }
-            }
-        }
-    }
-
-    val quadros = volta
-    if (quadros != null) CarroGirando(quadros) else CarroManobrando(cena)
-}
-
-/**
- * O H6 de verdade dando uma volta inteira e parando de frente.
- *
- * Tem relógio próprio, e não o da cena, porque as fotos chegam quando chegam —
- * pendurar o giro no relógio de fora faria o carro aparecer já no meio da volta
- * quando a leitura demorasse meio segundo. Aqui ele começa do zero no instante
- * em que tem o que mostrar.
- *
- * A volta termina no mesmo quadro em que começou, de propósito: a cena congela
- * no painel até o carro ligar de novo, e a foto que passa a noite lá tem de ser
- * a boa, não uma traseira de esguelha. Ver a nota sobre congelar em [Despedida].
- */
-@Composable
-private fun BoxWithConstraintsScope.CarroGirando(quadros: List<ImageBitmap>) {
-    val alvo = remember { mutableFloatStateOf(0f) }
-    val giro by animateFloatAsState(
-        targetValue = alvo.floatValue,
-        animationSpec = tween(Despedida.CENA_MS, easing = FastOutSlowInEasing),
-        label = "giro",
-    )
-    LaunchedEffect(Unit) { alvo.floatValue = 1f }
-
-    // A foto da central é larga e baixa — o carro em perspectiva, não de cima —,
-    // então quem manda no tamanho é a largura disponível.
-    val lado = minOf(maxWidth * 0.5f, maxHeight * 1.6f)
-    val paraEsquerda = with(LocalDensity.current) { -(maxWidth * 0.24f).toPx() }
-
-    // O último passo cai exatamente no primeiro quadro: a volta fecha.
-    val quadro = quadros[((giro * quadros.size).toInt()) % quadros.size]
-
-    Image(
-        bitmap = quadro,
-        contentDescription = null,
-        contentScale = ContentScale.Fit,
-        modifier = Modifier
-            .align(Alignment.Center)
-            .size(lado)
-            .graphicsLayer {
-                alpha = FastOutSlowInEasing.transform(trecho(giro, 0f, 0.25f))
-                translationX = FastOutSlowInEasing.transform(trecho(giro, 0.2f, 1f)) * paraEsquerda
-                val perto = 0.86f + 0.14f * trecho(giro, 0f, 0.4f)
-                scaleX = perto
-                scaleY = perto
-            },
-    )
-}
-
-/**
- * O H6 desenhado entrando em cena: sobe pela frente, gira um quarto de volta e
+ * O H6 entrando em cena: sobe pela frente, gira um quarto de volta e
  * encosta à esquerda, onde para de vez.
  *
  * Monta o carro fechado a partir das mesmas camadas do diagrama — ver
@@ -335,7 +275,7 @@ private fun BoxWithConstraintsScope.CarroGirando(quadros: List<ImageBitmap>) {
  * é literalmente o carro manobrando na vaga.
  */
 @Composable
-private fun BoxWithConstraintsScope.CarroManobrando(cena: Float) {
+private fun BoxWithConstraintsScope.CarroSeDespedindo(cena: Float) {
     // O quadro do desenho tem 794 x 720, mas o carro dentro dele é estreito e
     // comprido: ocupa cerca de 73% do lado na vertical. Deitado, é esse 73% que
     // vira comprimento, e é por ele que o tamanho é escolhido — o resto do

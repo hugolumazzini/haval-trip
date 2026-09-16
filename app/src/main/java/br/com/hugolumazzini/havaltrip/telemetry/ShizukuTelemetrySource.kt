@@ -230,6 +230,20 @@ class ShizukuTelemetrySource(
             classe.getMethod("getService", String::class.java).invoke(null, nome) as? IBinder
         }.getOrNull()
 
+        /**
+         * Uma linha avulsa com o serviço do carro, só para perguntar e sair.
+         *
+         * Separada da fonte de telemetria de propósito: aqui não se registra
+         * ouvinte nem se declara chave nenhuma, então nada do que for lido por
+         * este caminho entra no monitoramento contínuo do app. É o que a
+         * [IdentidadeDoCarro] precisa — uma pergunta de uma vez só.
+         */
+        internal fun servicoDoCarro(): IIntelligentVehicleControlService? = runCatching {
+            if (!autorizado()) return null
+            val cru = binderDoSistema(SERVICO_DO_CARRO) ?: return null
+            IIntelligentVehicleControlService.Stub.asInterface(ShizukuBinderWrapper(cru))
+        }.getOrNull()
+
         /** `true` se o Shizuku está instalado e rodando nesta central. */
         fun disponivel(): Boolean = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
 

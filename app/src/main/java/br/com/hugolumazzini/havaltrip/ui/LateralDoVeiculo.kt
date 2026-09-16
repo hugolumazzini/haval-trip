@@ -616,7 +616,28 @@ private val CAMADA_DO_VIDRO = mapOf(
  * dianteira esquerda, que nas imagens é a de cima à esquerda.
  */
 @Composable
-private fun CarroEmCamadas(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
+internal fun CarroEmCamadas(
+    painel: PainelDoVeiculo,
+    modifier: Modifier = Modifier,
+    /**
+     * Se os alertas entram: cintos e luzes.
+     *
+     * A despedida pede `false`. Ali o carrinho continua mostrando o que está
+     * **aberto** — porta, vidro, porta-malas, teto solar —, que é informação
+     * útil para quem está descendo, mas não acende cinto nem farol: aquela
+     * imagem fica congelada no painel até a próxima partida, e um alerta
+     * vermelho passando a noite ali manda procurar de manhã um problema que
+     * não existe.
+     */
+    comAlertas: Boolean = true,
+    /**
+     * `Crop` recorta a sobra do quadro para o carro encher a vitrine estreita
+     * da tela da central; `Fit` mostra o quadro inteiro, que é o que a
+     * despedida precisa — lá o carro gira, e o que hoje é sobra invisível
+     * passa a ser onde o nariz dele cai depois do giro.
+     */
+    escala: ContentScale = ContentScale.Crop,
+) {
     @Composable
     fun camada(recurso: Int) = Image(
         painter = painterResource(recurso),
@@ -628,7 +649,7 @@ private fun CarroEmCamadas(painel: PainelDoVeiculo, modifier: Modifier = Modifie
         // para fora, centrada. Com `Fit` a imagem encolheria até o quadro
         // inteiro caber na vitrine estreita, que é o contrário do que se quer —
         // o carro ficaria menor ainda do que estava.
-        contentScale = ContentScale.Crop,
+        contentScale = escala,
     )
 
     Box(modifier.clipToBounds(), contentAlignment = Alignment.Center) {
@@ -658,14 +679,16 @@ private fun CarroEmCamadas(painel: PainelDoVeiculo, modifier: Modifier = Modifie
         // aberto e porta fechada é justamente a combinação mais comum das duas.
         painel.vidrosAbertos.forEach { vidro -> CAMADA_DO_VIDRO[vidro]?.let { camada(it) } }
 
-        // E os cintos por cima de tudo: são os únicos que ficam dentro do carro,
-        // e nenhuma peça pode passar na frente deles.
-        Cintos(painel.semCinto, Modifier.fillMaxSize())
+        if (comAlertas) {
+            // E os cintos por cima de tudo: são os únicos que ficam dentro do
+            // carro, e nenhuma peça pode passar na frente deles.
+            Cintos(painel.semCinto, Modifier.fillMaxSize())
 
-        // As luzes por último: o feixe do farol sai para fora da lataria e a
-        // seta encosta na borda, então qualquer camada desenhada depois passaria
-        // por cima justamente da parte que interessa.
-        Luzes(painel.luzes, Modifier.fillMaxSize())
+            // As luzes por último: o feixe do farol sai para fora da lataria e a
+            // seta encosta na borda, então qualquer camada desenhada depois
+            // passaria por cima justamente da parte que interessa.
+            Luzes(painel.luzes, Modifier.fillMaxSize())
+        }
     }
 }
 

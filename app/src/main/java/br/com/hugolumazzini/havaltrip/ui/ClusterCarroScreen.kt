@@ -80,6 +80,7 @@ fun ClusterCarroScreen(vm: TripViewModel, espiando: Boolean = false) {
                 viagem.metrics,
                 estado.live,
                 tinta(ajustes, paleta),
+                painel,
                 Modifier.fillMaxSize().background(Color(ajustes.fundoDoCarro.argb)),
             )
         }

@@ -214,7 +214,7 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
                         // Dentro do anel, no lugar das visões: o resumo é a
                         // única coisa que fica no painel depois de desligar, e
                         // aqui ele herda o recorte redondo que já está acertado.
-                        DespedidaDaViagem(viagem.metrics, estado.live, cor)
+                        DespedidaDaViagem(viagem.metrics, estado.live, cor, painel)
                     } else {
                         Conteudo(visao, visoes.size, indice, painel, estado.live, ajustes, cor, true)
                     }
@@ -228,7 +228,7 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
                     .padding(horizontal = 24.dp, vertical = 14.dp),
             ) {
                 if (comResumo && viagem != null) {
-                    DespedidaDaViagem(viagem.metrics, estado.live, cor)
+                    DespedidaDaViagem(viagem.metrics, estado.live, cor, painel)
                 } else {
                     Conteudo(visao, visoes.size, indice, painel, estado.live, ajustes, cor, false)
                 }

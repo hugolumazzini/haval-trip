@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import br.com.hugolumazzini.havaltrip.AjustesDoCluster
 import br.com.hugolumazzini.havaltrip.ItemDoCluster
 import br.com.hugolumazzini.havaltrip.R
+import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo
+import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo.Abertura
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
 import br.com.hugolumazzini.havaltrip.domain.IgnitionState
 import br.com.hugolumazzini.havaltrip.domain.Trip
@@ -197,14 +200,21 @@ private fun trecho(cena: Float, inicio: Float, fim: Float): Float =
     ((cena - inicio) / (fim - inicio)).coerceIn(0f, 1f)
 
 /**
- * O desenho do resumo. [live] entra só porque os itens sabem formatar a partir
- * dele; nenhum dado ao vivo aparece aqui — o carro está desligado.
+ * O desenho do resumo.
+ *
+ * [live] entra porque os itens sabem formatar a partir dele. [painel] entra
+ * porque o carrinho da cena **continua vivo**: no H6 a telemetria não para
+ * quando a ignição desliga — foi conferido no carro, com a tela já congelada e
+ * o desenho ainda reagindo às portas —, e é justamente nesse minuto que se
+ * abrem porta, porta-malas e capô. Um carrinho de portas fechadas enquanto a
+ * porta está aberta seria um desenho mentindo na cara de quem está do lado.
  */
 @Composable
 internal fun DespedidaDaViagem(
     metricas: TripMetrics,
     live: VehicleLive,
     tinta: Tinta,
+    painel: PainelDoVeiculo,
     modifier: Modifier = Modifier,
 ) {
     // Um relógio só para a cena inteira, andando em ritmo constante; quem dá
@@ -223,7 +233,7 @@ internal fun DespedidaDaViagem(
         val comCarro = maxWidth >= Despedida.CABE_O_CARRO_LARGURA &&
             maxHeight >= Despedida.CABE_O_CARRO_ALTURA
 
-        if (comCarro) CarroSeDespedindo(cena)
+        if (comCarro) CarroSeDespedindo(cena, painel, tinta)
 
         // Sem carro não há por que esperar: o resumo é a cena inteira e entra
         // logo. Com carro, ele só começa quando o H6 já está virando, para que
@@ -275,7 +285,11 @@ internal fun DespedidaDaViagem(
  * é literalmente o carro manobrando na vaga.
  */
 @Composable
-private fun BoxWithConstraintsScope.CarroSeDespedindo(cena: Float) {
+private fun BoxWithConstraintsScope.CarroSeDespedindo(
+    cena: Float,
+    painel: PainelDoVeiculo,
+    tinta: Tinta,
+) {
     // O quadro do desenho tem 794 x 720, mas o carro dentro dele é estreito e
     // comprido: ocupa cerca de 73% do lado na vertical. Deitado, é esse 73% que
     // vira comprimento, e é por ele que o tamanho é escolhido — o resto do
@@ -309,19 +323,37 @@ private fun BoxWithConstraintsScope.CarroSeDespedindo(cena: Float) {
             },
         contentAlignment = Alignment.Center,
     ) {
-        // A base e, por cima, as quatro portas fechadas. Não é firula: a
-        // imagem de baixo tem os vãos das portas vazios, porque no diagrama
-        // toda porta é sempre desenhada por cima, aberta ou fechada. Sozinha,
-        // ela mostra um H6 sem portas.
-        CARRO_INTEIRO.forEach { camada ->
-            Image(
-                painter = painterResource(camada),
-                // Decorativo: o que precisa ser lido está nos números ao lado.
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
+        // O mesmo carro do diagrama, com as peças abertas abertas — e sem os
+        // alertas. Ver `CarroEmCamadas`.
+        //
+        // `Fit`, e não o `Crop` da tela da central: aqui o desenho gira, e com
+        // o recorte o nariz do carro sairia do quadro no meio do giro.
+        CarroEmCamadas(
+            painel,
+            Modifier.fillMaxSize(),
+            comAlertas = false,
+            escala = ContentScale.Fit,
+        )
+    }
+
+    // O capô é o único que não tem camada: nas imagens da central ele não
+    // existe aberto, então o desenho fica idêntico com ele levantado. Como
+    // levantar o capô ao descer do carro é raro e nunca por acaso, uma palavra
+    // discreta ao pé do carro resolve — sem ela, a despedida diria em silêncio
+    // que está tudo fechado.
+    if (Abertura.CAPO in painel.abertas) {
+        Text(
+            "CAPÔ ABERTO",
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 11.sp,
+                letterSpacing = 1.sp,
+            ),
+            color = tinta.cor.copy(alpha = 0.65f),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = maxWidth * 0.06f, bottom = maxHeight * 0.06f)
+                .graphicsLayer { alpha = trecho(cena, 0.80f, 1f) },
+        )
     }
 }
 

@@ -41,6 +41,7 @@ import br.com.hugolumazzini.havaltrip.TripViewModel
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo
 import br.com.hugolumazzini.havaltrip.domain.Trip
 import br.com.hugolumazzini.havaltrip.domain.VehicleLive
+import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
 import br.com.hugolumazzini.havaltrip.painel.PaginaDoCluster
 import br.com.hugolumazzini.havaltrip.painel.TeclaDoVolante
 import br.com.hugolumazzini.havaltrip.painel.TecladoDoVolante
@@ -137,6 +138,15 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
 
     if (!espiando && !naPaginaCerta) return
 
+    // Carro desligado: ou esta janela mostra o resumo, ou ela sai da frente de
+    // quem vai mostrar. Ver [Despedida.janelaDoResumo].
+    val despedindo = lembrarDespedida(estado.live.ignition) && !espiando
+    val viagem = Despedida.viagemQueAcabou(estado.trips)
+    val comResumo = despedindo &&
+        Despedida.janelaDoResumo(ajustes) == JanelaDoPainel.MENU &&
+        Despedida.valeMostrar(viagem)
+    if (despedindo && !comResumo) return
+
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
@@ -200,7 +210,14 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
                         .fillMaxHeight((if (deitado) LARGURA_UTIL else ALTURA_UTIL) / FOLGA_DA_TAPA),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Conteudo(visao, visoes.size, indice, painel, estado.live, ajustes, cor, true)
+                    if (comResumo && viagem != null) {
+                        // Dentro do anel, no lugar das visões: o resumo é a
+                        // única coisa que fica no painel depois de desligar, e
+                        // aqui ele herda o recorte redondo que já está acertado.
+                        DespedidaDaViagem(viagem.metrics, estado.live, cor)
+                    } else {
+                        Conteudo(visao, visoes.size, indice, painel, estado.live, ajustes, cor, true)
+                    }
                 }
             }
         } else {
@@ -210,7 +227,11 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
                     .offset(x = ajustes.empurraoDoMenu.x.dp, y = ajustes.empurraoDoMenu.y.dp)
                     .padding(horizontal = 24.dp, vertical = 14.dp),
             ) {
-                Conteudo(visao, visoes.size, indice, painel, estado.live, ajustes, cor, false)
+                if (comResumo && viagem != null) {
+                    DespedidaDaViagem(viagem.metrics, estado.live, cor)
+                } else {
+                    Conteudo(visao, visoes.size, indice, painel, estado.live, ajustes, cor, false)
+                }
             }
         }
     }

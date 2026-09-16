@@ -12,6 +12,7 @@ import br.com.hugolumazzini.havaltrip.engine.TripState
 import br.com.hugolumazzini.havaltrip.services.TripComparison
 import br.com.hugolumazzini.havaltrip.services.TripComparisonResult
 import br.com.hugolumazzini.havaltrip.telemetry.HavalTelemetrySource
+import br.com.hugolumazzini.havaltrip.telemetry.IdentidadeDoCarro
 import br.com.hugolumazzini.havaltrip.telemetry.ImagensDaCentral
 import br.com.hugolumazzini.havaltrip.telemetry.Relatorio
 import br.com.hugolumazzini.havaltrip.telemetry.ShizukuTelemetrySource
@@ -262,6 +263,38 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
             val completo = montar(Int.MAX_VALUE)
             val arquivo = runCatching { Relatorio.salvar(getApplication(), completo) }.getOrNull()
             _envio.value = Relatorio.enviar(montar(Relatorio.MAX_EVENTOS_ENVIADOS)).fold(
+                onSuccess = { Envio.Pronto(it) },
+                onFailure = {
+                    Envio.Falhou(
+                        motivo = it.message ?: it::class.java.simpleName,
+                        arquivo = arquivo?.absolutePath ?: "não foi possível gravar",
+                    )
+                },
+            )
+        }
+    }
+
+    /**
+     * Pergunta à central se ela sabe dizer que carro é este, e manda o que achou.
+     *
+     * Mesmo formato do inventário de imagens, e pela mesma razão: é uma
+     * pergunta de uma vez só. A resposta decide se dá para escolher o desenho
+     * pelo modelo sozinho ou se o motorista vai ter de escolher na mão. Ver
+     * [IdentidadeDoCarro].
+     */
+    fun enviarSondaDeIdentidade() {
+        if (_envio.value is Envio.Enviando) return
+        _envio.value = Envio.Enviando
+        viewModelScope.launch {
+            val contexto = getApplication<Application>()
+            val texto = withContext(Dispatchers.IO) {
+                buildString {
+                    runCatching { append(IdentidadeDoCarro.relato(contexto)) }
+                        .onFailure { appendLine("a sonda falhou: ${it.javaClass.name}: ${it.message}") }
+                }
+            }
+            val arquivo = runCatching { Relatorio.salvar(contexto, texto) }.getOrNull()
+            _envio.value = Relatorio.enviar(texto).fold(
                 onSuccess = { Envio.Pronto(it) },
                 onFailure = {
                     Envio.Falhou(

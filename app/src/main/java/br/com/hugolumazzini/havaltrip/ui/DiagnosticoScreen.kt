@@ -127,6 +127,16 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                 cor = Cores.SuperficieSelecionada,
                 corTexto = Cores.Destaque,
             )
+            // Também de uma vez só: pergunta ao carro se ele sabe dizer que
+            // modelo é, para o desenho poder mudar conforme a versão. Nada de
+            // chassi ou placa entra nessa lista. Ver `IdentidadeDoCarro`.
+            BotaoAcao(
+                texto = "Sondar modelo do carro",
+                onClick = vm::enviarSondaDeIdentidade,
+                habilitado = envio !is Envio.Enviando,
+                cor = Cores.SuperficieSelecionada,
+                corTexto = Cores.Destaque,
+            )
         }
 
         Spacer(Modifier.height(12.dp))

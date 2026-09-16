@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.Cluster
 import br.com.hugolumazzini.havaltrip.MedidaDaJanela
+import br.com.hugolumazzini.havaltrip.MedidaDaPeca
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
 import kotlin.math.roundToInt
 
@@ -44,6 +45,7 @@ import kotlin.math.roundToInt
 @Composable
 fun QuadroDeMedidas(janela: JanelaDoPainel) {
     val medidas by Cluster.medidas.collectAsStateWithLifecycle()
+    val pecas by Cluster.pecas.collectAsStateWithLifecycle()
 
     Box(
         Modifier
@@ -51,7 +53,9 @@ fun QuadroDeMedidas(janela: JanelaDoPainel) {
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
         Column {
-            linhasDaMedida(medidas[janela]).forEach { linha ->
+            val linhas = linhasDaMedida(medidas[janela]) +
+                linhasDasPecas(medidas[janela], pecas.values)
+            linhas.forEach { linha ->
                 Text(
                     linha,
                     color = Color(0xFF7CFF9E),
@@ -88,6 +92,38 @@ internal fun linhasDaMedida(medida: MedidaDaJanela?): List<String> {
             vies(medida.y, medida.altura, medida.janelaAltura),
         "fundo ${fundo(medida.fundoArgb)}, " + if (medida.fundoRedondo) "redondo" else "reto",
     )
+}
+
+/**
+ * As peças de dentro da janela, cada uma comparada com ela.
+ *
+ * A comparação é o ponto: "o carrinho tem 250 px" não diz nada sozinho, e
+ * "ocupa 61% da bola" diz tudo — é esse número que vira a constante no código.
+ *
+ * Vazio quando não há peça medida, e não uma linha dizendo que não há: estas
+ * linhas são extra, e um aviso permanente sobre a ausência delas encheria a
+ * régua das janelas que nunca terão peça nenhuma.
+ */
+internal fun linhasDasPecas(
+    janela: MedidaDaJanela?,
+    pecas: Collection<MedidaDaPeca>,
+): List<String> {
+    if (pecas.isEmpty()) return emptyList()
+    return pecas.sortedBy { it.nome }.flatMap { peca ->
+        val medida = "${peca.nome} ${peca.largura}x${peca.altura} px " +
+            "x=${peca.x} y=${peca.y}"
+        // Sem a janela não dá para comparar, e a linha crua ainda serve: é o
+        // tamanho de verdade da peça, que é metade do que se quer saber.
+        if (janela == null || janela.largura <= 0 || janela.altura <= 0) {
+            listOf(medida)
+        } else {
+            listOf(
+                medida,
+                "  do bloco ${dec(peca.largura, janela.largura)} x " +
+                    dec(peca.altura, janela.altura),
+            )
+        }
+    }
 }
 
 /**
@@ -167,6 +203,28 @@ fun Modifier.medindo(
                 altura = bloco.height.roundToInt(),
                 fundoArgb = fundoArgb,
                 fundoRedondo = fundoRedondo,
+            ),
+        )
+    }
+
+/**
+ * Um pedaço de dentro da janela conta o seu tamanho. Ver [MedidaDaPeca].
+ *
+ * Irmão de [medindo], e separado dele porque a pergunta é outra: aquele
+ * responde "onde esta janela caiu no painel", este responde "quanto deste
+ * pedaço cabe dentro dela". Medido sempre, como o outro — não custa nada e
+ * ninguém precisa lembrar de ligar.
+ */
+fun Modifier.medindoPeca(nome: String): Modifier =
+    this.onGloballyPositioned {
+        val caixa = it.boundsInRoot()
+        Cluster.anotarPeca(
+            MedidaDaPeca(
+                nome = nome,
+                x = caixa.left.roundToInt(),
+                y = caixa.top.roundToInt(),
+                largura = caixa.width.roundToInt(),
+                altura = caixa.height.roundToInt(),
             ),
         )
     }

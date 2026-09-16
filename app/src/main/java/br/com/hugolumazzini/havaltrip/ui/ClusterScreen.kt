@@ -157,9 +157,15 @@ fun ClusterScreen(
 
         Box(
             Modifier
-                .align(ajustes.lugar.alinhamento())
+                // Sempre do centro. Antes existiam nove cantos prontos *e* as
+                // setas, e os dois brigavam: o mesmo empurrão dava num lugar
+                // diferente conforme o canto, então mover o bloco exigia
+                // entender a combinação dos dois. Com uma âncora só, a seta é a
+                // única coisa que move — e alcança o painel inteiro, porque o
+                // [Empurrao.LIMITE] cobre a distância do centro até a borda.
+                .align(Alignment.Center)
                 // Depois do `align`, e não antes: o empurrão é a correção sobre
-                // o lugar escolhido, não um lugar concorrente.
+                // a âncora, não uma âncora concorrente.
                 .offset(x = ajustes.empurraoDosNumeros.x.dp, y = ajustes.empurraoDosNumeros.y.dp)
                 .width(largura)
                 .height(altura)

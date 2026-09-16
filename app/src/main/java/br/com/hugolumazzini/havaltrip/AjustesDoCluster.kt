@@ -216,14 +216,17 @@ enum class TamanhoDoCarro(val rotulo: String, val fracao: Float) {
 }
 
 /**
- * O empurrãozinho final, em dp, sobre o lugar escolhido.
+ * Onde a janela fica, em dp a partir do centro do painel.
  *
- * Os nove cantos e os dois lugares prontos acertam o grosso, mas não o fio: a
- * faixa da navegação, por exemplo, saiu de uma foto medida a régua, e no carro
- * ela caiu em cima da estrada desenhada em vez de na tarja vazia. Sem este
- * ajuste, corrigir isso seria mudar um número no código e gerar um APK novo a
- * cada tentativa — e quem vê o resultado é quem está sentado no carro, não quem
- * escreve o código.
+ * Era o retoque sobre um dos nove cantos prontos; virou a posição inteira quando
+ * os cantos saíram. Eles e as setas faziam a mesma coisa de dois jeitos que se
+ * somavam, e entender a soma era pior do que mover o bloco na mão.
+ *
+ * Só a seta chega no fio, e é disso que o painel precisa: a faixa da navegação
+ * saiu de uma foto medida a régua, e no carro ela caiu em cima da estrada
+ * desenhada em vez de na tarja vazia. Sem este ajuste, corrigir isso seria mudar
+ * um número no código e gerar um APK novo a cada tentativa — e quem vê o
+ * resultado é quem está sentado no carro, não quem escreve o código.
  *
  * Em dp e por setas, não por slider: o alvo é de poucos pixels, e slider com o
  * dedo num carro não acerta poucos pixels. A seta simples anda [PASSO] e a
@@ -244,18 +247,29 @@ data class Empurrao(val x: Int = 0, val y: Int = 0) {
         /** Quanto a seta simples anda por toque, em dp. */
         const val PASSO = 6
 
-        /** Quanto a seta dupla anda por toque, em dp. */
-        const val SALTO = 30
+        /**
+         * Quanto a seta dupla anda por toque, em dp.
+         *
+         * Subiu de 30 para 50 quando os cantos prontos saíram: com a âncora no
+         * centro, atravessar meia tela são 480 dp, e a 30 por toque isso daria
+         * dezesseis toques só para chegar à borda. A cinquenta são dez, e o
+         * ajuste no pixel continua sendo o da seta simples.
+         */
+        const val SALTO = 50
 
         /**
          * Até onde o empurrão vai, em dp para cada lado.
          *
-         * 240 é mais da metade da altura do painel: passa do ponto em que o
-         * bloco ainda estaria visível, e portanto nunca é o limite que atrapalha
-         * — só existe para uma preferência gravada errada não jogar a janela
-         * para fora da tela sem o motorista ter como trazê-la de volta.
+         * Era 240 quando existiam nove cantos prontos: o empurrão só corrigia o
+         * fio a partir do canto mais próximo. Agora a âncora é sempre o centro e
+         * a seta é o único jeito de mover, então o limite tem de cobrir a
+         * distância do centro até a borda — a janela do painel tem cerca de
+         * 960 x 360 dp, ou seja, 480 dp na horizontal. 600 sobra de propósito nos
+         * dois eixos (a conta é a mesma para uma janela maior noutra tela), e
+         * continua fechado para uma preferência gravada errada não jogar o bloco
+         * para fora da tela sem o motorista ter como trazê-lo de volta.
          */
-        const val LIMITE = 240
+        const val LIMITE = 600
     }
 }
 
@@ -370,7 +384,11 @@ data class AjustesDoCluster(
     val escalaFonte: Float = 1.0f,
     val cor: CorDoCluster = CorDoCluster.BRANCO,
     val fundo: FundoDoCluster = FundoDoCluster.TRANSPARENTE,
-    val lugar: LugarNoPainel = LugarNoPainel.CIMA_CENTRO,
+    // Os dois `lugar` são herança: as telas desenham sempre a partir do centro
+    // desde que os cantos prontos saíram da configuração (ver [Empurrao]). O
+    // campo continua gravado porque `lugarDoCarro` ainda distingue um caso — a
+    // [LugarNoPainel.BOLA_DO_AC], que muda o recorte, não a posição.
+    val lugar: LugarNoPainel = LugarNoPainel.MEIO_CENTRO,
     val tamanho: TamanhoNoPainel = TamanhoNoPainel.FAIXA,
     val lugarDoCarro: LugarNoPainel = LugarNoPainel.MEIO_CENTRO,
     val tamanhoDoCarro: TamanhoDoCarro = TamanhoDoCarro.MEDIO,

@@ -394,6 +394,21 @@ data class AjustesDoCluster(
      * inteiro — que só serve a quem projetar numa tela sem esse recorte.
      */
     val menuNaBola: Boolean = true,
+    /**
+     * O que o resumo de despedida mostra, e nesta ordem.
+     *
+     * Lista própria, e não a mesma [itens] das janelas de dirigir, porque as
+     * duas respondem perguntas diferentes: dirigindo interessa o que está
+     * acontecendo agora, e ao desligar interessa como foi a viagem inteira. O
+     * padrão são os quatro de sempre — quanto andei, quanto durou, quanto
+     * rendeu, quanto custou.
+     */
+    val itensDaDespedida: List<ItemDoCluster> = listOf(
+        ItemDoCluster.DISTANCIA,
+        ItemDoCluster.TEMPO,
+        ItemDoCluster.MEDIA,
+        ItemDoCluster.LITROS,
+    ),
 ) {
     /**
      * A lista que a tela do painel usa de fato.
@@ -405,6 +420,10 @@ data class AjustesDoCluster(
      */
     val ItensSeguros: List<ItemDoCluster>
         get() = itens.ifEmpty { listOf(ItemDoCluster.DISTANCIA) }
+
+    /** O mesmo cuidado para a despedida: desmarcar tudo não deixa a tela vazia. */
+    val ItensDaDespedidaSeguros: List<ItemDoCluster>
+        get() = itensDaDespedida.ifEmpty { listOf(ItemDoCluster.DISTANCIA) }
 }
 
 /**
@@ -445,6 +464,7 @@ object Cluster {
     private const val EMPURRAO_MENU_Y = "empurraoDoMenuY"
     private const val ZOOM_MENU = "zoomDoMenu"
     private const val MENU_NA_BOLA = "menuNaBola"
+    private const val ITENS_DESPEDIDA = "itensDaDespedida"
 
     /**
      * O que se grava no lugar de "nenhuma tela".
@@ -577,6 +597,10 @@ object Cluster {
                 .mais(prefs.getInt(EMPURRAO_MENU_X, 0), prefs.getInt(EMPURRAO_MENU_Y, 0)),
             zoomDoMenu = Zoom(0).mais(prefs.getInt(ZOOM_MENU, Zoom.PADRAO)),
             menuNaBola = prefs.getBoolean(MENU_NA_BOLA, true),
+            itensDaDespedida = prefs.getString(ITENS_DESPEDIDA, null)
+                ?.split(",")
+                ?.mapNotNull { nome -> ItemDoCluster.entries.find { it.name == nome } }
+                ?: padrao.itensDaDespedida,
         )
     }
 
@@ -608,6 +632,7 @@ object Cluster {
             .putInt(EMPURRAO_MENU_Y, novo.empurraoDoMenu.y)
             .putInt(ZOOM_MENU, novo.zoomDoMenu.porcento)
             .putBoolean(MENU_NA_BOLA, novo.menuNaBola)
+            .putString(ITENS_DESPEDIDA, novo.itensDaDespedida.joinToString(",") { it.name })
             .apply()
     }
 
@@ -621,6 +646,16 @@ object Cluster {
     fun alternarItem(item: ItemDoCluster) {
         val atuais = _ajustes.value.itens
         gravar(_ajustes.value.copy(itens = if (item in atuais) atuais - item else atuais + item))
+    }
+
+    /** O mesmo para a lista da despedida. Ver [AjustesDoCluster.itensDaDespedida]. */
+    fun alternarItemDaDespedida(item: ItemDoCluster) {
+        val atuais = _ajustes.value.itensDaDespedida
+        gravar(
+            _ajustes.value.copy(
+                itensDaDespedida = if (item in atuais) atuais - item else atuais + item,
+            ),
+        )
     }
 
     fun usarEscala(escala: Float) = gravar(_ajustes.value.copy(escalaFonte = escala))

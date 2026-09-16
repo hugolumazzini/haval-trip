@@ -42,7 +42,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.AjustesDoCluster
+import br.com.hugolumazzini.havaltrip.Cluster
 import br.com.hugolumazzini.havaltrip.ItemDoCluster
 import br.com.hugolumazzini.havaltrip.R
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo
@@ -108,18 +110,10 @@ object Despedida {
     val CABE_O_CARRO_ALTURA = 160.dp
 
     /**
-     * O que o resumo mostra, nesta ordem.
-     *
-     * Os quatro que respondem "como foi essa viagem": quanto andei, quanto
-     * durou, quanto rendeu e quanto custou. Autonomia e hodômetro ficam de fora
-     * de propósito — são sobre o carro, não sobre a viagem que terminou.
+     * O padrão do resumo mora em [AjustesDoCluster.itensDaDespedida], e não
+     * aqui, porque agora a lista é do motorista: os quatro de sempre são só o
+     * ponto de partida, e a Configuração deixa trocar quais e quantos.
      */
-    val ITENS = listOf(
-        ItemDoCluster.DISTANCIA,
-        ItemDoCluster.TEMPO,
-        ItemDoCluster.MEDIA,
-        ItemDoCluster.LITROS,
-    )
 
     /**
      * A Trip que representa a viagem que acabou.
@@ -221,6 +215,10 @@ internal fun DespedidaDaViagem(
     // peso a cada movimento é o `easing` de cada trecho. Com um relógio por
     // peça, uma travadinha em qualquer um deles desencontraria o carro dos
     // números, e desencontro numa cena de dois segundos se lê como defeito.
+    // O que o resumo mostra é escolhido na Configuração. Ver
+    // [AjustesDoCluster.itensDaDespedida].
+    val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
+
     val alvo = remember { mutableFloatStateOf(0f) }
     val cena by animateFloatAsState(
         targetValue = alvo.floatValue,
@@ -266,6 +264,7 @@ internal fun DespedidaDaViagem(
             entrada,
             largura,
             maxHeight,
+            ajustes.ItensDaDespedidaSeguros,
             Modifier
                 .align(if (comCarro) Alignment.CenterEnd else Alignment.Center)
                 .width(largura)
@@ -381,6 +380,7 @@ private fun ResumoDaViagem(
     entrada: Float,
     largura: Dp,
     altura: Dp,
+    itens: List<ItemDoCluster>,
     modifier: Modifier = Modifier,
 ) {
     // Lado a lado quando a faixa é bem mais larga que alta; em duas colunas
@@ -388,7 +388,14 @@ private fun ResumoDaViagem(
     // razão: quem escolhe o formato da janela é o motorista, e nenhuma medida
     // daqui pode ser fixa.
     val emLinha = largura > altura * 2.2f
-    val linhas = if (emLinha) 1 else 2
+    // Quantas filas o texto vai ocupar — é daqui que sai o corpo do número.
+    // Contado a partir da quantidade de itens, e não fixo em duas, senão dois
+    // itens escolhidos sairiam do tamanho de seis.
+    val linhas = when {
+        itens.size <= 1 -> 1
+        emLinha && itens.size <= 4 -> 1
+        else -> 2
+    }
     val alturaDaFatia = altura.value / (linhas + 1f)
     val numero = (alturaDaFatia * 0.62f).coerceIn(11f, 56f)
     val rotulo = (numero * 0.36f).coerceAtLeast(7f)
@@ -411,8 +418,12 @@ private fun ResumoDaViagem(
                 .offset(y = ((1f - entrada) * 6f).dp),
         )
 
-        val pares = Despedida.ITENS.map { it to it.leitura(metricas, live) }
-        val filas = if (emLinha) listOf(pares) else pares.chunked(2)
+        val pares = itens.map { it to it.leitura(metricas, live) }
+        // Quantos por fila. Numa fila só eles ficam maiores, mas seis lado a
+        // lado numa faixa espremem cada número até ninguém ler de relance; daí
+        // o teto de quatro por fila mesmo quando a janela é bem larga.
+        val porFila = if (emLinha) minOf(pares.size, 4) else (pares.size + 1) / 2
+        val filas = pares.chunked(porFila.coerceAtLeast(1))
 
         filas.forEach { fila ->
             Row(

@@ -552,12 +552,37 @@ private fun PainelDeInstrumentos(estado: TripState) {
         Spacer(Modifier.height(14.dp))
         Text(
             "Quando o carro é desligado, esta janela troca sozinha para um resumo " +
-                "da viagem que acabou — distância, tempo, média e gasto. Ele fica " +
+                "da viagem que acabou, ao lado do desenho do carro. Ele fica " +
                 "congelado no painel, que é o que o painel faz com a última imagem.",
             style = MaterialTheme.typography.bodySmall,
             color = Cores.TextoApoio,
         )
         Spacer(Modifier.height(8.dp))
+        Text(
+            "O que o resumo mostra",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Cores.TextoCorrido,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Lista própria, separada da de cima: dirigindo interessa o que está " +
+                "acontecendo agora, e ao desligar interessa como foi a viagem toda. " +
+                "Até quatro ficam lado a lado; daí em diante o resumo usa duas filas.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ItemDoCluster.entries.forEach { item ->
+                Opcao(item.descricao, item in ajustes.itensDaDespedida) {
+                    Cluster.alternarItemDaDespedida(item)
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
         BotaoAcao("Ver a despedida", onClick = {
             contexto.startActivity(
                 Intent(contexto, ClusterActivity::class.java)

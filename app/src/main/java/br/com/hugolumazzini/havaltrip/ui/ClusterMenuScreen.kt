@@ -1,6 +1,5 @@
 package br.com.hugolumazzini.havaltrip.ui
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -16,9 +15,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import kotlin.math.ceil
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -27,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,6 +33,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.Text
 import br.com.hugolumazzini.havaltrip.AjustesDoCluster
 import br.com.hugolumazzini.havaltrip.Cluster
+import br.com.hugolumazzini.havaltrip.Zoom
+import br.com.hugolumazzini.havaltrip.RotuloDoCluster
 import br.com.hugolumazzini.havaltrip.LugarNoPainel
 import br.com.hugolumazzini.havaltrip.TamanhoDoCarro
 import br.com.hugolumazzini.havaltrip.TripViewModel
@@ -168,70 +168,145 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
         // canto: ver [BolaDoPainel]. O alinhamento de canto era o que punha a
         // bola no lugar errado — ele encosta o bloco na borda, e a bola do
         // painel não está encostada em borda nenhuma.
-        contentAlignment = if (ajustes.menuNaBola) Alignment.TopStart else Alignment.Center,
+        contentAlignment = Alignment.TopStart,
     ) {
         val visao = visoes[indice]
         val cor = tinta(ajustes, paleta)
 
-        if (ajustes.menuNaBola) {
-            // A medida que o motorista acertou à mão no painel, em frações da
-            // janela. Ver [BolaDoPainel].
-            val lado = maxHeight * (BolaDoPainel.LADO * ajustes.zoomDoMenu.fator).coerceIn(0.05f, 1f)
+        // A medida que o motorista acertou à mão no painel, em frações da
+        // janela. Ver [BolaDoPainel].
+        // Sem o zoom e dividido pela folga. Duas correções que andam
+        // juntas: [BolaDoPainel.LADO] foi medido na tapa preta, que era
+        // maior que o círculo de propósito, então usá-lo como diâmetro
+        // faria a bola nascer 28% maior que a do painel; e o zoom saiu
+        // daqui porque a bola é medida do carro — mexer nela só a
+        // desencaixaria da que o painel desenha embaixo. O zoom foi para o
+        // conteúdo, logo abaixo.
+        val lado = maxHeight * (BolaDoPainel.LADO / FOLGA_DA_TAPA).coerceIn(0.05f, 1f)
+        Box(
+            Modifier
+                // Pelo centro: o canto de um quadrado que muda de tamanho
+                // com o zoom não é lugar nenhum, o centro da bola é.
+                .offset(
+                    x = maxWidth * BolaDoPainel.CENTRO_X - lado / 2 + ajustes.empurraoDoMenu.x.dp,
+                    y = maxHeight * BolaDoPainel.CENTRO_Y - lado / 2 + ajustes.empurraoDoMenu.y.dp,
+                )
+                .size(lado)
+                // Redondo, e só. Antes era um quadrado preto com um anel
+                // azul desenhado dentro: o quadrado tapava o alerta de cinto
+                // do painel, que é maior que o círculo, e o anel devolvia o
+                // contorno que o quadrado cobria. No carro o resultado foi
+                // uma caixa preta com uma bola dentro, que não é o que o
+                // painel desenha em nenhuma outra página. Agora a janela é o
+                // círculo, e o que fica atrás dele é escolha ("Fundo").
+                .background(Color(ajustes.fundoDoMenu.argb), CircleShape)
+                // Conta à central onde o círculo caiu. Não existia aqui
+                // porque a página é inteira e não havia posição a acertar;
+                // passou a existir quando a bola virou uma caixa dentro
+                // dela, com centro e diâmetro próprios. É desta leitura que
+                // saem os números de [BolaDoPainel] — sem ela, a calibração
+                // pede para medir e não mostra o que foi medido.
+                .medindo(
+                    JanelaDoPainel.MENU,
+                    constraints.maxWidth,
+                    constraints.maxHeight,
+                    ajustes.fundoDoMenu.argb,
+                    true,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            // Em pé ou deitado conforme o que vai dentro. Ver [LARGURA_UTIL].
+            val deitado = visao is Visao.Carro ||
+                ajustes.ItensSeguros.size > MUITOS_ITENS
+            // Três limites, e não dois: a coluna única não é a mesma peça
+            // que as duas colunas. O teto dos dados foi medido com seis, que é
+            // o caso mais apertado; aplicá-lo também a três travava o estica
+            // muito antes de o bloco encostar na borda — sobrava círculo e o
+            // botão de crescer não crescia mais nada.
+            val limite = when {
+                visao is Visao.Carro -> CARRINHO_NA_BOLA
+                deitado -> DADOS_NA_BOLA
+                ajustes.rotuloDoMenu == RotuloDoCluster.TEXTO -> DADOS_EM_COLUNA_COM_TEXTO
+                else -> DADOS_EM_COLUNA
+            }
+            // O tamanho de partida desta peça, antes do estica.
+            val baseLargura = (if (deitado) ALTURA_UTIL else LARGURA_UTIL) * SOBRA
+            val baseAltura = (if (deitado) LARGURA_UTIL else ALTURA_UTIL) * SOBRA
+            // E o quanto de estica ainda cabe nela. Ver [Cluster.anotarFaixaDoZoomDoMenu].
+            LaunchedEffect(limite, baseLargura, baseAltura) {
+                Cluster.anotarFaixaDoZoomDoMenu(
+                    piso = emPorcento(limite.minimoLargura, limite.minimoAltura, baseLargura, baseAltura),
+                    teto = emPorcento(limite.maximoLargura, limite.maximoAltura, baseLargura, baseAltura),
+                )
+            }
             Box(
                 Modifier
-                    // Pelo centro: o canto de um quadrado que muda de tamanho
-                    // com o zoom não é lugar nenhum, o centro da bola é.
+                    // Dentro da bola, e não na tela: é o conteúdo que anda,
+                    // a bola fica onde o painel a desenha.
                     .offset(
-                        x = maxWidth * BolaDoPainel.CENTRO_X - lado / 2 + ajustes.empurraoDoMenu.x.dp,
-                        y = maxHeight * BolaDoPainel.CENTRO_Y - lado / 2 + ajustes.empurraoDoMenu.y.dp,
+                        x = ajustes.empurraoDentroDoMenu.x.dp,
+                        y = ajustes.empurraoDentroDoMenu.y.dp,
                     )
-                    .size(lado)
-                    // A tapa preta: cobre o alerta de cinto do painel, que é um
-                    // quadrado maior que o círculo. Ver `ClusterCarroScreen`.
-                    .background(Color(0xFF000000), RoundedCornerShape(CANTO_DA_TAPA)),
+                    // Frações do círculo, e não da tapa: a caixa de fora já
+                    // é o círculo. A [SOBRA] guarda a borda para a moldura.
+                    // O teto de 1 é o próprio círculo — `fillMax` não aceita
+                    // mais que a caixa, e nada maior caberia mesmo.
+                    // Frações do círculo, e não da tapa: a caixa de fora já
+                    // é o círculo. A [SOBRA] guarda a borda para a moldura.
+                    // Os limites são medidos na régua, no painel, e são o
+                    // que impede o estica de virar desenho cortado: ver
+                    // [CARRINHO_NA_BOLA] e [DADOS_NA_BOLA].
+                    .fillMaxWidth(
+                        ((if (deitado) ALTURA_UTIL else LARGURA_UTIL) * SOBRA *
+                            ajustes.zoomDoMenu.fator)
+                            .coerceIn(limite.minimoLargura, limite.maximoLargura),
+                    )
+                    .fillMaxHeight(
+                        ((if (deitado) LARGURA_UTIL else ALTURA_UTIL) * SOBRA *
+                            ajustes.zoomDoMenu.fator)
+                            .coerceIn(limite.minimoAltura, limite.maximoAltura),
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
-                Canvas(Modifier.fillMaxHeight(1f / FOLGA_DA_TAPA).aspectRatio(1f)) {
-                    val traco = size.minDimension * GROSSURA_DO_ANEL
-                    drawCircle(
-                        color = AZUL_DO_PAINEL,
-                        radius = (size.minDimension - traco) / 2f,
-                        style = Stroke(width = traco),
-                    )
-                }
-                // Dentro do anel, e não da tapa: o que passar do anel cai em
-                // cima do contorno azul e fica parecendo erro de desenho.
-                // Em pé ou deitado conforme o que vai dentro. Ver [LARGURA_UTIL].
-                val deitado = visao is Visao.Carro ||
-                    ajustes.ItensSeguros.size > MUITOS_ITENS
-                Box(
-                    Modifier
-                        .fillMaxWidth((if (deitado) ALTURA_UTIL else LARGURA_UTIL) / FOLGA_DA_TAPA)
-                        .fillMaxHeight((if (deitado) LARGURA_UTIL else ALTURA_UTIL) / FOLGA_DA_TAPA),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (comResumo && viagem != null) {
-                        // Dentro do anel, no lugar das visões: o resumo é a
-                        // única coisa que fica no painel depois de desligar, e
-                        // aqui ele herda o recorte redondo que já está acertado.
-                        DespedidaDaViagem(viagem.metrics, estado.live, cor, painel)
-                    } else {
-                        Conteudo(visao, visoes.size, indice, painel, estado.live, ajustes, cor, true)
-                    }
-                }
-            }
-        } else {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .offset(x = ajustes.empurraoDoMenu.x.dp, y = ajustes.empurraoDoMenu.y.dp)
-                    .padding(horizontal = 24.dp, vertical = 14.dp),
-            ) {
                 if (comResumo && viagem != null) {
+                    // Dentro do anel, no lugar das visões: o resumo é a
+                    // única coisa que fica no painel depois de desligar, e
+                    // aqui ele herda o recorte redondo que já está acertado.
                     DespedidaDaViagem(viagem.metrics, estado.live, cor, painel)
                 } else {
-                    Conteudo(visao, visoes.size, indice, painel, estado.live, ajustes, cor, false)
+                    Conteudo(
+                        visao, visoes.size, indice, painel, estado.live, ajustes, cor,
+                        apertado = true,
+                        // Título e bolinhas vêm logo abaixo, fora do zoom.
+                        comMoldura = false,
+                    )
                 }
+            }
+
+            // Fora da caixa do zoom, de propósito. Título e bolinhas são
+            // moldura, não dado: dizem "em que visão você está", e o lugar
+            // deles é a borda do círculo. Dentro do zoom, aumentar o número
+            // engordava as bolinhas junto e empurrava o título para fora da
+            // bola.
+            if (!comResumo) {
+                Bolinhas(
+                    visoes.size,
+                    indice,
+                    cor.cor,
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .offset(x = -lado * MARGEM_DA_BOLA),
+                )
+                Text(
+                    visao.titulo,
+                    color = cor.cor.copy(alpha = 0.75f),
+                    fontSize = (lado.value * TITULO_NA_BOLA).coerceIn(9f, 26f).sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = lado * MARGEM_DA_BOLA),
+                )
             }
         }
     }
@@ -258,6 +333,9 @@ private fun Conteudo(
     ajustes: AjustesDoCluster,
     cor: Tinta,
     apertado: Boolean,
+    // Se o título e as bolinhas saem daqui. Na bola eles são presos ao círculo,
+    // fora do zoom do conteúdo — ver [ClusterMenuScreen].
+    comMoldura: Boolean = true,
 ) {
     val quantosItens = ajustes.ItensSeguros.size
 
@@ -267,34 +345,8 @@ private fun Conteudo(
         // As bolinhas de lado, e não sob o título: são um marcador de posição
         // vertical — para cima e para baixo é o que troca a visão —, e em pé,
         // encostadas na direita, elas apontam para o mesmo eixo do gesto.
-        Bolinhas(
-            quantas,
-            indice,
-            cor.cor,
-            Modifier
-                .align(Alignment.CenterEnd)
-                // Empurradas para fora do quadrado útil, na direção do anel: o
-                // círculo é mais largo na altura do meio do que o retângulo
-                // útil, e sem isto as bolinhas ficariam coladas nos
-                // números com um vazio grande entre elas e a borda azul.
-                .offset(x = if (apertado) maxWidth * PARA_A_BORDA else 0.dp),
-        )
-
-        // O título sobe para a faixa entre o retângulo útil e o anel — espaço
-        // que estava sobrando — em vez de comer uma linha do miolo. Dentro do
-        // quadrado ele custava perto de um sexto da altura dos dados, que é o
-        // que fazia os números parecerem pequenos para o tamanho da bola.
-        if (apertado) {
-            Text(
-                visao.titulo,
-                color = cor.cor.copy(alpha = 0.75f),
-                fontSize = corpo,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = -maxHeight * TITULO_ACIMA),
-            )
+        if (comMoldura) {
+            Bolinhas(quantas, indice, cor.cor, Modifier.align(Alignment.CenterEnd))
         }
 
         Column(
@@ -325,7 +377,12 @@ private fun Conteudo(
                         // altura: o retângulo útil é em pé, feito para números
                         // empilhados, e o desenho é mais largo que alto.
                         if (apertado) {
-                            Modifier.fillMaxWidth().aspectRatio(LARGURA_POR_ALTURA)
+                            // Medido para a régua da central: é daqui que sai
+                            // quanto do círculo o carrinho come de verdade.
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(LARGURA_POR_ALTURA)
+                                .medindoPeca("carrinho")
                         } else {
                             Modifier
                                 .fillMaxHeight(ajustes.zoomDoMenu.fator.coerceIn(0.2f, 1f))
@@ -349,6 +406,24 @@ private fun Conteudo(
                         // fácil de varrer com o olho; daí para cima o número
                         // já teria encolhido demais para valer a simetria.
                         colunas = if (apertado && quantosItens > MUITOS_ITENS) 2 else 1,
+                        // Só na bola: é lá que uma linha de rótulo por dado
+                        // custa caro. Na página larga o rótulo continua escrito.
+                        rotulo = if (apertado) {
+                            ajustes.rotuloDoMenu
+                        } else {
+                            RotuloDoCluster.TEXTO
+                        },
+                        // Idem: o afastamento é uma queixa de bola. Na página
+                        // larga os dados ficam lado a lado, e não há altura
+                        // sobrando para espalhar.
+                        afastamento = if (apertado) {
+                            ajustes.afastamentoDoMenu.fator
+                        } else {
+                            1f
+                        },
+                        // Idem ao carrinho: a régua conta quanto da bola a
+                        // coluna de dados ocupa.
+                        peca = if (apertado) "dados" else null,
                     )
                 }
             }
@@ -357,29 +432,123 @@ private fun Conteudo(
 }
 
 /**
- * Quanto o título sobe acima do retângulo útil, em fração da altura dele.
+ * Folga entre a moldura e a curva do círculo, em fração do diâmetro.
  *
- * O retângulo acaba a 0,36 do diâmetro do centro e o anel está a 0,5: sobra
- * uma calota de espaço em cima que nenhum dado alcança.
- * dentro dela sem encostar no azul e sem estreitar tanto que "VIAGEM ATUAL" —
- * o rótulo mais comprido — precise quebrar em duas linhas.
+ * Vale para os dois que ficam na borda: as bolinhas, de lado, e o título, em
+ * cima. O retângulo do conteúdo acaba a 0,31 do centro e a curva está a 0,5 —
+ * é essa sobra que eles ocupam, sem encostar na curva, onde o texto sairia
+ * cortado nas pontas.
  */
-private const val TITULO_ACIMA = 0.11f
+private const val MARGEM_DA_BOLA = 0.07f
 
-/** De quantos dados em diante a bola passa a mostrar duas colunas. */
-private const val MUITOS_ITENS = 4
+/**
+ * Tamanho do título na bola, em fração do diâmetro.
+ *
+ * Fração da bola, e não da caixa do conteúdo, justamente porque o título não
+ * cresce com o zoom: ele é moldura, e a moldura é do tamanho do círculo. O
+ * número sai de casar com o que o [TITULO_NA_ALTURA] dava antes de o zoom do
+ * conteúdo existir.
+ */
+private const val TITULO_NA_BOLA = 0.034f
+
+/**
+ * De quantos dados em diante a bola passa a mostrar duas colunas.
+ *
+ * Três é o limite de uma coluna só: até aí os números ficam empilhados, que é a
+ * leitura mais rápida. Do quarto em diante eles se dividem — quatro em duas
+ * filas de dois enche o círculo bem melhor do que quatro numa pilha, que obriga
+ * cada número a encolher para caber na fatia de um quarto da altura.
+ */
+private const val MUITOS_ITENS = 3
+
+/**
+ * Que zoom faz a peça chegar a uma dada fração do círculo.
+ *
+ * O maior dos dois lados, e não o menor: enquanto um lado ainda pode crescer, o
+ * botão ainda faz alguma coisa — parar no primeiro que trava roubaria estica
+ * que existe.
+ */
+private fun emPorcento(largura: Float, altura: Float, baseLargura: Float, baseAltura: Float): Int =
+    ceil(maxOf(largura / baseLargura, altura / baseAltura) * 100f)
+        .toInt()
+        .coerceIn(Zoom.MINIMO, Zoom.MAXIMO)
+
+/**
+ * Até onde uma peça pode crescer dentro do círculo, em fração do diâmetro.
+ *
+ * Os números saíram da régua, no painel: o motorista esticou até o desenho
+ * encostar na borda e até ele ficar pequeno demais, e as duas leituras viraram
+ * estas constantes. É por isso que são limites e não um tamanho fixo — o estica
+ * continua valendo, só não passa mais do que cabe.
+ */
+private data class LimiteNaBola(
+    val maximoLargura: Float,
+    val maximoAltura: Float,
+    // Só o carrinho tem piso, e por um motivo: ele é um desenho, e abaixo de um
+    // certo tamanho vira mancha. Número encolhido ainda é número, então nos
+    // dados não há piso nenhum — encolher é escolha legítima do motorista, e um
+    // mínimo inventado aqui só brigaria com o botão de tamanho.
+    val minimoLargura: Float = 0f,
+    val minimoAltura: Float = 0f,
+)
+
+/**
+ * O carrinho: de 0,62 a 0,90 do diâmetro de largura.
+ *
+ * Quem manda é a largura — o desenho é mais largo que alto, e é ela que encosta
+ * no círculo primeiro. A altura acompanha pela proporção do desenho, então os
+ * limites dela são frouxos de propósito: apertá-los deformaria o carro.
+ */
+private val CARRINHO_NA_BOLA = LimiteNaBola(
+    maximoLargura = 0.898f,
+    maximoAltura = 0.780f,
+    minimoLargura = 0.620f,
+    minimoAltura = 0.539f,
+)
+
+/**
+ * Duas colunas de dados, de quatro a seis: até 0,82 de largura e 0,67 de altura.
+ *
+ * Medido no painel com seis dados e com o rótulo escrito, que é o caso mais
+ * apertado que existe.
+ */
+private val DADOS_NA_BOLA = LimiteNaBola(0.820f, 0.671f)
+
+/**
+ * Coluna única, até três dados, com a palavra escrita em cima do número.
+ *
+ * Mais baixo que o caso do ícone, e não mais alto, porque a palavra rouba a
+ * linha de cima de cada dado: o bloco chega à borda com o número menor. Os dois
+ * casos foram medidos separados justamente por isso — um teto só serviria a um
+ * deles e sobraria ou faltaria círculo no outro.
+ */
+private val DADOS_EM_COLUNA_COM_TEXTO = LimiteNaBola(0.620f, 0.759f)
+
+/**
+ * Coluna única, até três dados, sem a palavra: ícone ao lado ou só o número.
+ *
+ * Os dois andam juntos porque o ícone mora na mesma linha do número — nenhum
+ * dos dois gasta a linha de cima —, e a medida do painel deu a mesma para os
+ * dois.
+ */
+private val DADOS_EM_COLUNA = LimiteNaBola(0.671f, 0.820f)
 
 /** Quanto de largura as bolinhas comem na direita, e o conteúdo não usa. */
 private val FAIXA_DAS_BOLINHAS = 20.dp
 
 /**
- * Quanto as bolinhas saem do quadrado útil rumo ao anel, em fração da largura.
+ * Tamanho de cada bolinha, igual para todas.
  *
- * O quadrado inscrito acaba a 0,35 do diâmetro do centro e o anel está a 0,5;
- * 0,12 do lado do quadrado põe as bolinhas em cerca de 0,44 — perto da borda
- * sem encostar nela.
+ * Fixo, e não uma fração de nada: elas são moldura, não dado — crescer junto
+ * com os números só roubaria espaço de quem importa. E igual entre si porque a
+ * bolinha da página atual, quando era maior, empurrava as outras de lado a cada
+ * troca de página: a coluna inteira dançava, e o olho ia atrás do movimento em
+ * vez de ir ao número. Quem marca a página agora é só a opacidade.
  */
-private const val PARA_A_BORDA = 0.12f
+private val TAMANHO_DA_BOLINHA = 4.dp
+
+/** Espaço entre uma bolinha e a seguinte. */
+private val ENTRE_BOLINHAS = 5.dp
 
 /** Quantas visões existem e em qual estamos, do jeito que o painel do carro mostra. */
 @Composable
@@ -388,10 +557,10 @@ private fun Bolinhas(quantas: Int, atual: Int, cor: Color, modifier: Modifier = 
         repeat(quantas) { i ->
             Box(
                 Modifier
-                    .padding(bottom = 6.dp)
-                    .size(if (i == atual) 8.dp else 6.dp)
+                    .padding(bottom = ENTRE_BOLINHAS)
+                    .size(TAMANHO_DA_BOLINHA)
                     .clip(CircleShape)
-                    .background(cor.copy(alpha = if (i == atual) 0.9f else 0.3f)),
+                    .background(cor.copy(alpha = if (i == atual) 0.95f else 0.25f)),
             )
         }
     }
@@ -416,3 +585,12 @@ private const val TITULO_NA_ALTURA = 0.055f
  */
 private const val LARGURA_UTIL = 0.60f
 private const val ALTURA_UTIL = 0.72f
+
+/**
+ * Quanto do retângulo útil sobra para o conteúdo depois de reservar a borda.
+ *
+ * A moldura — título e bolinhas — mora na faixa entre o retângulo e a curva,
+ * e é a [MARGEM_DA_BOLA] que a posiciona. Sem descontar esta sobra, na visão
+ * do carro (a mais larga) o conteúdo ia até debaixo das bolinhas.
+ */
+private const val SOBRA = 0.86f

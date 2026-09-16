@@ -1,5 +1,6 @@
 package br.com.hugolumazzini.havaltrip.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -9,7 +10,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
@@ -21,18 +24,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import br.com.hugolumazzini.havaltrip.AFASTAMENTO_MAXIMO
+import br.com.hugolumazzini.havaltrip.AFASTAMENTO_MINIMO
 import br.com.hugolumazzini.havaltrip.AjustesDoCluster
 import br.com.hugolumazzini.havaltrip.Cluster
 import br.com.hugolumazzini.havaltrip.FundoDoCluster
 import br.com.hugolumazzini.havaltrip.ItemDoCluster
 import br.com.hugolumazzini.havaltrip.CorDoCluster
 import br.com.hugolumazzini.havaltrip.LugarNoPainel
+import br.com.hugolumazzini.havaltrip.RotuloDoCluster
 import br.com.hugolumazzini.havaltrip.TripViewModel
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
 import br.com.hugolumazzini.havaltrip.domain.MedidaDoPainel
@@ -198,6 +210,23 @@ internal fun Painel(
     emLinha: Boolean,
     tinta: Tinta,
     colunas: Int = 1,
+    /**
+     * Como cada dado se identifica. O padrão é o rótulo escrito, que é o que
+     * esta tela sempre fez; quem pede outra coisa é a bola, onde o espaço é
+     * redondo e cada linha de texto sai do tamanho do número.
+     */
+    rotulo: RotuloDoCluster = RotuloDoCluster.TEXTO,
+    /**
+     * Quanta altura a coluna de dados usa, de 0 a 1. Menos que tudo aproxima os
+     * dados entre si. Só a bola mexe nisto — ver
+     * [AjustesDoCluster.afastamentoDoMenu].
+     */
+    afastamento: Float = 1f,
+    /**
+     * Nome desta coluna de dados na régua da central, ou `null` para não medir.
+     * Ver [medindoPeca].
+     */
+    peca: String? = null,
 ) {
     val itens = ajustes.ItensSeguros
 
@@ -244,7 +273,7 @@ internal fun Painel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 leituras.forEach { (item, leitura) ->
-                    Bloco(item, leitura, tamanho, tinta, emLinha, Modifier.weight(1f))
+                    Bloco(item, leitura, tamanho, tinta, emLinha, rotulo, Modifier.weight(1f))
                 }
             }
         } else {
@@ -252,8 +281,22 @@ internal fun Painel(
             // do primeiro, e não seis posições abaixo dele. A ordem em que o
             // motorista escolheu os dados é a ordem de leitura, da esquerda
             // para a direita.
+            // A coluna pode ocupar menos que a altura toda, centrada: é assim
+            // que o afastamento aproxima os dados sem mexer no tamanho deles.
+            // A fatia de onde sai a letra continua sendo a da altura inteira,
+            // de propósito — encolher o número junto faria o botão de afastar
+            // virar um segundo botão de tamanho.
             Column(
-                Modifier.fillMaxSize(),
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(
+                        afastamento.coerceIn(
+                            AFASTAMENTO_MINIMO / 100f,
+                            AFASTAMENTO_MAXIMO / 100f,
+                        ),
+                    )
+                    .align(Alignment.Center)
+                    .then(peca?.let { Modifier.medindoPeca(it) } ?: Modifier),
                 verticalArrangement = Arrangement.SpaceEvenly,
             ) {
                 leituras.chunked(emColunas).forEach { fila ->
@@ -263,7 +306,7 @@ internal fun Painel(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         fila.forEach { (item, leitura) ->
-                            Bloco(item, leitura, tamanho, tinta, emLinha, Modifier.weight(1f))
+                            Bloco(item, leitura, tamanho, tinta, emLinha, rotulo, Modifier.weight(1f))
                         }
                         // A última fila pode vir incompleta — cinco dados em
                         // duas colunas. O vazio segura o lugar para o dado
@@ -283,20 +326,25 @@ private fun Bloco(
     numero: Float,
     tinta: Tinta,
     emLinha: Boolean,
+    comoSeIdentifica: RotuloDoCluster,
     modifier: Modifier = Modifier,
 ) {
     val (valor, unidade) = leitura
     val rotulo = MedidaDoPainel.tamanhoDoRotulo(numero)
 
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            item.rotulo,
-            color = Cores.TextoApoio,
-            fontSize = rotulo.sp,
-            letterSpacing = (rotulo * 0.08f).sp,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-        )
+        // A linha do rótulo só existe no modo texto. Nos outros dois ela não
+        // vira espaço em branco: some, e a altura que sobra é do número.
+        if (comoSeIdentifica == RotuloDoCluster.TEXTO) {
+            Text(
+                item.rotulo,
+                color = Cores.TextoApoio,
+                fontSize = rotulo.sp,
+                letterSpacing = (rotulo * 0.08f).sp,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
+        }
         // Lado a lado, a unidade ganha a sua própria linha embaixo do número —
         // é o desenho mais limpo. Empilhado, ela vai ao lado do número: uma
         // terceira linha por dado esbarrava no rótulo do dado seguinte.
@@ -305,6 +353,24 @@ private fun Bloco(
             Text(unidade, color = Cores.TextoApoio, fontSize = rotulo.sp, maxLines = 1)
         } else {
             Row(verticalAlignment = Alignment.Bottom) {
+                if (comoSeIdentifica == RotuloDoCluster.ICONE) {
+                    IconeDoItem(
+                        item,
+                        Cores.TextoApoio,
+                        Modifier
+                            // Na altura do corpo do número, e não na base dele.
+                            // A linha toda é alinhada por baixo, que é o que a
+                            // unidade quer — ela é texto e casa com a base da
+                            // letra. O ícone não é texto: encostado no pé do
+                            // número ele fica caído, parecendo outra coisa
+                            // pendurada embaixo em vez da marca daquele dado.
+                            // O recuo de baixo compensa a folga que a fonte
+                            // guarda para as letras que descem.
+                            .align(Alignment.CenterVertically)
+                            .padding(end = (numero * 0.20f).dp, bottom = (numero * 0.06f).dp)
+                            .size((numero * ICONE_NO_NUMERO).dp),
+                    )
+                }
                 Numero(valor, numero, tinta)
                 Text(
                     " $unidade",
@@ -374,3 +440,115 @@ internal fun tinta(ajustes: AjustesDoCluster, paleta: PaletaDoImpulse.Resultado?
  */
 internal fun fundo(espiando: Boolean): Color =
     if (espiando) Color(0xFF0B0B0F) else Color.Transparent
+
+/** Lado do ícone, em fração do tamanho do número ao lado dele. */
+private const val ICONE_NO_NUMERO = 0.62f
+
+/**
+ * A marca de cada dado, desenhada à mão.
+ *
+ * À mão porque o conjunto pronto do Material não tem nada que sirva: os poucos
+ * desenhos de carro que ele traz são de painel de oficina, e num quadrado de
+ * meio centímetro eles viram uma mancha. Estes são traços grossos e abertos,
+ * que é o que sobrevive à distância do painel.
+ *
+ * O que **não** está aqui, de propósito: a bomba de combustível para a média.
+ * De relance, bomba no painel de um carro é uma coisa só — tanque acabando — e
+ * um ícone que mente sobre a urgência é pior do que ícone nenhum.
+ */
+@Composable
+private fun IconeDoItem(item: ItemDoCluster, cor: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val l = size.minDimension
+        val traco = l * 0.11f
+        val risco = Stroke(width = traco, cap = StrokeCap.Round)
+        val meio = Offset(l / 2f, l / 2f)
+
+        fun linha(x1: Float, y1: Float, x2: Float, y2: Float) = drawLine(
+            cor, Offset(l * x1, l * y1), Offset(l * x2, l * y2), traco, StrokeCap.Round,
+        )
+
+        when (item) {
+            // Estrada que se afunila no horizonte, com a faixa do meio: a
+            // distância percorrida.
+            ItemDoCluster.DISTANCIA -> {
+                linha(0.18f, 0.94f, 0.38f, 0.10f)
+                linha(0.82f, 0.94f, 0.62f, 0.10f)
+                linha(0.50f, 0.80f, 0.50f, 0.58f)
+                linha(0.50f, 0.42f, 0.50f, 0.24f)
+            }
+
+            // Gota sobre um traço: combustível por distância. A gota sozinha é
+            // líquido; o traço embaixo é o chão que ela rende.
+            ItemDoCluster.MEDIA, ItemDoCluster.LITROS -> {
+                drawPath(
+                    Path().apply {
+                        moveTo(l * 0.5f, l * 0.08f)
+                        cubicTo(l * 0.5f, l * 0.08f, l * 0.88f, l * 0.48f, l * 0.88f, l * 0.62f)
+                        cubicTo(l * 0.88f, l * 0.83f, l * 0.71f, l * 0.94f, l * 0.5f, l * 0.94f)
+                        cubicTo(l * 0.29f, l * 0.94f, l * 0.12f, l * 0.83f, l * 0.12f, l * 0.62f)
+                        cubicTo(l * 0.12f, l * 0.48f, l * 0.5f, l * 0.08f, l * 0.5f, l * 0.08f)
+                        close()
+                    },
+                    cor,
+                    style = if (item == ItemDoCluster.LITROS) Fill else risco,
+                )
+            }
+
+            // Relógio.
+            ItemDoCluster.TEMPO -> {
+                drawCircle(cor, radius = (l - traco) / 2f, center = meio, style = risco)
+                linha(0.5f, 0.28f, 0.5f, 0.52f)
+                linha(0.5f, 0.52f, 0.72f, 0.62f)
+            }
+
+            // Ponteiro de velocímetro: o arco do mostrador e a agulha. Na média
+            // a agulha aponta para cima (meio do curso); na máxima, para o fim
+            // da escala — é a mesma família de dado, com a diferença no ângulo.
+            ItemDoCluster.VELOCIDADE_MEDIA, ItemDoCluster.VELOCIDADE_MAXIMA -> {
+                drawArc(
+                    cor,
+                    startAngle = 160f,
+                    sweepAngle = 220f,
+                    useCenter = false,
+                    topLeft = Offset(traco / 2f, traco / 2f),
+                    size = Size(l - traco, l - traco),
+                    style = risco,
+                )
+                if (item == ItemDoCluster.VELOCIDADE_MEDIA) {
+                    linha(0.5f, 0.5f, 0.5f, 0.18f)
+                } else {
+                    linha(0.5f, 0.5f, 0.80f, 0.28f)
+                }
+            }
+
+            // Raio: o consumo deste instante.
+            ItemDoCluster.CONSUMO_AGORA -> {
+                linha(0.60f, 0.06f, 0.28f, 0.54f)
+                linha(0.28f, 0.54f, 0.54f, 0.54f)
+                linha(0.54f, 0.54f, 0.40f, 0.94f)
+            }
+
+            // Seta longa para a direita: até onde ainda dá para ir.
+            ItemDoCluster.AUTONOMIA -> {
+                linha(0.08f, 0.5f, 0.88f, 0.5f)
+                linha(0.62f, 0.26f, 0.90f, 0.5f)
+                linha(0.62f, 0.74f, 0.90f, 0.5f)
+            }
+
+            // Os dois zeros do hodômetro, dentro da janelinha.
+            ItemDoCluster.HODOMETRO -> {
+                drawRoundRect(
+                    cor,
+                    topLeft = Offset(l * 0.06f, l * 0.26f),
+                    size = Size(l * 0.88f, l * 0.48f),
+                    cornerRadius = CornerRadius(l * 0.10f),
+                    style = risco,
+                )
+                linha(0.30f, 0.40f, 0.30f, 0.60f)
+                linha(0.52f, 0.40f, 0.52f, 0.60f)
+                linha(0.72f, 0.40f, 0.72f, 0.60f)
+            }
+        }
+    }
+}

@@ -81,6 +81,24 @@ enum class CorDoCluster(val rotulo: String, val argb: Long) {
  * O retângulo é reto, sem canto arredondado, justamente porque a função dele é
  * cobrir: canto arredondado deixaria vazar as quinas do que se quer esconder.
  */
+/**
+ * Como cada dado se identifica na bola.
+ *
+ * Existe para comparar três desenhos no carro, que é o único lugar em que a
+ * diferença se decide: o painel é pequeno, fica longe e é lido de relance.
+ *
+ * O ponto de partida da dúvida: a unidade já diz quase tudo. "3,9 km/L" não
+ * precisa da palavra MÉDIA em cima, e cada rótulo custa uma linha de altura que
+ * sai do tamanho do número. [NENHUM] aposta nisso; [ICONE] guarda uma marca
+ * para os casos em que a unidade não basta — "km" é distância, mas também é
+ * hodômetro e autonomia.
+ */
+enum class RotuloDoCluster(val rotulo: String) {
+    TEXTO("Texto"),
+    ICONE("Ícone ao lado"),
+    NENHUM("Só o número"),
+}
+
 enum class FundoDoCluster(val rotulo: String, val argb: Long) {
     TRANSPARENTE("Transparente", 0x00000000),
     ESCURO("Escuro", 0xCC000000),
@@ -296,6 +314,15 @@ value class Zoom(val porcento: Int = 100) {
 
     val natural: Boolean get() = porcento == PADRAO
 
+    /**
+     * O mesmo número, preso à faixa do afastamento.
+     *
+     * Existe para o valor já gravado fora da faixa não custar meia dúzia de
+     * toques sem efeito: o primeiro toque parte daqui, e não de onde o contador
+     * tinha ido parar.
+     */
+    val util: Int get() = porcento.coerceIn(AFASTAMENTO_MINIMO, AFASTAMENTO_MAXIMO)
+
     companion object {
         const val PADRAO = 100
 
@@ -331,6 +358,21 @@ value class Zoom(val porcento: Int = 100) {
  * atravessa até a central pelo [Cluster.medidas]. Ver `linhasDaMedida` para
  * como ele se lê.
  */
+/**
+ * Um pedaço de dentro de uma janela, em pixels absolutos da tela.
+ *
+ * Absolutos, e não frações, porque a conta que interessa é contra outra peça —
+ * quanto o carrinho ocupa do círculo — e cada peça tem um pai diferente. Quem
+ * compara é a régua na central, que tem as duas medidas na mão.
+ */
+data class MedidaDaPeca(
+    val nome: String,
+    val x: Int,
+    val y: Int,
+    val largura: Int,
+    val altura: Int,
+)
+
 data class MedidaDaJanela(
     val janelaLargura: Int,
     val janelaAltura: Int,
@@ -374,6 +416,28 @@ data class MedidaDaJanela(
  *   do carro aparece. `null` é "em todas", que é como sempre foi. Ver
  *   [br.com.hugolumazzini.havaltrip.painel.PaginaDoCluster].
  */
+/**
+ * Quantos dados cabem numa janela do painel.
+ *
+ * Seis é o que a bola comporta em duas colunas de três com o número ainda
+ * legível de relance — foi medido no painel, não escolhido no papel. Do sétimo
+ * em diante cada fatia encolhe a ponto de o número virar enfeite, e um dado que
+ * não se lê dirigindo é pior do que dado nenhum: ocupa o lugar de um que se
+ * leria.
+ */
+const val MAXIMO_DE_ITENS = 6
+
+/**
+ * Até onde a coluna de dados se aproxima e se espalha dentro da bola.
+ *
+ * Cem por cento é a coluna ocupando toda a altura do conteúdo — não existe
+ * "mais que tudo", e o que passasse disso seria cortado pela borda. Vinte por
+ * cento é o outro extremo útil: abaixo disso os números se sobrepõem em vez de
+ * se aproximar.
+ */
+const val AFASTAMENTO_MINIMO = 20
+const val AFASTAMENTO_MAXIMO = 100
+
 data class AjustesDoCluster(
     val tripId: String? = null,
     val itens: List<ItemDoCluster> = listOf(
@@ -403,15 +467,46 @@ data class AjustesDoCluster(
     val telaDoMenu: Int? = null,
     val paginaDoMenu: Int? = null,
     val empurraoDoMenu: Empurrao = Empurrao(),
+    /**
+     * Onde o conteúdo cai **dentro** da bola, separado de onde a bola cai no
+     * painel.
+     *
+     * São dois acertos diferentes e um não substitui o outro: mover a bola
+     * inteira a tira do círculo que o painel desenha embaixo, e mover só o
+     * conteúdo endireita o texto sem desencaixar nada. Sem este segundo
+     * empurrão, um título alto demais só poderia ser corrigido puxando a bola
+     * para baixo — e aí a bola é que ficava errada.
+     */
+    val empurraoDentroDoMenu: Empurrao = Empurrao(),
     val zoomDoMenu: Zoom = Zoom(),
     /**
-     * Se a página se encaixa no recorte redondo da bola do ar.
+     * Quanto os dados se espalham na altura da bola.
      *
-     * Ligado por padrão porque é o caso que existe: a página que sobra no
-     * carrossel é justamente a da bola vazia. Desligado, a visão usa o painel
-     * inteiro — que só serve a quem projetar numa tela sem esse recorte.
+     * Separado do zoom porque são duas queixas diferentes: "o número é pequeno"
+     * se resolve crescendo, e "está tudo grudado" (ou "espalhado demais") se
+     * resolve aqui. Fazer as duas coisas com um botão só obrigaria a escolher
+     * qual das duas se estraga.
+     *
+     * 100% é a coluna ocupando toda a altura do conteúdo, que é o que a bola
+     * sempre fez; abaixo disso ela se fecha em torno do centro. Acima de 100
+     * não vai: o que sobraria para fora da caixa é o que a bola corta.
      */
-    val menuNaBola: Boolean = true,
+    val afastamentoDoMenu: Zoom = Zoom(),
+    /**
+     * O que fica atrás da bola.
+     *
+     * Preto sólido por padrão porque é o que tapa o que o painel desenha ali
+     * embaixo. Transparente serve para deixar o desenho do painel aparecer em
+     * volta do conteúdo — só vale a pena onde não há nada atrás que atrapalhe.
+     */
+    val fundoDoMenu: FundoDoCluster = FundoDoCluster.PRETO,
+    /**
+     * Como os dados se identificam dentro da bola. Ver [RotuloDoCluster].
+     *
+     * Só na bola: nas janelinhas soltas o espaço não é redondo nem tão apertado,
+     * e lá o rótulo escrito não custa o tamanho do número.
+     */
+    val rotuloDoMenu: RotuloDoCluster = RotuloDoCluster.TEXTO,
     /**
      * O que o resumo de despedida mostra, e nesta ordem.
      *
@@ -437,7 +532,7 @@ data class AjustesDoCluster(
      * de existir do resumo.
      */
     val ItensSeguros: List<ItemDoCluster>
-        get() = itens.ifEmpty { listOf(ItemDoCluster.DISTANCIA) }
+        get() = itens.ifEmpty { listOf(ItemDoCluster.DISTANCIA) }.take(MAXIMO_DE_ITENS)
 
     /** O mesmo cuidado para a despedida: desmarcar tudo não deixa a tela vazia. */
     val ItensDaDespedidaSeguros: List<ItemDoCluster>
@@ -480,8 +575,12 @@ object Cluster {
     private const val PAGINA_MENU = "paginaDoMenu"
     private const val EMPURRAO_MENU_X = "empurraoDoMenuX"
     private const val EMPURRAO_MENU_Y = "empurraoDoMenuY"
+    private const val EMPURRAO_DENTRO_MENU_X = "empurraoDentroDoMenuX"
+    private const val EMPURRAO_DENTRO_MENU_Y = "empurraoDentroDoMenuY"
     private const val ZOOM_MENU = "zoomDoMenu"
-    private const val MENU_NA_BOLA = "menuNaBola"
+    private const val FUNDO_MENU = "fundoDoMenu"
+    private const val ROTULO_MENU = "rotuloDoMenu"
+    private const val AFASTAMENTO_MENU = "afastamentoDoMenu"
     private const val ITENS_DESPEDIDA = "itensDaDespedida"
 
     /**
@@ -530,6 +629,26 @@ object Cluster {
     fun anotarMedida(janela: JanelaDoPainel, medida: MedidaDaJanela) {
         if (_medidas.value[janela] == medida) return
         _medidas.value = _medidas.value + (janela to medida)
+    }
+
+    /**
+     * As peças de dentro de uma janela, medidas à parte.
+     *
+     * Separado de [medidas] porque a chave lá é a janela projetada, e estas não
+     * são janelas: são pedaços de uma — o carrinho e a coluna de dados dentro
+     * da bola. Acrescentá-las àquele enum as tornaria coisas projetáveis no
+     * painel, que não são.
+     *
+     * É material de conferência: serve para eu saber quanto do círculo cada
+     * pedaço come de verdade, em vez de deduzir da fração que pedi no código.
+     */
+    private val _pecas = MutableStateFlow<Map<String, MedidaDaPeca>>(emptyMap())
+    val pecas: StateFlow<Map<String, MedidaDaPeca>> = _pecas.asStateFlow()
+
+    /** Mesma proteção contra repetição de [anotarMedida]. */
+    fun anotarPeca(medida: MedidaDaPeca) {
+        if (_pecas.value[medida.nome] == medida) return
+        _pecas.value = _pecas.value + (medida.nome to medida)
     }
 
     /**
@@ -613,8 +732,21 @@ object Cluster {
                 .takeIf { it != QUALQUER_PAGINA },
             empurraoDoMenu = Empurrao()
                 .mais(prefs.getInt(EMPURRAO_MENU_X, 0), prefs.getInt(EMPURRAO_MENU_Y, 0)),
+            empurraoDentroDoMenu = Empurrao().mais(
+                prefs.getInt(EMPURRAO_DENTRO_MENU_X, 0),
+                prefs.getInt(EMPURRAO_DENTRO_MENU_Y, 0),
+            ),
             zoomDoMenu = Zoom(0).mais(prefs.getInt(ZOOM_MENU, Zoom.PADRAO)),
-            menuNaBola = prefs.getBoolean(MENU_NA_BOLA, true),
+            fundoDoMenu = prefs.getString(FUNDO_MENU, null)
+                ?.let { nome -> FundoDoCluster.entries.find { it.name == nome } }
+                ?: padrao.fundoDoMenu,
+            afastamentoDoMenu = Zoom(
+                prefs.getInt(AFASTAMENTO_MENU, padrao.afastamentoDoMenu.porcento)
+                    .coerceIn(AFASTAMENTO_MINIMO, AFASTAMENTO_MAXIMO),
+            ),
+            rotuloDoMenu = prefs.getString(ROTULO_MENU, null)
+                ?.let { nome -> RotuloDoCluster.entries.find { it.name == nome } }
+                ?: padrao.rotuloDoMenu,
             itensDaDespedida = prefs.getString(ITENS_DESPEDIDA, null)
                 ?.split(",")
                 ?.mapNotNull { nome -> ItemDoCluster.entries.find { it.name == nome } }
@@ -648,8 +780,12 @@ object Cluster {
             .putInt(PAGINA_MENU, novo.paginaDoMenu ?: QUALQUER_PAGINA)
             .putInt(EMPURRAO_MENU_X, novo.empurraoDoMenu.x)
             .putInt(EMPURRAO_MENU_Y, novo.empurraoDoMenu.y)
+            .putInt(EMPURRAO_DENTRO_MENU_X, novo.empurraoDentroDoMenu.x)
+            .putInt(EMPURRAO_DENTRO_MENU_Y, novo.empurraoDentroDoMenu.y)
             .putInt(ZOOM_MENU, novo.zoomDoMenu.porcento)
-            .putBoolean(MENU_NA_BOLA, novo.menuNaBola)
+            .putString(FUNDO_MENU, novo.fundoDoMenu.name)
+            .putString(ROTULO_MENU, novo.rotuloDoMenu.name)
+            .putInt(AFASTAMENTO_MENU, novo.afastamentoDoMenu.porcento)
             .putString(ITENS_DESPEDIDA, novo.itensDaDespedida.joinToString(",") { it.name })
             .apply()
     }
@@ -663,6 +799,10 @@ object Cluster {
      */
     fun alternarItem(item: ItemDoCluster) {
         val atuais = _ajustes.value.itens
+        // Marcar o sétimo não faz nada, em vez de derrubar o primeiro: numa
+        // lista de marcar, a caixa que desmarca sozinha outra caixa é o tipo de
+        // coisa que o motorista lê como defeito. Quem manda desmarcar é ele.
+        if (item !in atuais && atuais.size >= MAXIMO_DE_ITENS) return
         gravar(_ajustes.value.copy(itens = if (item in atuais) atuais - item else atuais + item))
     }
 
@@ -709,6 +849,34 @@ object Cluster {
     fun usarFundoDoCarro(fundo: FundoDoCluster) =
         gravar(_ajustes.value.copy(fundoDoCarro = fundo))
 
+    fun usarFundoDoMenu(fundo: FundoDoCluster) =
+        gravar(_ajustes.value.copy(fundoDoMenu = fundo))
+
+    /**
+     * Aproxima ou espalha os dados na altura da bola.
+     *
+     * Preso à faixa que muda alguma coisa, pelo mesmo motivo do estica: acima de
+     * [AFASTAMENTO_MAXIMO] a coluna já ocupa a altura inteira e não há para onde
+     * espalhar. Sem o limite, o contador subia até 300 sem nada mudar na tela, e
+     * na volta os primeiros toques no "−" gastavam esses pontos invisíveis —
+     * quem estava olhando via um botão quebrado.
+     */
+    fun afastarNoMenu(delta: Int) = gravar(
+        _ajustes.value.copy(
+            afastamentoDoMenu = Zoom(
+                (_ajustes.value.afastamentoDoMenu.util + delta)
+                    .coerceIn(AFASTAMENTO_MINIMO, AFASTAMENTO_MAXIMO),
+            ),
+        ),
+    )
+
+    /** Volta ao espalhamento de fábrica: a coluna ocupando a altura toda. */
+    fun afastamentoNatural() = gravar(_ajustes.value.copy(afastamentoDoMenu = Zoom()))
+
+    /** Troca o jeito de identificar cada dado na bola. Ver [RotuloDoCluster]. */
+    fun usarRotuloDoMenu(rotulo: RotuloDoCluster) =
+        gravar(_ajustes.value.copy(rotuloDoMenu = rotulo))
+
     /**
      * Em qual página do carrossel do painel a janela do carro aparece.
      *
@@ -720,9 +888,6 @@ object Cluster {
 
     /** O mesmo, para a janela do menu. Ver [usarPaginaDoCarro]. */
     fun usarPaginaDoMenu(pagina: Int?) = gravar(_ajustes.value.copy(paginaDoMenu = pagina))
-
-    /** Encaixar a página no recorte redondo da bola, ou usar o painel inteiro. */
-    fun encaixarMenuNaBola(sim: Boolean) = gravar(_ajustes.value.copy(menuNaBola = sim))
 
     /**
      * Empurra uma das janelas alguns dp a partir do lugar escolhido.
@@ -756,10 +921,34 @@ object Cluster {
                 _ajustes.value.copy(zoomDosNumeros = _ajustes.value.zoomDosNumeros.mais(delta))
             JanelaDoPainel.CARRO ->
                 _ajustes.value.copy(zoomDoCarro = _ajustes.value.zoomDoCarro.mais(delta))
-            JanelaDoPainel.MENU ->
-                _ajustes.value.copy(zoomDoMenu = _ajustes.value.zoomDoMenu.mais(delta))
+            JanelaDoPainel.MENU -> {
+                // Encosta no útil antes de somar. Sem isto, o número continuava
+                // subindo depois que a bola já tinha parado de crescer, e na
+                // volta o motorista apertava o "−" cinco, seis vezes sem ver
+                // nada mudar — o botão parecia quebrado, e o defeito era só o
+                // contador tendo ido para um lugar que não existe na tela.
+                val util = _ajustes.value.zoomDoMenu.porcento.coerceIn(faixaDoZoomDoMenu)
+                val novo = (util + delta).coerceIn(faixaDoZoomDoMenu)
+                _ajustes.value.copy(zoomDoMenu = Zoom(0).mais(novo))
+            }
         },
     )
+
+    /**
+     * Até onde o estica da bola ainda muda alguma coisa.
+     *
+     * Quem sabe disto é a própria bola, não os ajustes: o teto depende do que
+     * está dentro dela — carrinho, três dados em coluna, seis em duas — e de
+     * quanto de círculo aquela peça pode ocupar. Por isso a janela mede e conta
+     * aqui, como já faz com a posição. Não é gravado: é leitura do que está na
+     * tela agora, e a próxima visão manda a dela.
+     */
+    private var faixaDoZoomDoMenu = Zoom.MINIMO..Zoom.MAXIMO
+
+    fun anotarFaixaDoZoomDoMenu(piso: Int, teto: Int) {
+        if (piso > teto) return
+        faixaDoZoomDoMenu = piso..teto
+    }
 
     /** Volta a janela ao tamanho escolhido, sem estica. */
     fun tamanhoNatural(janela: JanelaDoPainel) = gravar(
@@ -769,6 +958,20 @@ object Cluster {
             JanelaDoPainel.MENU -> _ajustes.value.copy(zoomDoMenu = Zoom())
         },
     )
+
+    /**
+     * Move o conteúdo dentro da bola, sem mexer na bola.
+     *
+     * Fora do [empurrar] por janela porque não é uma janela: é uma segunda
+     * posição dentro da mesma. Ver [AjustesDoCluster.empurraoDentroDoMenu].
+     */
+    fun empurrarDentroDoMenu(dx: Int, dy: Int) = gravar(
+        _ajustes.value.copy(empurraoDentroDoMenu = _ajustes.value.empurraoDentroDoMenu.mais(dx, dy)),
+    )
+
+    /** Devolve o conteúdo ao centro da bola. */
+    fun centralizarDentroDoMenu() =
+        gravar(_ajustes.value.copy(empurraoDentroDoMenu = Empurrao()))
 
     /** Desfaz o ajuste fino de uma janela. */
     fun centralizar(janela: JanelaDoPainel) = gravar(
@@ -809,7 +1012,6 @@ object Cluster {
         _ajustes.value.copy(
             telaDoMenu = tela,
             paginaDoMenu = pagina,
-            menuNaBola = true,
         ),
     )
 

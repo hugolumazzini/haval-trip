@@ -44,6 +44,8 @@ import androidx.compose.runtime.LaunchedEffect
 import br.com.hugolumazzini.havaltrip.CorDoCluster
 import br.com.hugolumazzini.havaltrip.telemetry.PaletaDoImpulse
 import br.com.hugolumazzini.havaltrip.FundoDoCluster
+import br.com.hugolumazzini.havaltrip.MAXIMO_DE_ITENS
+import br.com.hugolumazzini.havaltrip.RotuloDoCluster
 import br.com.hugolumazzini.havaltrip.ClusterActivity
 import br.com.hugolumazzini.havaltrip.DESPEDIDA
 import br.com.hugolumazzini.havaltrip.ESPIANDO
@@ -112,12 +114,15 @@ private fun paradaMaisProxima(segundos: Double?): Int {
  * caminho até ele vira um toque só.
  */
 private enum class AbaDaConfiguracao(val rotulo: String) {
-    NUMEROS("Números"),
-    CARRO("Carro"),
-    PAGINA("Página com visões"),
-    DESPEDIDA("Despedida"),
+    // A ordem é a do uso, não a da implementação: o que o motorista abre todo
+    // dia (zerar contador) vem primeiro, depois o que ele abre de vez em quando
+    // (versão), e por último o que se acerta uma vez e não se mexe mais.
     CONTADORES("Contadores"),
     VERSAO("Versão"),
+    NUMEROS("Números"),
+    CARRO("Carro"),
+    DESPEDIDA("Despedida"),
+    PAGINA("Integrar ao painel"),
 }
 
 /**
@@ -132,7 +137,7 @@ fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
     // `rememberSaveable` para a aba sobreviver ao giro de tela e à volta de
     // outra tela: reabrir sempre em "Números" faria perder o lugar a cada
     // espiada em "Ver como fica".
-    var aba by rememberSaveable { mutableStateOf(AbaDaConfiguracao.NUMEROS) }
+    var aba by rememberSaveable { mutableStateOf(AbaDaConfiguracao.CONTADORES) }
 
     Column(Modifier.fillMaxWidth()) {
         Text("CONFIGURAÇÃO", style = EstiloRotulo)
@@ -376,8 +381,16 @@ private fun ZeragemAutomatica(vm: TripViewModel, estado: TripState) {
 
 /** Botão de escolha única, no tamanho de dedo que a central pede. */
 @Composable
-private fun Opcao(texto: String, marcada: Boolean, onClick: () -> Unit) {
-    OpcaoColorida(texto, marcada, Cores.Destaque, onClick)
+private fun Opcao(
+    texto: String,
+    marcada: Boolean,
+    // Apagada quando o toque não faria nada — hoje só a lista de dados, que tem
+    // teto. Uma pastilha que aceita o dedo e não muda nada é lida como defeito;
+    // apagada, ela explica sozinha que o lugar acabou.
+    habilitada: Boolean = true,
+    onClick: () -> Unit,
+) {
+    OpcaoColorida(texto, marcada, Cores.Destaque, habilitada, onClick)
 }
 
 /**
@@ -388,7 +401,13 @@ private fun Opcao(texto: String, marcada: Boolean, onClick: () -> Unit) {
  * motorista a tocar para descobrir o que cada um faz.
  */
 @Composable
-private fun OpcaoColorida(texto: String, marcada: Boolean, corMarcada: Color, onClick: () -> Unit) {
+private fun OpcaoColorida(
+    texto: String,
+    marcada: Boolean,
+    corMarcada: Color,
+    habilitada: Boolean = true,
+    onClick: () -> Unit,
+) {
     // Folga generosa de propósito: a pastilha é o alvo do dedo em movimento,
     // dentro de um carro, e o toque que erra custa uma segunda olhada para a
     // tela. Vale gastar espaço aqui — a tela é larga e sobra.
@@ -396,13 +415,17 @@ private fun OpcaoColorida(texto: String, marcada: Boolean, corMarcada: Color, on
         Modifier
             .clip(RoundedCornerShape(10.dp))
             .background(if (marcada) Cores.SuperficieSelecionada else Cores.Campo)
-            .clickable(onClick = onClick)
+            .clickable(enabled = habilitada, onClick = onClick)
             .padding(horizontal = 24.dp, vertical = 18.dp),
     ) {
         Text(
             texto,
             style = MaterialTheme.typography.titleMedium,
-            color = if (marcada) corMarcada else Cores.TextoCorrido,
+            color = when {
+                marcada -> corMarcada
+                habilitada -> Cores.TextoCorrido
+                else -> Cores.TextoCorrido.copy(alpha = 0.35f)
+            },
         )
     }
 }
@@ -469,8 +492,8 @@ private fun NumerosNoPainel(estado: TripState) {
         Text("Quais informações", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(4.dp))
         Text(
-            "Aparecem na ordem em que você marcar. Três cabem bem numa faixa; " +
-                "acima disso, dê mais espaço à janela no Impulse.",
+            "Aparecem na ordem em que você marcar, até $MAXIMO_DE_ITENS. Três cabem " +
+                "bem numa faixa; acima disso, dê mais espaço à janela no Impulse.",
             style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
@@ -480,7 +503,12 @@ private fun NumerosNoPainel(estado: TripState) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             ItemDoCluster.entries.forEach { item ->
-                Opcao(item.descricao, item in ajustes.itens) { Cluster.alternarItem(item) }
+                Opcao(
+                    item.descricao,
+                    item in ajustes.itens,
+                    habilitada = item in ajustes.itens ||
+                        ajustes.itens.size < MAXIMO_DE_ITENS,
+                ) { Cluster.alternarItem(item) }
             }
         }
 
@@ -725,15 +753,13 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
     val ouvindoPagina by PaginaDoCluster.ligado.collectAsStateWithLifecycle()
     val ouvindoTeclas by TecladoDoVolante.ligado.collectAsStateWithLifecycle()
 
-    Text("Página com visões", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
+    Text("Integrar ao painel", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
     Spacer(Modifier.height(4.dp))
     Text(
-        "Uma página inteira do painel, em vez de janelinhas soltas. As páginas do " +
-            "painel se trocam com as setas para os lados, no volante; dentro desta, " +
-            "para cima e para baixo trocam a visão: primeiro o carro, depois um " +
-            "contador para cada Trip. Aponte esta janela para a tela do painel " +
-            "inteira e escolha em qual página ela aparece — de preferência a bola " +
-            "que ficou vazia.",
+        "O computador de bordo ocupando a bola vazia do painel, como se fosse uma " +
+            "página do próprio carro. As páginas se trocam com as setas para os " +
+            "lados, no volante; dentro desta, para cima e para baixo trocam a " +
+            "visão: primeiro o carro, depois um contador para cada Trip.",
         style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
@@ -780,21 +806,97 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
     AvisoDaPagina(ajustes.paginaDoMenu)
 
     Spacer(Modifier.height(14.dp))
-    Text("Formato", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+    Text("Fundo", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
     Spacer(Modifier.height(4.dp))
     Text(
-        "A bola que sobrou é um recorte redondo pequeno, não a tela toda. " +
-            "Encaixado, tudo cabe dentro dela; no painel inteiro, o conteúdo se " +
-            "espalha — e aí só serve se a página que você escolheu não tiver esse " +
-            "recorte.",
+        "O que fica atrás da bola. Preto apaga o que o painel desenha ali; " +
+            "transparente deixa o desenho do painel aparecer por baixo dos números.",
         style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
     Spacer(Modifier.height(8.dp))
     FlowRowSimples {
-        Opcao("Encaixar na bola", ajustes.menuNaBola) { Cluster.encaixarMenuNaBola(true) }
-        Opcao("Painel inteiro", !ajustes.menuNaBola) { Cluster.encaixarMenuNaBola(false) }
+        FundoDoCluster.entries.forEach { fundo ->
+            Opcao(fundo.rotulo, ajustes.fundoDoMenu == fundo) { Cluster.usarFundoDoMenu(fundo) }
+        }
     }
+
+    // A mesma lista da aba "Números", de propósito: o dado é um só, e ter duas
+    // escolhas separadas obrigaria a manter as duas em dia para ver a mesma
+    // coisa nas duas janelas. O que faltava era ela estar **aqui** também —
+    // quem está acertando a bola não tem por que ir procurar noutra aba o
+    // botão que decide o que a bola mostra.
+    Spacer(Modifier.height(14.dp))
+    Text(
+        "Quais informações",
+        style = MaterialTheme.typography.titleMedium,
+        color = Cores.TextoCorrido,
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "Os dados de cada contador, na ordem em que você marcar, até " +
+            "$MAXIMO_DE_ITENS. É a mesma escolha da aba \"Números\": mudar aqui muda " +
+            "lá. Na bola, até três ficam numa coluna; do quarto em diante eles se " +
+            "dividem em duas.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(8.dp))
+    FlowRowSimples {
+        ItemDoCluster.entries.forEach { item ->
+            Opcao(
+                item.descricao,
+                item in ajustes.itens,
+                habilitada = item in ajustes.itens || ajustes.itens.size < MAXIMO_DE_ITENS,
+            ) { Cluster.alternarItem(item) }
+        }
+    }
+
+    Spacer(Modifier.height(14.dp))
+    Text(
+        "Como cada dado se identifica",
+        style = MaterialTheme.typography.titleMedium,
+        color = Cores.TextoCorrido,
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "A palavra em cima do número custa uma linha de altura, e a unidade " +
+            "já diz quase a mesma coisa. Troque entre os três e veja no painel " +
+            "qual se lê de relance — é a única comparação que vale.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(8.dp))
+    FlowRowSimples {
+        RotuloDoCluster.entries.forEach { r ->
+            Opcao(r.rotulo, ajustes.rotuloDoMenu == r) { Cluster.usarRotuloDoMenu(r) }
+        }
+    }
+
+    // Calibração, não ajuste de motorista. Não há mais escolha de formato: esta
+    // página é sempre a bola que o Impulse deixa vazia, e oferecer "painel
+    // inteiro" era oferecer um modo que o app não usa. O que fica aqui é só a
+    // medida, enquanto ela não estiver acertada de vez: quem mede é quem está
+    // sentado no carro, e a régua da janela é o único jeito de saber onde a bola
+    // caiu. Quando o número estiver fechado, isto sai e vira constante, como
+    // [BolaDoPainel] já é.
+    Spacer(Modifier.height(18.dp))
+    Text("Calibração", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "Temporário: serve para acertar onde a bola cai neste painel e me contar o " +
+            "resultado. Vai virar padrão do app.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(14.dp))
+    AjusteFino(
+        JanelaDoPainel.MENU,
+        ajustes.empurraoDoMenu,
+        ajustes.zoomDoMenu,
+        dentro = ajustes.empurraoDentroDoMenu,
+        afastamento = ajustes.afastamentoDoMenu,
+    )
 
     Spacer(Modifier.height(10.dp))
     Text(
@@ -927,6 +1029,52 @@ private fun FlowRowSimples(conteudo: @Composable FlowRowScope.() -> Unit) {
 }
 
 /**
+ * Um teclado de setas que empurra alguma coisa, com o estado escrito embaixo.
+ *
+ * Separado do [AjusteFino] porque agora há mais de uma coisa para empurrar na
+ * mesma tela: a bola no painel e o conteúdo dentro dela. Duas cópias do mesmo
+ * teclado envelheceriam diferente.
+ */
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun SetasDePosicao(
+    titulo: String,
+    texto: String,
+    empurrao: Empurrao,
+    empurrar: (Int, Int) -> Unit,
+    desfazer: () -> Unit,
+) {
+    Text(titulo, style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text(texto, style = MaterialTheme.typography.bodyMedium, color = Cores.TextoApoio)
+    Spacer(Modifier.height(8.dp))
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Seta("▲▲", "sobe muito") { empurrar(0, -Empurrao.SALTO) }
+        Seta("▲", "sobe pouco") { empurrar(0, -Empurrao.PASSO) }
+        Seta("▼", "desce pouco") { empurrar(0, Empurrao.PASSO) }
+        Seta("▼▼", "desce muito") { empurrar(0, Empurrao.SALTO) }
+        Seta("◀◀", "esquerda muito") { empurrar(-Empurrao.SALTO, 0) }
+        Seta("◀", "esquerda pouco") { empurrar(-Empurrao.PASSO, 0) }
+        Seta("▶", "direita pouco") { empurrar(Empurrao.PASSO, 0) }
+        Seta("▶▶", "direita muito") { empurrar(Empurrao.SALTO, 0) }
+        BotaoAcao("Desfazer", onClick = desfazer, habilitado = !empurrao.centrado)
+    }
+    Spacer(Modifier.height(6.dp))
+    // O número aparece sempre, inclusive zerado: sem ele não há como saber se o
+    // toque pegou, já que quem confere está olhando para a outra tela.
+    Text(
+        if (empurrao.centrado) "No lugar, sem empurrão."
+        else "Empurrado ${rumo(empurrao.x, "para a direita", "para a esquerda")} e " +
+            "${rumo(empurrao.y, "para baixo", "para cima")}.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Cores.TextoApoio,
+    )
+}
+
+/**
  * A posição da janela, em setas — e agora o único jeito de movê-la.
  *
  * Antes dividia o trabalho com nove cantos prontos, e os dois se atrapalhavam: o
@@ -947,53 +1095,63 @@ private fun FlowRowSimples(conteudo: @Composable FlowRowScope.() -> Unit) {
  */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-private fun AjusteFino(janela: JanelaDoPainel, empurrao: Empurrao, zoom: Zoom) {
-    Text("Ajuste fino da posição", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-    Spacer(Modifier.height(4.dp))
-    Text(
-        "As setas movem a janela pelo painel a partir do centro, e alcançam " +
-            "qualquer lugar dele: a dupla atravessa, a simples acerta o fio. " +
-            "\"Desfazer\" traz de volta ao centro. Use \"Ver como fica\" para conferir.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = Cores.TextoApoio,
-    )
-    Spacer(Modifier.height(8.dp))
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Seta("▲▲", "sobe muito") { Cluster.empurrar(janela, 0, -Empurrao.SALTO) }
-        Seta("▲", "sobe pouco") { Cluster.empurrar(janela, 0, -Empurrao.PASSO) }
-        Seta("▼", "desce pouco") { Cluster.empurrar(janela, 0, Empurrao.PASSO) }
-        Seta("▼▼", "desce muito") { Cluster.empurrar(janela, 0, Empurrao.SALTO) }
-        Seta("◀◀", "esquerda muito") { Cluster.empurrar(janela, -Empurrao.SALTO, 0) }
-        Seta("◀", "esquerda pouco") { Cluster.empurrar(janela, -Empurrao.PASSO, 0) }
-        Seta("▶", "direita pouco") { Cluster.empurrar(janela, Empurrao.PASSO, 0) }
-        Seta("▶▶", "direita muito") { Cluster.empurrar(janela, Empurrao.SALTO, 0) }
-        BotaoAcao(
-            "Desfazer",
-            onClick = { Cluster.centralizar(janela) },
-            habilitado = !empurrao.centrado,
-        )
-    }
-    Spacer(Modifier.height(6.dp))
-    // O número aparece sempre, inclusive zerado: sem ele não há como saber se o
-    // toque pegou, já que quem confere está olhando para a outra tela.
-    Text(
-        if (empurrao.centrado) "No lugar, sem empurrão."
-        else "Empurrado ${rumo(empurrao.x, "para a direita", "para a esquerda")} e " +
-            "${rumo(empurrao.y, "para baixo", "para cima")}.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = Cores.TextoApoio,
+private fun AjusteFino(
+    janela: JanelaDoPainel,
+    empurrao: Empurrao,
+    zoom: Zoom,
+    // Quando existe, a janela tem duas posições para acertar: a dela no painel
+    // e a do conteúdo dentro dela. É o caso da bola — ver
+    // [AjustesDoCluster.empurraoDentroDoMenu].
+    dentro: Empurrao? = null,
+    // Idem: só a bola empilha os dados numa coluna, e só ela tem o que afastar.
+    afastamento: Zoom? = null,
+) {
+    SetasDePosicao(
+        titulo = "Ajuste fino da posição",
+        texto = if (dentro == null) {
+            "As setas movem a janela pelo painel a partir do centro, e alcançam " +
+                "qualquer lugar dele: a dupla atravessa, a simples acerta o fio. " +
+                "\"Desfazer\" traz de volta ao centro. Use \"Ver como fica\" para conferir."
+        } else {
+            "Move a bola inteira pelo painel, para encaixá-la na que o carro " +
+                "desenha embaixo. A dupla atravessa, a simples acerta o fio."
+        },
+        empurrao = empurrao,
+        empurrar = { dx, dy -> Cluster.empurrar(janela, dx, dy) },
+        desfazer = { Cluster.centralizar(janela) },
     )
 
+    if (dentro != null) {
+        Spacer(Modifier.height(14.dp))
+        SetasDePosicao(
+            titulo = "Ajuste fino da posição do conteúdo",
+            texto = "Move só o que está dentro da bola — os números, o título, as " +
+                "bolinhas —, sem tirar a bola do lugar.",
+            empurrao = dentro,
+            empurrar = { dx, dy -> Cluster.empurrarDentroDoMenu(dx, dy) },
+            desfazer = { Cluster.centralizarDentroDoMenu() },
+        )
+    }
+
     Spacer(Modifier.height(14.dp))
-    Text("Ajuste fino do tamanho", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+    Text(
+        if (janela == JanelaDoPainel.MENU) "Ajuste fino do conteúdo" else "Ajuste fino do tamanho",
+        style = MaterialTheme.typography.titleMedium,
+        color = Cores.TextoCorrido,
+    )
     Spacer(Modifier.height(4.dp))
     Text(
-        "Estica ou encolhe a partir do tamanho escolhido acima, em proporção — " +
-            "os dois lados crescem juntos, então o bloco não deforma. Os tamanhos " +
-            "prontos são degraus largos; isto é o que fica entre um e outro.",
+        // Na bola o que cresce é o que está dentro. O diâmetro é medida do
+        // painel do carro, e mexer nele desencontraria a nossa bola da dele.
+        if (janela == JanelaDoPainel.MENU) {
+            "Estica ou encolhe o que aparece dentro da bola — os números, o " +
+                "desenho. A bola em si não muda de tamanho: ela é a do painel, e " +
+                "tem de continuar encaixada na que o carro desenha embaixo."
+        } else {
+            "Estica ou encolhe a partir do tamanho escolhido acima, em proporção — " +
+                "os dois lados crescem juntos, então o bloco não deforma. Os tamanhos " +
+                "prontos são degraus largos; isto é o que fica entre um e outro."
+        },
         style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
@@ -1019,6 +1177,51 @@ private fun AjusteFino(janela: JanelaDoPainel, empurrao: Empurrao, zoom: Zoom) {
         style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
+
+    // Só a bola: é lá que os dados ficam empilhados numa coluna e sobra (ou
+    // falta) altura entre eles. Na janela solta eles vão lado a lado.
+    if (afastamento != null) {
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "Afastamento entre os dados",
+            style = MaterialTheme.typography.titleMedium,
+            color = Cores.TextoCorrido,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Aproxima ou espalha os dados na altura da bola, sem mexer no " +
+                "tamanho deles — é o botão para quando está tudo grudado ou " +
+                "esparramado demais. Espalhar mais que a bola inteira não dá: " +
+                "o que passasse disso seria cortado.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Seta("−−", "bem mais juntos") { Cluster.afastarNoMenu(-Zoom.SALTO) }
+            Seta("−", "um pouco mais juntos") { Cluster.afastarNoMenu(-Zoom.PASSO) }
+            Seta("+", "um pouco mais separados") { Cluster.afastarNoMenu(Zoom.PASSO) }
+            Seta("++", "bem mais separados") { Cluster.afastarNoMenu(Zoom.SALTO) }
+            BotaoAcao(
+                "Desfazer",
+                onClick = { Cluster.afastamentoNatural() },
+                habilitado = !afastamento.natural,
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            if (afastamento.natural) {
+                "Espalhados pela altura toda."
+            } else {
+                "${afastamento.porcento.coerceAtMost(100)}% da altura."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = Cores.TextoApoio,
+        )
+    }
 
     Spacer(Modifier.height(14.dp))
     Text("Medidas desta janela", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)

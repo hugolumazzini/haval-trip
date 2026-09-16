@@ -94,7 +94,9 @@ fun ClusterCarroScreen(vm: TripViewModel, espiando: Boolean = false) {
             .fillMaxSize()
             .background(fundo(espiando))
             .padding(4.dp),
-        contentAlignment = ajustes.lugarDoCarro.alinhamento(),
+        // Sempre do centro, pelo mesmo motivo da tela dos números: a seta é a
+        // única coisa que move o desenho, e ela alcança o painel inteiro.
+        contentAlignment = Alignment.Center,
     ) {
         // A largura vem da altura, e não da janela: sem isso, numa janela do
         // tamanho do painel as pressões dos pneus iam parar nas duas pontas da

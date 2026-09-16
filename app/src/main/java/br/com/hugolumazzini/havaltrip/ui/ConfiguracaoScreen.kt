@@ -26,8 +26,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import android.content.Context
 import android.content.Intent
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -66,7 +69,6 @@ import androidx.compose.ui.semantics.semantics
 import br.com.hugolumazzini.havaltrip.Empurrao
 import br.com.hugolumazzini.havaltrip.Zoom
 import br.com.hugolumazzini.havaltrip.ItemDoCluster
-import br.com.hugolumazzini.havaltrip.LugarNoPainel
 import br.com.hugolumazzini.havaltrip.TamanhoDoCarro
 import br.com.hugolumazzini.havaltrip.TamanhoNoPainel
 import br.com.hugolumazzini.havaltrip.TripViewModel
@@ -101,57 +103,100 @@ private fun paradaMaisProxima(segundos: Double?): Int {
 }
 
 /**
- * Ajustes do computador de bordo.
+ * Os assuntos da configuração, um por aba.
  *
- * Só duas decisões, e as duas são de gosto: quantos contadores manuais o
- * motorista quer ver na lateral, e quanto tempo de carro parado encerra a
- * viagem atual. Nada aqui apaga número nenhum — esconder um contador o congela
- * com o que ele já mediu, e voltar a mostrá-lo o traz inteiro de volta.
+ * A tela era uma rolagem só, com tudo dentro: para trocar a cor dos números era
+ * preciso passar por contadores, zeragem e projeção. Dentro do carro isso é
+ * pior do que parece — cada rolagem longa é um tempo de olho fora da estrada.
+ * Separar por assunto faz cada ajuste caber numa tela sem rolar (ou quase), e o
+ * caminho até ele vira um toque só.
+ */
+private enum class AbaDaConfiguracao(val rotulo: String) {
+    NUMEROS("Números"),
+    CARRO("Carro"),
+    PAGINA("Página com visões"),
+    DESPEDIDA("Despedida"),
+    CONTADORES("Contadores"),
+    VERSAO("Versão"),
+}
+
+/**
+ * Ajustes do computador de bordo, divididos por assunto.
+ *
+ * Nada aqui apaga número nenhum — esconder um contador o congela com o que ele
+ * já mediu, e voltar a mostrá-lo o traz inteiro de volta.
  */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
-    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-        Text("CONFIGURAÇÃO", style = EstiloRotulo)
-        Spacer(Modifier.height(14.dp))
+    // `rememberSaveable` para a aba sobreviver ao giro de tela e à volta de
+    // outra tela: reabrir sempre em "Números" faria perder o lugar a cada
+    // espiada em "Ver como fica".
+    var aba by rememberSaveable { mutableStateOf(AbaDaConfiguracao.NUMEROS) }
 
-        Cartao(Modifier.fillMaxWidth()) {
-            Column {
-                Text("Contadores manuais", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Quantos contadores aparecem na lateral, fora a Viagem atual. " +
-                        "Os que saem da lista param de contar, mas guardam o que já mediram.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Cores.TextoApoio,
-                )
-                Spacer(Modifier.height(12.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    (1..TripSnapshot.MAX_CONTADORES_MANUAIS).forEach { quantos ->
-                        Opcao(
-                            texto = quantos.toString(),
-                            marcada = estado.contadoresManuais == quantos,
-                            onClick = { vm.definirContadoresManuais(quantos) },
-                        )
-                    }
-                }
+    Column(Modifier.fillMaxWidth()) {
+        Text("CONFIGURAÇÃO", style = EstiloRotulo)
+        Spacer(Modifier.height(12.dp))
+
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            AbaDaConfiguracao.entries.forEach { qual ->
+                Opcao(qual.rotulo, aba == qual) { aba = qual }
             }
         }
 
         Spacer(Modifier.height(14.dp))
 
-        Cartao(Modifier.fillMaxWidth()) { ZeragemAutomatica(vm, estado) }
+        // A rolagem vive aqui dentro, e não em volta das abas: as abas ficam
+        // paradas no topo enquanto o conteúdo rola, que é o que faz a troca de
+        // assunto continuar a um toque de distância.
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+            Cartao(Modifier.fillMaxWidth()) {
+                when (aba) {
+                    AbaDaConfiguracao.NUMEROS -> NumerosNoPainel(estado)
+                    AbaDaConfiguracao.CARRO -> CarroNoPainel()
+                    AbaDaConfiguracao.PAGINA -> PaginaComVisoesNaAba()
+                    AbaDaConfiguracao.DESPEDIDA -> DespedidaNoPainel()
+                    AbaDaConfiguracao.CONTADORES -> Contadores(vm, estado)
+                    AbaDaConfiguracao.VERSAO -> SobreEAtualizacao(vm)
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+        }
+    }
+}
 
-        Spacer(Modifier.height(14.dp))
+/** Contadores manuais e zeragem automática: as duas decisões do histórico. */
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun Contadores(vm: TripViewModel, estado: TripState) {
+    Column {
+        Text("Contadores manuais", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Quantos contadores aparecem na lateral, fora a Viagem atual. " +
+                "Os que saem da lista param de contar, mas guardam o que já mediram.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(12.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            (1..TripSnapshot.MAX_CONTADORES_MANUAIS).forEach { quantos ->
+                Opcao(
+                    texto = quantos.toString(),
+                    marcada = estado.contadoresManuais == quantos,
+                    onClick = { vm.definirContadoresManuais(quantos) },
+                )
+            }
+        }
 
-        Cartao(Modifier.fillMaxWidth()) { PainelDeInstrumentos(estado) }
-
-        Spacer(Modifier.height(14.dp))
-
-        Cartao(Modifier.fillMaxWidth()) { SobreEAtualizacao(vm) }
+        Spacer(Modifier.height(22.dp))
+        ZeragemAutomatica(vm, estado)
     }
 }
 
@@ -168,7 +213,7 @@ private fun SobreEAtualizacao(vm: TripViewModel) {
     val situacao by vm.atualizador.collectAsStateWithLifecycle()
 
     Column {
-        Text("Versão", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
+        Text("Versão", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
         Spacer(Modifier.height(4.dp))
         Text(
             "$nome (código $codigo)",
@@ -179,7 +224,7 @@ private fun SobreEAtualizacao(vm: TripViewModel) {
         Text(
             "A verificação consulta o catálogo da Haval APK Store. Precisa de internet — " +
                 "no carro, o Wi‑Fi do celular resolve.",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
         Spacer(Modifier.height(12.dp))
@@ -298,7 +343,7 @@ private fun ZeragemAutomatica(vm: TripViewModel, estado: TripState) {
             "Com a chave fora por mais que este tempo, a Viagem atual é arquivada " +
                 "no histórico e recomeça do zero. Abaixo dele, o trajeto continua o mesmo — " +
                 "é o que faz uma parada rápida não virar duas viagens.",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
         Spacer(Modifier.height(4.dp))
@@ -323,8 +368,8 @@ private fun ZeragemAutomatica(vm: TripViewModel, estado: TripState) {
             ),
         )
         Row(Modifier.widthIn(max = 700.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("na hora", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
-            Text("3 h", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+            Text("na hora", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoApoio)
+            Text("3 h", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoApoio)
         }
     }
 }
@@ -344,23 +389,35 @@ private fun Opcao(texto: String, marcada: Boolean, onClick: () -> Unit) {
  */
 @Composable
 private fun OpcaoColorida(texto: String, marcada: Boolean, corMarcada: Color, onClick: () -> Unit) {
+    // Folga generosa de propósito: a pastilha é o alvo do dedo em movimento,
+    // dentro de um carro, e o toque que erra custa uma segunda olhada para a
+    // tela. Vale gastar espaço aqui — a tela é larga e sobra.
     Box(
         Modifier
             .clip(RoundedCornerShape(10.dp))
             .background(if (marcada) Cores.SuperficieSelecionada else Cores.Campo)
             .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 12.dp),
+            .padding(horizontal = 24.dp, vertical = 18.dp),
     ) {
         Text(
             texto,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.titleMedium,
             color = if (marcada) corMarcada else Cores.TextoCorrido,
         )
     }
 }
 
 /**
- * O que o Haval Trip mostra no painel de instrumentos.
+ * Abre a janela do painel aqui na central, para conferir o ajuste sem depender
+ * do Impulse nem do carro ligado. É a mesma tela, com o mesmo tamanho
+ * (1920 x 720): o que aparecer aqui é o que vai aparecer lá. Para sair, Voltar.
+ */
+private fun espiar(contexto: Context, atividade: Class<*>) {
+    contexto.startActivity(Intent(contexto, atividade).putExtra(ESPIANDO, true))
+}
+
+/**
+ * Os números da viagem no painel de instrumentos.
  *
  * Quem coloca a janela lá é o Impulse, na tela "Telas" dele — ele é que decide
  * onde e de que tamanho. Aqui se decide só o conteúdo: qual contador, quais
@@ -370,7 +427,7 @@ private fun OpcaoColorida(texto: String, marcada: Boolean, corMarcada: Color, on
  */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-private fun PainelDeInstrumentos(estado: TripState) {
+private fun NumerosNoPainel(estado: TripState) {
     val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
     val paleta by Cluster.paleta.collectAsStateWithLifecycle()
     // Sem isto, quem troca a paleta no volante e volta aqui continuaria vendo
@@ -378,25 +435,15 @@ private fun PainelDeInstrumentos(estado: TripState) {
     LaunchedEffect(Unit) { Cluster.atualizarPaleta() }
     val contexto = LocalContext.current
 
-    /**
-     * Abre a janela do painel aqui na central, para conferir o ajuste sem
-     * depender do Impulse nem do carro ligado. É a mesma tela, com o mesmo
-     * tamanho de tela (1920 x 720): o que aparecer aqui é o que vai aparecer
-     * lá. Para sair, o botão Voltar.
-     */
-    fun espiar(atividade: Class<*>) {
-        contexto.startActivity(Intent(contexto, atividade).putExtra(ESPIANDO, true))
-    }
-
     Column {
-        Text("Painel de instrumentos", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
+        Text("Números no painel", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
         Spacer(Modifier.height(4.dp))
         Text(
             "O resumo que aparece no painel atrás do volante. Escolha a tela aqui " +
                 "embaixo e o app se coloca lá sozinho, sem passar pelo Impulse; a " +
                 "posição dentro da tela se escolhe mais abaixo, e o que sobra fica " +
                 "transparente.",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
 
@@ -404,7 +451,7 @@ private fun PainelDeInstrumentos(estado: TripState) {
         Projecao(JanelaDoPainel.NUMEROS, ajustes.telaDosNumeros)
 
         Spacer(Modifier.height(14.dp))
-        Text("Qual contador", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+        Text("Qual contador", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(8.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -419,12 +466,12 @@ private fun PainelDeInstrumentos(estado: TripState) {
         }
 
         Spacer(Modifier.height(14.dp))
-        Text("Quais informações", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+        Text("Quais informações", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(4.dp))
         Text(
             "Aparecem na ordem em que você marcar. Três cabem bem numa faixa; " +
                 "acima disso, dê mais espaço à janela no Impulse.",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
         Spacer(Modifier.height(8.dp))
@@ -438,12 +485,12 @@ private fun PainelDeInstrumentos(estado: TripState) {
         }
 
         Spacer(Modifier.height(14.dp))
-        Text("Tamanho da letra", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+        Text("Tamanho da letra", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(4.dp))
         Text(
             "Normal já se ajusta sozinho ao tamanho da janela. As outras opções " +
                 "só puxam esse cálculo para cima ou para baixo.",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
         Spacer(Modifier.height(8.dp))
@@ -459,7 +506,7 @@ private fun PainelDeInstrumentos(estado: TripState) {
         }
 
         Spacer(Modifier.height(14.dp))
-        Text("Cor dos números", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+        Text("Cor dos números", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(8.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -473,17 +520,17 @@ private fun PainelDeInstrumentos(estado: TripState) {
         }
         if (ajustes.cor == CorDoCluster.DO_IMPULSE) {
             Spacer(Modifier.height(6.dp))
-            Text(recadoDaPaleta(paleta), style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+            Text(recadoDaPaleta(paleta), style = MaterialTheme.typography.bodyMedium, color = Cores.TextoApoio)
         }
 
         Spacer(Modifier.height(14.dp))
-        Text("Fundo do bloco", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+        Text("Fundo do bloco", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(4.dp))
         Text(
             "Transparente deixa o painel do carro aparecer por baixo. Escolha um dos " +
                 "opacos quando o bloco cair em cima de algo que o painel já desenha ali — " +
                 "número sobre número não se lê.",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
         Spacer(Modifier.height(8.dp))
@@ -497,42 +544,7 @@ private fun PainelDeInstrumentos(estado: TripState) {
         }
 
         Spacer(Modifier.height(14.dp))
-        Text("Em que canto do painel", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Lugares prontos, para não ter de acertar pixel com o dedo nos " +
-                "sliders do Impulse.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Cores.TextoApoio,
-        )
-        Spacer(Modifier.height(8.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            LugarNoPainel.Cantos.forEach { lugar ->
-                Opcao(lugar.rotulo, ajustes.lugar == lugar) { Cluster.usarLugar(lugar) }
-            }
-            // A faixa da navegação fica junto dos cantos porque é isso que ela
-            // é para quem escolhe: mais um lugar. Que ela também acerte o
-            // tamanho é detalhe de implementação, não uma segunda decisão.
-            Opcao(
-                LugarNoPainel.FAIXA_NAVEGACAO.rotulo,
-                ajustes.lugar == LugarNoPainel.FAIXA_NAVEGACAO &&
-                    ajustes.tamanho == TamanhoNoPainel.FAIXA_DA_NAVEGACAO,
-            ) { Cluster.usarFaixaDaNavegacao() }
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "\"Faixa da navegação\" é a tarja larga logo abaixo dos ícones do topo, " +
-                "onde o painel do carro mostra as setas quando há rota. Ela já vem com " +
-                "o tamanho certo.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Cores.TextoApoio,
-        )
-
-        Spacer(Modifier.height(14.dp))
-        Text("Quanto espaço ocupa", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+        Text("Quanto espaço ocupa", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(8.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -547,14 +559,31 @@ private fun PainelDeInstrumentos(estado: TripState) {
         AjusteFino(JanelaDoPainel.NUMEROS, ajustes.empurraoDosNumeros, ajustes.zoomDosNumeros)
 
         Spacer(Modifier.height(12.dp))
-        BotaoAcao("Ver como fica", onClick = { espiar(ClusterActivity::class.java) })
+        BotaoAcao("Ver como fica", onClick = { espiar(contexto, ClusterActivity::class.java) })
+    }
+}
 
-        Spacer(Modifier.height(14.dp))
+/**
+ * O resumo que aparece ao desligar o carro.
+ *
+ * Aba própria porque não é ajuste de nenhuma das três janelas: qual delas mostra
+ * o resumo é decisão do app ([Despedida.janelaDoResumo]), e o que o motorista
+ * escolhe aqui — quais números aparecem — vale para a que for.
+ */
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun DespedidaNoPainel() {
+    val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
+    val contexto = LocalContext.current
+
+    Column {
+        Text("Despedida", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
+        Spacer(Modifier.height(4.dp))
         Text(
-            "Quando o carro é desligado, esta janela troca sozinha para um resumo " +
+            "Quando o carro é desligado, uma das janelas troca sozinha para um resumo " +
                 "da viagem que acabou, ao lado do desenho do carro. Ele fica " +
                 "congelado no painel, que é o que o painel faz com a última imagem.",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
         Spacer(Modifier.height(8.dp))
@@ -565,10 +594,10 @@ private fun PainelDeInstrumentos(estado: TripState) {
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            "Lista própria, separada da de cima: dirigindo interessa o que está " +
+            "Lista própria, separada da aba dos números: dirigindo interessa o que está " +
                 "acontecendo agora, e ao desligar interessa como foi a viagem toda. " +
                 "Até quatro ficam lado a lado; daí em diante o resumo usa duas filas.",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
         Spacer(Modifier.height(8.dp))
@@ -590,17 +619,31 @@ private fun PainelDeInstrumentos(estado: TripState) {
                     .putExtra(DESPEDIDA, true),
             )
         })
+    }
+}
 
+/**
+ * O desenho do carro visto de cima, na sua própria janela.
+ *
+ * Janela separada da dos números justamente para cada uma poder ficar num lugar
+ * diferente — e até em telas diferentes: os números no painel e o carro na bola
+ * do ar, ao mesmo tempo.
+ */
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun CarroNoPainel() {
+    val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
+    val contexto = LocalContext.current
 
-        Spacer(Modifier.height(18.dp))
-        Text("O carro no painel", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
+    Column {
+        Text("Carro no painel", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
         Spacer(Modifier.height(4.dp))
         Text(
-            "O desenho visto de cima, com portas, cintos e pressão dos pneus, numa " +
-                "janela separada. São duas janelas justamente para cada uma poder " +
-                "ficar num lugar diferente — e até em telas diferentes: os números " +
-                "no painel e o carro na bola do ar, ao mesmo tempo.",
-            style = MaterialTheme.typography.bodySmall,
+            "O desenho visto de cima, com portas, cintos e pressão dos pneus. " +
+                "Para ocupar a bola redonda do painel, use a aba \"Página com " +
+                "visões\": é a janela que troca de visão pela cruzinha do volante. " +
+                "Aqui o carro fica solto, fixo por cima de qualquer página.",
+            style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
 
@@ -608,32 +651,8 @@ private fun PainelDeInstrumentos(estado: TripState) {
         Projecao(JanelaDoPainel.CARRO, ajustes.telaDoCarro)
 
         Spacer(Modifier.height(14.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            LugarNoPainel.Cantos.forEach { lugar ->
-                Opcao(lugar.rotulo, ajustes.lugarDoCarro == lugar) { Cluster.usarLugarDoCarro(lugar) }
-            }
-            // O chip "Bola do ar" ficava aqui e foi tirado: era a armadilha.
-            // Ele punha *esta* janela — o desenho do carro, uma visão só — no
-            // recorte redondo, e quem procurava a bola queria a página que
-            // navega pela cruzinha. No carro o resultado foi um carro torto por
-            // cima do painel e setas que não trocavam nada, o que é exatamente
-            // o que a opção prometia não fazer. Agora a bola tem um lugar só,
-            // em "Página com visões", e é a janela certa. A opção antiga
-            // continua gravável em [Cluster.usarBolaDoAr] para quem já a tinha.
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Para ocupar a bola redonda que sobrou no painel, use \"Página com " +
-                "visões\", mais abaixo: é a janela que troca de visão pela " +
-                "cruzinha do volante. Estes cantos aqui são para o carro solto, " +
-                "fixo por cima de qualquer página.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Cores.TextoApoio,
-        )
-        Spacer(Modifier.height(10.dp))
+        Text("Tamanho do carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -646,13 +665,13 @@ private fun PainelDeInstrumentos(estado: TripState) {
         }
 
         Spacer(Modifier.height(14.dp))
-        Text("Fundo do carro", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+        Text("Fundo do carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(4.dp))
         Text(
             "Na bola do ar o fundo opaco é redondo, do tamanho da bola: é ele que " +
                 "tapa a tela do ar-condicionado por baixo. Transparente deixa os dois " +
                 "desenhos aparecerem um sobre o outro.",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
         Spacer(Modifier.height(8.dp))
@@ -672,11 +691,16 @@ private fun PainelDeInstrumentos(estado: TripState) {
         AjusteFino(JanelaDoPainel.CARRO, ajustes.empurraoDoCarro, ajustes.zoomDoCarro)
 
         Spacer(Modifier.height(12.dp))
-        BotaoAcao("Ver como fica o carro", onClick = { espiar(ClusterCarroActivity::class.java) })
-
-        Spacer(Modifier.height(18.dp))
-        PaginaComVisoes(ajustes, ::espiar)
+        BotaoAcao("Ver como fica o carro", onClick = { espiar(contexto, ClusterCarroActivity::class.java) })
     }
+}
+
+/** A aba da terceira janela. Ver [PaginaComVisoes]. */
+@Composable
+private fun PaginaComVisoesNaAba() {
+    val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
+    val contexto = LocalContext.current
+    Column { PaginaComVisoes(ajustes) { espiar(contexto, it) } }
 }
 
 /**
@@ -685,9 +709,8 @@ private fun PainelDeInstrumentos(estado: TripState) {
  *
  * ## Solto e página, e por que os dois existem
  *
- * "Solto" é o que as duas seções acima fazem: janelinhas fixas num canto do
- * painel, por cima de qualquer página. Serve para quem quer o número sempre à
- * vista.
+ * "Solto" é o que as abas "Números" e "Carro" fazem: janelinhas fixas no painel,
+ * por cima de qualquer página. Serve para quem quer o número sempre à vista.
  *
  * "Página" é outra ideia: uma coisa de cada vez, do tamanho do painel, e nada
  * quando o motorista está noutra página. Serve para quem tem uma bola sobrando
@@ -702,7 +725,7 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
     val ouvindoPagina by PaginaDoCluster.ligado.collectAsStateWithLifecycle()
     val ouvindoTeclas by TecladoDoVolante.ligado.collectAsStateWithLifecycle()
 
-    Text("Página com visões", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
+    Text("Página com visões", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
     Spacer(Modifier.height(4.dp))
     Text(
         "Uma página inteira do painel, em vez de janelinhas soltas. As páginas do " +
@@ -711,7 +734,7 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
             "contador para cada Trip. Aponte esta janela para a tela do painel " +
             "inteira e escolha em qual página ela aparece — de preferência a bola " +
             "que ficou vazia.",
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
 
@@ -722,7 +745,7 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
     Projecao(JanelaDoPainel.MENU, ajustes.telaDoMenu)
 
     Spacer(Modifier.height(14.dp))
-    Text("Página do painel", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+    Text("Página do painel", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
     Spacer(Modifier.height(4.dp))
     Text(
         when {
@@ -737,7 +760,7 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
                 "O painel está na página $agora. Pare na bola vazia e toque em " +
                     "\"só nesta página\"."
         },
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
     Spacer(Modifier.height(8.dp))
@@ -757,14 +780,14 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
     AvisoDaPagina(ajustes.paginaDoMenu)
 
     Spacer(Modifier.height(14.dp))
-    Text("Formato", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+    Text("Formato", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
     Spacer(Modifier.height(4.dp))
     Text(
         "A bola que sobrou é um recorte redondo pequeno, não a tela toda. " +
             "Encaixado, tudo cabe dentro dela; no painel inteiro, o conteúdo se " +
             "espalha — e aí só serve se a página que você escolheu não tiver esse " +
             "recorte.",
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
     Spacer(Modifier.height(8.dp))
@@ -782,7 +805,7 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
             "A cruzinha do volante não está sendo lida nesta central. A página ainda " +
                 "funciona, mas fica travada na primeira visão."
         },
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodyMedium,
         color = if (ouvindoTeclas) Cores.TextoApoio else Cores.Atencao,
     )
 
@@ -809,7 +832,7 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
                             "."
                         }
             },
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
     }
@@ -843,7 +866,7 @@ private fun PaginaDoPainel(escolhida: Int?) {
     val agora by PaginaDoCluster.pagina.collectAsStateWithLifecycle()
     val ouvindo by PaginaDoCluster.ligado.collectAsStateWithLifecycle()
 
-    Text("Página do painel", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+    Text("Página do painel", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
     Spacer(Modifier.height(4.dp))
     Text(
         when {
@@ -857,7 +880,7 @@ private fun PaginaDoPainel(escolhida: Int?) {
                 "O painel está na página $agora. Gire o carrossel até a bola em que " +
                     "você quer o carro e toque em \"só nesta página\"."
         },
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
     Spacer(Modifier.height(8.dp))
@@ -889,7 +912,7 @@ private fun PaginaDoPainel(escolhida: Int?) {
 private fun AvisoDaPagina(pagina: Int?) {
     val aviso = PaginaDoCluster.aviso(pagina) ?: return
     Spacer(Modifier.height(6.dp))
-    Text(aviso, style = MaterialTheme.typography.bodySmall, color = Cores.Atencao)
+    Text(aviso, style = MaterialTheme.typography.bodyMedium, color = Cores.Atencao)
 }
 
 /** Uma fila de chips que quebra a linha. Só para não repetir os dois espaçamentos. */
@@ -904,13 +927,18 @@ private fun FlowRowSimples(conteudo: @Composable FlowRowScope.() -> Unit) {
 }
 
 /**
- * O ajuste fino de posição da janela, em setas.
+ * A posição da janela, em setas — e agora o único jeito de movê-la.
  *
- * Por que existe: os lugares prontos acertam o grosso e erram o fio. A faixa da
- * navegação foi medida numa foto do painel, e no carro o bloco caiu sobre a
- * estrada desenhada em vez de na tarja vazia acima dela. Sem isto, cada
- * tentativa de acerto seria um número trocado no código e um APK novo — e quem
- * enxerga o resultado está sentado no carro, não na frente do editor.
+ * Antes dividia o trabalho com nove cantos prontos, e os dois se atrapalhavam: o
+ * mesmo empurrão dava num lugar diferente conforme o canto, então mover o bloco
+ * exigia entender a combinação. Os cantos saíram; ficou uma âncora só, o centro,
+ * e estas setas, que agora alcançam o painel inteiro ([Empurrao.LIMITE]).
+ *
+ * O que os cantos nunca deram e isto dá: o pixel. A faixa da navegação foi
+ * medida numa foto do painel, e no carro o bloco caiu sobre a estrada desenhada
+ * em vez de na tarja vazia acima dela. Sem isto, cada tentativa de acerto seria
+ * um número trocado no código e um APK novo — e quem enxerga o resultado está
+ * sentado no carro, não na frente do editor.
  *
  * Setas e não slider: o erro a corrigir é de alguns pixels, e o alvo de um
  * slider com o dedo, num carro, é muito maior do que isso. A seta dupla anda
@@ -920,12 +948,13 @@ private fun FlowRowSimples(conteudo: @Composable FlowRowScope.() -> Unit) {
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 private fun AjusteFino(janela: JanelaDoPainel, empurrao: Empurrao, zoom: Zoom) {
-    Text("Ajuste fino da posição", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+    Text("Ajuste fino da posição", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
     Spacer(Modifier.height(4.dp))
     Text(
-        "Empurra a janela a partir do lugar escolhido acima, para acertar o que " +
-            "o lugar pronto errou por pouco. Use o \"Ver como fica\" para conferir.",
-        style = MaterialTheme.typography.bodySmall,
+        "As setas movem a janela pelo painel a partir do centro, e alcançam " +
+            "qualquer lugar dele: a dupla atravessa, a simples acerta o fio. " +
+            "\"Desfazer\" traz de volta ao centro. Use \"Ver como fica\" para conferir.",
+        style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
     Spacer(Modifier.height(8.dp))
@@ -954,18 +983,18 @@ private fun AjusteFino(janela: JanelaDoPainel, empurrao: Empurrao, zoom: Zoom) {
         if (empurrao.centrado) "No lugar, sem empurrão."
         else "Empurrado ${rumo(empurrao.x, "para a direita", "para a esquerda")} e " +
             "${rumo(empurrao.y, "para baixo", "para cima")}.",
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
 
     Spacer(Modifier.height(14.dp))
-    Text("Ajuste fino do tamanho", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+    Text("Ajuste fino do tamanho", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
     Spacer(Modifier.height(4.dp))
     Text(
         "Estica ou encolhe a partir do tamanho escolhido acima, em proporção — " +
             "os dois lados crescem juntos, então o bloco não deforma. Os tamanhos " +
             "prontos são degraus largos; isto é o que fica entre um e outro.",
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
     Spacer(Modifier.height(8.dp))
@@ -987,12 +1016,12 @@ private fun AjusteFino(janela: JanelaDoPainel, empurrao: Empurrao, zoom: Zoom) {
     Text(
         if (zoom.natural) "No tamanho escolhido."
         else "${zoom.porcento}% do tamanho escolhido.",
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
 
     Spacer(Modifier.height(14.dp))
-    Text("Medidas desta janela", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+    Text("Medidas desta janela", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
     Spacer(Modifier.height(4.dp))
     Text(
         "O que a janela mediu de si mesma. Com ela projetada no painel, muda a " +
@@ -1000,7 +1029,7 @@ private fun AjusteFino(janela: JanelaDoPainel, empurrao: Empurrao, zoom: Zoom) {
             "acompanha os ajustes. Depois de acertar a posição, me mande estas " +
             "linhas: com elas eu corrijo as posições prontas no código, e quem " +
             "vier depois não precisa ajustar nada.",
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
     Spacer(Modifier.height(8.dp))
@@ -1062,7 +1091,7 @@ private fun BolaDeUmaVez(pagina: Int?, ouvindoPagina: Boolean) {
             "página $pagina — e toque no botão. A janela vai para a ${painel?.descricao?.lowercase()}, " +
             "encaixada no recorte redondo, e só aparece nessa bola. As setas do " +
             "volante passam a trocar as visões enquanto ela estiver na frente.",
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
     Spacer(Modifier.height(8.dp))
@@ -1117,7 +1146,7 @@ private fun Projecao(janela: JanelaDoPainel, escolhida: Int?) {
         onDispose { lifecycle.lifecycle.removeObserver(olheiro) }
     }
 
-    Text("Em que tela", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+    Text("Em que tela", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
     Spacer(Modifier.height(4.dp))
     Text(
         "No H6 o painel de instrumentos costuma ser a tela 3. \"Nenhuma\" deixa a " +
@@ -1126,7 +1155,7 @@ private fun Projecao(janela: JanelaDoPainel, escolhida: Int?) {
             "projetar nela abre a janela por cima desta tela, e \"Recolher\" " +
             "devolve — serve para confirmar que a janela funciona quando o painel " +
             "não aceita.",
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
     Spacer(Modifier.height(8.dp))
@@ -1148,7 +1177,7 @@ private fun Projecao(janela: JanelaDoPainel, escolhida: Int?) {
         Text(
             "Esta central não está mostrando nenhuma tela além da grande. No carro " +
                 "isso costuma significar painel apagado — tente de novo com o carro ligado.",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
     }
@@ -1186,14 +1215,14 @@ private fun Projecao(janela: JanelaDoPainel, escolhida: Int?) {
             "\"Projetar\" de novo para trazer a nossa para a frente. Na partida do " +
             "carro isso é feito sozinho, meio minuto depois de ligar — que é o tempo " +
             "de o Impulse terminar de subir.",
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
 
     val recado = recadoDaProjecao(situacao, resultados[janela])
     if (recado != null) {
         Spacer(Modifier.height(6.dp))
-        Text(recado, style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+        Text(recado, style = MaterialTheme.typography.bodyMedium, color = Cores.TextoApoio)
     }
     if (situacao == ShizukuShell.Situacao.PRECISA_AUTORIZAR) {
         Spacer(Modifier.height(8.dp))

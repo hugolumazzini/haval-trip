@@ -65,6 +65,23 @@ class EstadoDoCarro(private val diario: DiarioDeCampo) {
     fun destravar() = travadas.clear()
 
     /**
+     * `true` enquanto nenhuma chave tiver chegado.
+     *
+     * Silêncio não é informação. Nos primeiros instantes depois de a central
+     * reiniciar, o Shisuku ainda está subindo e reconectando aos serviços da
+     * GWM, e o cache aqui está vazio — mas uma amostra montada desse vazio sai
+     * com velocidade 0, hodômetro 0 e ignição desligada, que é exatamente o
+     * retrato de um carro estacionado. Com o carro andando, isso seria uma
+     * mentira convincente o bastante para fechar a viagem em andamento. Por
+     * isso as fontes não emitem amostra nenhuma enquanto isto for `true`.
+     *
+     * O critério são as chaves que decidem a ignição, e não o cache inteiro: as
+     * propriedades chegam uma a uma, e um farol ou uma porta que chegaram
+     * primeiro não autorizam ninguém a afirmar que o carro está desligado.
+     */
+    fun mudo(): Boolean = CHAVES_DA_IGNICAO.none { cache.containsKey(it) }
+
+    /**
      * O consumo instantâneo já decodificado, para quem precisa saber em que
      * unidade o carro está falando — a tela de diagnóstico, principalmente.
      */
@@ -180,4 +197,15 @@ class EstadoDoCarro(private val diario: DiarioDeCampo) {
     )
 
     private fun numero(chave: String): Double? = cache[chave]?.trim()?.toDoubleOrNull()
+
+    companion object {
+        /** As chaves que [LeituraDaIgnicao] consulta. Ver [mudo]. */
+        private val CHAVES_DA_IGNICAO = listOf(
+            HavalTelemetrySource.CHAVE_PRONTO_PARA_ANDAR,
+            HavalTelemetrySource.CHAVE_MOTOR,
+            HavalTelemetrySource.CHAVE_ROTACAO,
+            HavalTelemetrySource.CHAVE_MODO_ENERGIA,
+            HavalTelemetrySource.CHAVE_VELOCIDADE,
+        )
+    }
 }

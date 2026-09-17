@@ -483,6 +483,83 @@ class TripManagerTest {
         assertEquals(0.0, m.state.value.trip(TripManager.ID_AUTOMATICA)!!.metrics.distanceKm, 1e-9)
     }
 
+    @Test
+    fun `reiniciar a central no meio da viagem nao zera a Viagem atual`() {
+        val m = manager()
+        m.handleIgnitionChange(IgnitionState.ON)
+        m.dirigir(600, 60.0)
+        assertEquals(10.0, m.state.value.trip(TripManager.ID_AUTOMATICA)!!.metrics.distanceKm, 1e-6)
+        m.flush()
+
+        // A central reinicia: o app morre com a ignição ainda ligada e volta
+        // um minuto e meio depois, com o carro parado no mesmo lugar.
+        agora += 90_000
+        val depois = manager()
+        depois.dirigir(10, 60.0)
+
+        assertTrue(depois.state.value.trip(TripManager.ID_AUTOMATICA)!!.metrics.distanceKm > 10.0)
+        assertTrue(depois.state.value.history.isEmpty())
+    }
+
+    @Test
+    fun `carro dormindo com o app morto ainda zera a Viagem atual`() {
+        val m = manager()
+        m.handleIgnitionChange(IgnitionState.ON)
+        m.dirigir(600, 60.0)
+        m.flush()
+
+        // A energia caiu junto com a chave: nenhuma ignição desligada foi vista,
+        // e o carro só voltou horas depois, parado no mesmo hodômetro.
+        agora += 6 * 60 * 60 * 1000L
+        val depois = manager()
+        depois.dirigir(10, 60.0)
+
+        assertTrue(depois.state.value.trip(TripManager.ID_AUTOMATICA)!!.metrics.distanceKm < 1.0)
+        assertEquals(1, depois.state.value.history.size)
+    }
+
+    @Test
+    fun `chave fora na volta respeita a zeragem curta escolhida pelo motorista`() {
+        val m = manager()
+        // O motorista pediu para a Viagem atual fechar um minuto depois da
+        // chave sair. O piso que protege o reinício da central não pode passar
+        // por cima dessa escolha.
+        m.definirZeragemAutomatica(60.0)
+        m.handleIgnitionChange(IgnitionState.ON)
+        m.dirigir(600, 60.0)
+        m.flush()
+
+        // A energia caiu junto com a chave, sem o app ver a ignição desligar.
+        // Ao voltar, noventa segundos depois, o carro está com a chave fora.
+        agora += 90_000
+        val depois = manager()
+        depois.dirigir(40, 0.0, ignicao = IgnitionState.OFF)
+
+        assertEquals(0.0, depois.state.value.trip(TripManager.ID_AUTOMATICA)!!.metrics.distanceKm, 1e-9)
+        assertEquals(1, depois.state.value.history.size)
+    }
+
+    @Test
+    fun `o READY que demora a chegar depois do reinicio nao zera a viagem`() {
+        val m = manager()
+        m.definirZeragemAutomatica(60.0)
+        m.handleIgnitionChange(IgnitionState.ON)
+        m.dirigir(600, 60.0)
+        m.flush()
+
+        // A central reiniciou com o carro ligado e parado num sinal. O Shisuku
+        // sobe junto e demora a reemitir o driving_ready_state: nos primeiros
+        // segundos o app lê "desligado" sem o carro ter desligado.
+        agora += 90_000
+        val depois = manager()
+        depois.dirigir(10, 0.0, ignicao = IgnitionState.OFF)
+        // O READY chega, e o carro volta a andar.
+        depois.dirigir(60, 60.0)
+
+        assertTrue(depois.state.value.trip(TripManager.ID_AUTOMATICA)!!.metrics.distanceKm > 10.0)
+        assertTrue(depois.state.value.history.isEmpty())
+    }
+
     // ------------------------------------------------------------- hodômetro
 
     @Test

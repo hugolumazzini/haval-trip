@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.Text
 import br.com.hugolumazzini.havaltrip.AjustesDoCluster
+import br.com.hugolumazzini.havaltrip.AlvoNaBola
 import br.com.hugolumazzini.havaltrip.Cluster
 import br.com.hugolumazzini.havaltrip.Zoom
 import br.com.hugolumazzini.havaltrip.RotuloDoCluster
@@ -217,7 +218,14 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
         ) {
             // Em pé ou deitado conforme o que vai dentro. Ver [LARGURA_UTIL].
             val deitado = visao is Visao.Carro ||
-                ajustes.ItensSeguros.size > MUITOS_ITENS
+                ajustes.ItensDoMenuSeguros.size > MUITOS_ITENS
+            // Cada conteúdo da bola tem posição e tamanho próprios: ver
+            // [AlvoNaBola].
+            val alvo = if (visao is Visao.Carro) AlvoNaBola.CARRO else AlvoNaBola.DADOS
+            val empurraoDentro =
+                if (alvo == AlvoNaBola.CARRO) ajustes.empurraoDoCarroNaBola
+                else ajustes.empurraoDentroDoMenu
+            val zoom = if (alvo == AlvoNaBola.CARRO) ajustes.zoomDoCarroNaBola else ajustes.zoomDoMenu
             // Três limites, e não dois: a coluna única não é a mesma peça
             // que as duas colunas. O teto dos dados foi medido com seis, que é
             // o caso mais apertado; aplicá-lo também a três travava o estica
@@ -233,8 +241,9 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
             val baseLargura = (if (deitado) ALTURA_UTIL else LARGURA_UTIL) * SOBRA
             val baseAltura = (if (deitado) LARGURA_UTIL else ALTURA_UTIL) * SOBRA
             // E o quanto de estica ainda cabe nela. Ver [Cluster.anotarFaixaDoZoomDoMenu].
-            LaunchedEffect(limite, baseLargura, baseAltura) {
-                Cluster.anotarFaixaDoZoomDoMenu(
+            LaunchedEffect(alvo, limite, baseLargura, baseAltura) {
+                Cluster.anotarFaixaDoZoomNaBola(
+                    alvo,
                     piso = emPorcento(limite.minimoLargura, limite.minimoAltura, baseLargura, baseAltura),
                     teto = emPorcento(limite.maximoLargura, limite.maximoAltura, baseLargura, baseAltura),
                 )
@@ -243,10 +252,7 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
                 Modifier
                     // Dentro da bola, e não na tela: é o conteúdo que anda,
                     // a bola fica onde o painel a desenha.
-                    .offset(
-                        x = ajustes.empurraoDentroDoMenu.x.dp,
-                        y = ajustes.empurraoDentroDoMenu.y.dp,
-                    )
+                    .offset(x = empurraoDentro.x.dp, y = empurraoDentro.y.dp)
                     // Frações do círculo, e não da tapa: a caixa de fora já
                     // é o círculo. A [SOBRA] guarda a borda para a moldura.
                     // O teto de 1 é o próprio círculo — `fillMax` não aceita
@@ -258,12 +264,12 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
                     // [CARRINHO_NA_BOLA] e [DADOS_NA_BOLA].
                     .fillMaxWidth(
                         ((if (deitado) ALTURA_UTIL else LARGURA_UTIL) * SOBRA *
-                            ajustes.zoomDoMenu.fator)
+                            zoom.fator)
                             .coerceIn(limite.minimoLargura, limite.maximoLargura),
                     )
                     .fillMaxHeight(
                         ((if (deitado) LARGURA_UTIL else ALTURA_UTIL) * SOBRA *
-                            ajustes.zoomDoMenu.fator)
+                            zoom.fator)
                             .coerceIn(limite.minimoAltura, limite.maximoAltura),
                     ),
                 contentAlignment = Alignment.Center,
@@ -337,7 +343,7 @@ private fun Conteudo(
     // fora do zoom do conteúdo — ver [ClusterMenuScreen].
     comMoldura: Boolean = true,
 ) {
-    val quantosItens = ajustes.ItensSeguros.size
+    val quantosItens = ajustes.ItensDoMenuSeguros.size
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val corpo = (maxHeight.value * TITULO_NA_ALTURA).coerceIn(9f, 26f).sp
@@ -385,7 +391,7 @@ private fun Conteudo(
                                 .medindoPeca("carrinho")
                         } else {
                             Modifier
-                                .fillMaxHeight(ajustes.zoomDoMenu.fator.coerceIn(0.2f, 1f))
+                                .fillMaxHeight(ajustes.zoomDoCarroNaBola.fator.coerceIn(0.2f, 1f))
                                 .aspectRatio(LARGURA_POR_ALTURA)
                         },
                         legenda = false,
@@ -424,6 +430,8 @@ private fun Conteudo(
                         // Idem ao carrinho: a régua conta quanto da bola a
                         // coluna de dados ocupa.
                         peca = if (apertado) "dados" else null,
+                        // A lista desta página, que não é mais a dos números.
+                        itens = ajustes.ItensDoMenuSeguros,
                     )
                 }
             }

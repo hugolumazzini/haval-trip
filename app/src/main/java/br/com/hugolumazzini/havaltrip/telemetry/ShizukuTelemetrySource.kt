@@ -153,7 +153,9 @@ class ShizukuTelemetrySource(
                 }
 
                 estado.publicarFita()
-                trySend(estado.montarAmostra())
+                // Enquanto nada tiver chegado, não há amostra a dar: ver
+                // [EstadoDoCarro.mudo].
+                if (!estado.mudo()) trySend(estado.montarAmostra())
             }
         }
 

@@ -227,8 +227,13 @@ internal fun Painel(
      * Ver [medindoPeca].
      */
     peca: String? = null,
+    /**
+     * Quais dados mostrar. O padrão é a lista da janela dos números, que é a
+     * dona desta tela; a bola do painel manda a dela — ver
+     * [AjustesDoCluster.itensDoMenu].
+     */
+    itens: List<ItemDoCluster> = ajustes.ItensSeguros,
 ) {
-    val itens = ajustes.ItensSeguros
 
     BoxWithConstraints(
         Modifier

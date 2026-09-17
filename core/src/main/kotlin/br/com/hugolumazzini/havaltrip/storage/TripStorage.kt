@@ -62,6 +62,19 @@ interface TripStorage {
 
     /** Grava o snapshot de forma atômica. */
     fun save(snapshot: TripSnapshot)
+
+    /**
+     * Carimba que o app estava vivo neste instante.
+     *
+     * É de propósito mais barato que [save]: guarda só um número. Serve para
+     * medir quanto tempo o app ficou fora do ar — reiniciar a central leva
+     * pouco mais de um minuto, o carro dormindo leva horas, e sem este carimbo
+     * as duas coisas ficam indistinguíveis.
+     */
+    fun marcarVivo(atMs: Long) {}
+
+    /** Último instante carimbado por [marcarVivo], ou `null` se não houver. */
+    fun ultimoSinalDeVidaMs(): Long? = null
 }
 
 /** Guarda tudo na memória. Serve aos testes e ao demo. */
@@ -75,6 +88,14 @@ class InMemoryTripStorage(private var atual: TripSnapshot? = null) : TripStorage
         atual = snapshot
         saveCount++
     }
+
+    private var vivoMs: Long? = null
+
+    override fun marcarVivo(atMs: Long) {
+        vivoMs = atMs
+    }
+
+    override fun ultimoSinalDeVidaMs(): Long? = vivoMs
 }
 
 /**
@@ -134,8 +155,28 @@ class FileTripStorage(private val directory: File) : TripStorage {
         }
     }
 
+    /**
+     * O sinal de vida é um arquivo à parte, com um número dentro.
+     *
+     * Não entra no snapshot porque ele é reescrito por inteiro e com `sync()`:
+     * carimbar a cada minuto ali seria gravar o histórico inteiro sessenta
+     * vezes por hora na flash da central. Aqui são poucos bytes, e perder o
+     * carimbo numa queda de energia não custa nada — na pior das hipóteses o
+     * app volta a usar a hora da última gravação, que é o comportamento antigo.
+     */
+    override fun marcarVivo(atMs: Long) {
+        runCatching {
+            directory.mkdirs()
+            File(directory, VIVO).writeText(atMs.toString())
+        }
+    }
+
+    override fun ultimoSinalDeVidaMs(): Long? =
+        runCatching { File(directory, VIVO).readText().trim().toLong() }.getOrNull()
+
     companion object {
         const val NOME = "trips.json"
+        const val VIVO = "vivo.txt"
     }
 }
 

@@ -8,6 +8,7 @@ import br.com.hugolumazzini.havaltrip.engine.TripManager
 import br.com.hugolumazzini.havaltrip.engine.TripState
 import br.com.hugolumazzini.havaltrip.storage.FileTripStorage
 import br.com.hugolumazzini.havaltrip.telemetry.BancadaDeTestes
+import br.com.hugolumazzini.havaltrip.telemetry.ColetaDeEnergia
 import br.com.hugolumazzini.havaltrip.telemetry.DiarioDeCampo
 import br.com.hugolumazzini.havaltrip.telemetry.EstadoDoCarro
 import br.com.hugolumazzini.havaltrip.telemetry.HavalTelemetrySource
@@ -89,6 +90,15 @@ class MotorDeBordo private constructor(private val app: Application) {
 
     val situacaoShizuku: StateFlow<ShizukuTelemetrySource.Situacao> = linhaDireta.situacao
 
+    /**
+     * A medição de energia elétrica, para quem tem PHEV. Desligada por padrão.
+     *
+     * Mora aqui, e não na tela, porque ela acompanha a ignição: quem vai rodar
+     * a coleta é outra pessoa, no carro dela, e não se pede a alguém que abra
+     * um aplicativo antes de dar a partida. Ver [ColetaDeEnergia].
+     */
+    val coletaDeEnergia = ColetaDeEnergia(app, escopo)
+
     private val _fonte = MutableStateFlow(
         when {
             ShizukuTelemetrySource.disponivel() -> Fonte.SHIZUKU
@@ -127,6 +137,12 @@ class MotorDeBordo private constructor(private val app: Application) {
                 if (amostra.ignition != anterior) {
                     anterior = amostra.ignition
                     manager.handleIgnitionChange(amostra.ignition)
+                    // A coleta de energia começa e termina com a chave, sem
+                    // ninguém apertar nada. Ela mesma se cala se estiver
+                    // desligada, que é o caso de todo mundo menos quem está
+                    // medindo um PHEV.
+                    if (amostra.ignition == IgnitionState.ON) coletaDeEnergia.comecar()
+                    else coletaDeEnergia.terminar()
                 }
                 manager.processTelemetry(amostra)
             }

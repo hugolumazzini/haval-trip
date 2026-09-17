@@ -24,8 +24,8 @@ android {
         //
         // A numeração é 0.x: a `v1.0.0` de 31/08/2026 foi a primeira tentativa,
         // e a contagem recomeçou em 0.2.0 no dia seguinte.
-        versionCode = 29
-        versionName = "0.9.16"
+        versionCode = 30
+        versionName = "0.9.17"
     }
 
     buildTypes {

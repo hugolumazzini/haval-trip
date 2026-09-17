@@ -52,6 +52,7 @@ import br.com.hugolumazzini.havaltrip.ESPIANDO
 import br.com.hugolumazzini.havaltrip.ClusterCarroActivity
 import br.com.hugolumazzini.havaltrip.ClusterMenuActivity
 import br.com.hugolumazzini.havaltrip.AjustesDoCluster
+import br.com.hugolumazzini.havaltrip.AlvoNaBola
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -821,11 +822,10 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
         }
     }
 
-    // A mesma lista da aba "Números", de propósito: o dado é um só, e ter duas
-    // escolhas separadas obrigaria a manter as duas em dia para ver a mesma
-    // coisa nas duas janelas. O que faltava era ela estar **aqui** também —
-    // quem está acertando a bola não tem por que ir procurar noutra aba o
-    // botão que decide o que a bola mostra.
+    // Lista própria, e não a da aba "Números": são duas janelas com espaços
+    // diferentes, e quem escolhe autonomia e velocidade máxima nos números não
+    // está escolhendo isso aqui. Quem já usava a lista única começa com ela
+    // repetida nas duas, e daí cada uma segue seu caminho.
     Spacer(Modifier.height(14.dp))
     Text(
         "Quais informações",
@@ -834,9 +834,9 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
     )
     Spacer(Modifier.height(4.dp))
     Text(
-        "Os dados de cada contador, na ordem em que você marcar, até " +
-            "$MAXIMO_DE_ITENS. É a mesma escolha da aba \"Números\": mudar aqui muda " +
-            "lá. Na bola, até três ficam numa coluna; do quarto em diante eles se " +
+        "Os dados de cada contador nesta página, na ordem em que você marcar, até " +
+            "$MAXIMO_DE_ITENS. É uma escolha só desta página: a aba \"Números\" tem a " +
+            "dela. Na bola, até três ficam numa coluna; do quarto em diante eles se " +
             "dividem em duas.",
         style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
@@ -846,9 +846,10 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
         ItemDoCluster.entries.forEach { item ->
             Opcao(
                 item.descricao,
-                item in ajustes.itens,
-                habilitada = item in ajustes.itens || ajustes.itens.size < MAXIMO_DE_ITENS,
-            ) { Cluster.alternarItem(item) }
+                item in ajustes.itensDoMenu,
+                habilitada = item in ajustes.itensDoMenu ||
+                    ajustes.itensDoMenu.size < MAXIMO_DE_ITENS,
+            ) { Cluster.alternarItemDoMenu(item) }
         }
     }
 
@@ -890,13 +891,7 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
         color = Cores.TextoApoio,
     )
     Spacer(Modifier.height(14.dp))
-    AjusteFino(
-        JanelaDoPainel.MENU,
-        ajustes.empurraoDoMenu,
-        ajustes.zoomDoMenu,
-        dentro = ajustes.empurraoDentroDoMenu,
-        afastamento = ajustes.afastamentoDoMenu,
-    )
+    AjusteFinoDaBola(ajustes)
 
     Spacer(Modifier.height(10.dp))
     Text(
@@ -1099,129 +1094,27 @@ private fun AjusteFino(
     janela: JanelaDoPainel,
     empurrao: Empurrao,
     zoom: Zoom,
-    // Quando existe, a janela tem duas posições para acertar: a dela no painel
-    // e a do conteúdo dentro dela. É o caso da bola — ver
-    // [AjustesDoCluster.empurraoDentroDoMenu].
-    dentro: Empurrao? = null,
-    // Idem: só a bola empilha os dados numa coluna, e só ela tem o que afastar.
-    afastamento: Zoom? = null,
 ) {
     SetasDePosicao(
         titulo = "Ajuste fino da posição",
-        texto = if (dentro == null) {
-            "As setas movem a janela pelo painel a partir do centro, e alcançam " +
-                "qualquer lugar dele: a dupla atravessa, a simples acerta o fio. " +
-                "\"Desfazer\" traz de volta ao centro. Use \"Ver como fica\" para conferir."
-        } else {
-            "Move a bola inteira pelo painel, para encaixá-la na que o carro " +
-                "desenha embaixo. A dupla atravessa, a simples acerta o fio."
-        },
+        texto = "As setas movem a janela pelo painel a partir do centro, e alcançam " +
+            "qualquer lugar dele: a dupla atravessa, a simples acerta o fio. " +
+            "\"Desfazer\" traz de volta ao centro. Use \"Ver como fica\" para conferir.",
         empurrao = empurrao,
         empurrar = { dx, dy -> Cluster.empurrar(janela, dx, dy) },
         desfazer = { Cluster.centralizar(janela) },
     )
 
-    if (dentro != null) {
-        Spacer(Modifier.height(14.dp))
-        SetasDePosicao(
-            titulo = "Ajuste fino da posição do conteúdo",
-            texto = "Move só o que está dentro da bola — os números, o título, as " +
-                "bolinhas —, sem tirar a bola do lugar.",
-            empurrao = dentro,
-            empurrar = { dx, dy -> Cluster.empurrarDentroDoMenu(dx, dy) },
-            desfazer = { Cluster.centralizarDentroDoMenu() },
-        )
-    }
-
     Spacer(Modifier.height(14.dp))
-    Text(
-        if (janela == JanelaDoPainel.MENU) "Ajuste fino do conteúdo" else "Ajuste fino do tamanho",
-        style = MaterialTheme.typography.titleMedium,
-        color = Cores.TextoCorrido,
+    SetasDeTamanho(
+        titulo = "Ajuste fino do tamanho",
+        texto = "Estica ou encolhe a partir do tamanho escolhido acima, em proporção — " +
+            "os dois lados crescem juntos, então o bloco não deforma. Os tamanhos " +
+            "prontos são degraus largos; isto é o que fica entre um e outro.",
+        zoom = zoom,
+        ampliar = { delta -> Cluster.ampliar(janela, delta) },
+        desfazer = { Cluster.tamanhoNatural(janela) },
     )
-    Spacer(Modifier.height(4.dp))
-    Text(
-        // Na bola o que cresce é o que está dentro. O diâmetro é medida do
-        // painel do carro, e mexer nele desencontraria a nossa bola da dele.
-        if (janela == JanelaDoPainel.MENU) {
-            "Estica ou encolhe o que aparece dentro da bola — os números, o " +
-                "desenho. A bola em si não muda de tamanho: ela é a do painel, e " +
-                "tem de continuar encaixada na que o carro desenha embaixo."
-        } else {
-            "Estica ou encolhe a partir do tamanho escolhido acima, em proporção — " +
-                "os dois lados crescem juntos, então o bloco não deforma. Os tamanhos " +
-                "prontos são degraus largos; isto é o que fica entre um e outro."
-        },
-        style = MaterialTheme.typography.bodyMedium,
-        color = Cores.TextoApoio,
-    )
-    Spacer(Modifier.height(8.dp))
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Seta("−−", "bem menor") { Cluster.ampliar(janela, -Zoom.SALTO) }
-        Seta("−", "um pouco menor") { Cluster.ampliar(janela, -Zoom.PASSO) }
-        Seta("+", "um pouco maior") { Cluster.ampliar(janela, Zoom.PASSO) }
-        Seta("++", "bem maior") { Cluster.ampliar(janela, Zoom.SALTO) }
-        BotaoAcao(
-            "Desfazer",
-            onClick = { Cluster.tamanhoNatural(janela) },
-            habilitado = !zoom.natural,
-        )
-    }
-    Spacer(Modifier.height(6.dp))
-    Text(
-        if (zoom.natural) "No tamanho escolhido."
-        else "${zoom.porcento}% do tamanho escolhido.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = Cores.TextoApoio,
-    )
-
-    // Só a bola: é lá que os dados ficam empilhados numa coluna e sobra (ou
-    // falta) altura entre eles. Na janela solta eles vão lado a lado.
-    if (afastamento != null) {
-        Spacer(Modifier.height(14.dp))
-        Text(
-            "Afastamento entre os dados",
-            style = MaterialTheme.typography.titleMedium,
-            color = Cores.TextoCorrido,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Aproxima ou espalha os dados na altura da bola, sem mexer no " +
-                "tamanho deles — é o botão para quando está tudo grudado ou " +
-                "esparramado demais. Espalhar mais que a bola inteira não dá: " +
-                "o que passasse disso seria cortado.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Cores.TextoApoio,
-        )
-        Spacer(Modifier.height(8.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Seta("−−", "bem mais juntos") { Cluster.afastarNoMenu(-Zoom.SALTO) }
-            Seta("−", "um pouco mais juntos") { Cluster.afastarNoMenu(-Zoom.PASSO) }
-            Seta("+", "um pouco mais separados") { Cluster.afastarNoMenu(Zoom.PASSO) }
-            Seta("++", "bem mais separados") { Cluster.afastarNoMenu(Zoom.SALTO) }
-            BotaoAcao(
-                "Desfazer",
-                onClick = { Cluster.afastamentoNatural() },
-                habilitado = !afastamento.natural,
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            if (afastamento.natural) {
-                "Espalhados pela altura toda."
-            } else {
-                "${afastamento.porcento.coerceAtMost(100)}% da altura."
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = Cores.TextoApoio,
-        )
-    }
 
     Spacer(Modifier.height(14.dp))
     Text("Medidas desta janela", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
@@ -1237,6 +1130,169 @@ private fun AjusteFino(
     )
     Spacer(Modifier.height(8.dp))
     QuadroDeMedidas(janela)
+}
+
+/**
+ * As setas de esticar, com o tamanho atual escrito embaixo.
+ *
+ * Separado pelo mesmo motivo do [SetasDePosicao]: agora há mais de uma coisa
+ * para esticar na mesma tela — o carro na bola e os dados na bola —, e duas
+ * cópias do mesmo teclado envelheceriam diferente.
+ */
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun SetasDeTamanho(
+    titulo: String,
+    texto: String,
+    zoom: Zoom,
+    ampliar: (Int) -> Unit,
+    desfazer: () -> Unit,
+) {
+    Text(titulo, style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text(texto, style = MaterialTheme.typography.bodyMedium, color = Cores.TextoApoio)
+    Spacer(Modifier.height(8.dp))
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Seta("−−", "bem menor") { ampliar(-Zoom.SALTO) }
+        Seta("−", "um pouco menor") { ampliar(-Zoom.PASSO) }
+        Seta("+", "um pouco maior") { ampliar(Zoom.PASSO) }
+        Seta("++", "bem maior") { ampliar(Zoom.SALTO) }
+        BotaoAcao("Desfazer", onClick = desfazer, habilitado = !zoom.natural)
+    }
+    Spacer(Modifier.height(6.dp))
+    Text(
+        if (zoom.natural) "No tamanho escolhido." else "${zoom.porcento}% do tamanho escolhido.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Cores.TextoApoio,
+    )
+}
+
+/**
+ * O ajuste fino da bola do painel: a bola, o carro dentro dela e os dados.
+ *
+ * Três acertos, e não um. A bola é medida do carro — ela tem de encaixar no
+ * círculo que o painel desenha embaixo. Dentro dela moram dois desenhos de
+ * formatos opostos, o carrinho largo e a coluna de números alta, e o tamanho
+ * que deixa um no ponto deixa o outro sobrando: por isso cada um tem a sua
+ * posição e o seu tamanho. Ver [AlvoNaBola].
+ */
+@Composable
+private fun AjusteFinoDaBola(ajustes: AjustesDoCluster) {
+    SetasDePosicao(
+        titulo = "Ajuste fino da posição",
+        texto = "Move a bola inteira pelo painel, para encaixá-la na que o carro " +
+            "desenha embaixo. A dupla atravessa, a simples acerta o fio. Isto vale " +
+            "para as duas visões: a bola é uma só.",
+        empurrao = ajustes.empurraoDoMenu,
+        empurrar = { dx, dy -> Cluster.empurrar(JanelaDoPainel.MENU, dx, dy) },
+        desfazer = { Cluster.centralizar(JanelaDoPainel.MENU) },
+    )
+
+    Spacer(Modifier.height(18.dp))
+    Text("O carro na bola", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "Vale só para a visão do carro. Gire a cruzinha do volante até ela aparecer " +
+            "no painel antes de mexer aqui.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(10.dp))
+    SetasDePosicao(
+        titulo = "Posição do carro",
+        texto = "Move o desenho dentro da bola, sem tirar a bola do lugar.",
+        empurrao = ajustes.empurraoDoCarroNaBola,
+        empurrar = { dx, dy -> Cluster.empurrarNaBola(AlvoNaBola.CARRO, dx, dy) },
+        desfazer = { Cluster.centralizarNaBola(AlvoNaBola.CARRO) },
+    )
+    Spacer(Modifier.height(14.dp))
+    SetasDeTamanho(
+        titulo = "Tamanho do carro",
+        texto = "Estica ou encolhe o desenho. A bola em si não muda: ela é a do " +
+            "painel, e tem de continuar encaixada na que o carro desenha embaixo.",
+        zoom = ajustes.zoomDoCarroNaBola,
+        ampliar = { delta -> Cluster.ampliarNaBola(AlvoNaBola.CARRO, delta) },
+        desfazer = { Cluster.tamanhoNaturalNaBola(AlvoNaBola.CARRO) },
+    )
+
+    Spacer(Modifier.height(18.dp))
+    Text("Os dados na bola", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "Vale para as visões dos contadores. Pare o volante numa delas antes de " +
+            "mexer aqui.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(10.dp))
+    SetasDePosicao(
+        titulo = "Posição dos dados",
+        texto = "Move os números, o título e as bolinhas dentro da bola, sem tirar a " +
+            "bola do lugar.",
+        empurrao = ajustes.empurraoDentroDoMenu,
+        empurrar = { dx, dy -> Cluster.empurrarNaBola(AlvoNaBola.DADOS, dx, dy) },
+        desfazer = { Cluster.centralizarNaBola(AlvoNaBola.DADOS) },
+    )
+    Spacer(Modifier.height(14.dp))
+    SetasDeTamanho(
+        titulo = "Tamanho dos dados",
+        texto = "Estica ou encolhe os números dentro da bola. A bola em si não muda.",
+        zoom = ajustes.zoomDoMenu,
+        ampliar = { delta -> Cluster.ampliarNaBola(AlvoNaBola.DADOS, delta) },
+        desfazer = { Cluster.tamanhoNaturalNaBola(AlvoNaBola.DADOS) },
+    )
+
+    Spacer(Modifier.height(14.dp))
+    Text(
+        "Afastamento entre os dados",
+        style = MaterialTheme.typography.titleMedium,
+        color = Cores.TextoCorrido,
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "Aproxima ou espalha os dados na altura da bola, sem mexer no tamanho " +
+            "deles — é o botão para quando está tudo grudado ou esparramado demais. " +
+            "Espalhar mais que a bola inteira não dá: o que passasse disso seria cortado.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(8.dp))
+    FlowRowSimples {
+        Seta("−−", "bem mais juntos") { Cluster.afastarNoMenu(-Zoom.SALTO) }
+        Seta("−", "um pouco mais juntos") { Cluster.afastarNoMenu(-Zoom.PASSO) }
+        Seta("+", "um pouco mais separados") { Cluster.afastarNoMenu(Zoom.PASSO) }
+        Seta("++", "bem mais separados") { Cluster.afastarNoMenu(Zoom.SALTO) }
+        BotaoAcao(
+            "Desfazer",
+            onClick = { Cluster.afastamentoNatural() },
+            habilitado = !ajustes.afastamentoDoMenu.natural,
+        )
+    }
+    Spacer(Modifier.height(6.dp))
+    Text(
+        if (ajustes.afastamentoDoMenu.natural) {
+            "Espalhados pela altura toda."
+        } else {
+            "${ajustes.afastamentoDoMenu.porcento.coerceAtMost(100)}% da altura."
+        },
+        style = MaterialTheme.typography.bodyMedium,
+        color = Cores.TextoApoio,
+    )
+
+    Spacer(Modifier.height(14.dp))
+    Text("Medidas desta janela", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "O que a janela mediu de si mesma. Com ela projetada no painel, muda a " +
+            "cada toque nas setas. Depois de acertar, me mande estas linhas.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(8.dp))
+    QuadroDeMedidas(JanelaDoPainel.MENU)
 }
 
 /**

@@ -20,6 +20,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -28,9 +31,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.Envio
 import br.com.hugolumazzini.havaltrip.Fonte
+import br.com.hugolumazzini.havaltrip.Gravador
 import br.com.hugolumazzini.havaltrip.TripViewModel
 import br.com.hugolumazzini.havaltrip.domain.IgnitionState
+import br.com.hugolumazzini.havaltrip.telemetry.ColetaDeEnergia
 import br.com.hugolumazzini.havaltrip.telemetry.DiarioDeCampo
+import br.com.hugolumazzini.havaltrip.telemetry.GravadorDeMudancas
 import br.com.hugolumazzini.havaltrip.telemetry.HavalTelemetrySource
 import br.com.hugolumazzini.havaltrip.telemetry.ShizukuTelemetrySource
 import br.com.hugolumazzini.havaltrip.ui.theme.Cores
@@ -54,6 +60,8 @@ fun DiagnosticoScreen(vm: TripViewModel) {
     val leituras by vm.diario.atual.collectAsStateWithLifecycle()
     val fita by vm.diario.fita.collectAsStateWithLifecycle()
     val envio by vm.envio.collectAsStateWithLifecycle()
+    val gravador by vm.gravador.collectAsStateWithLifecycle()
+    val coleta by vm.coletaDeEnergia.collectAsStateWithLifecycle()
     val fonte by vm.fonte.collectAsStateWithLifecycle()
     val situacao by vm.situacaoShizuku.collectAsStateWithLifecycle()
     val fonteReal = fonte != Fonte.SIMULADOR
@@ -130,14 +138,25 @@ fun DiagnosticoScreen(vm: TripViewModel) {
             // Também de uma vez só: pergunta ao carro se ele sabe dizer que
             // modelo é, para o desenho poder mudar conforme a versão. Nada de
             // chassi ou placa entra nessa lista. Ver `IdentidadeDoCarro`.
+            //
+            // O aviso no rótulo não é exagero: esta sonda lê o `dex` de todos os
+            // aplicativos da GWM instalados, na hora, e no teste no carro isso
+            // travou a central. Fica porque a resposta ainda interessa, mas com
+            // o preço escrito no botão.
             BotaoAcao(
-                texto = "Sondar modelo do carro",
+                texto = "Sondar modelo do carro (trava a central)",
                 onClick = vm::enviarSondaDeIdentidade,
                 habilitado = envio !is Envio.Enviando,
                 cor = Cores.SuperficieSelecionada,
                 corTexto = Cores.Destaque,
             )
         }
+
+        Spacer(Modifier.height(12.dp))
+        MedicaoDeEnergia(vm, coleta, envio, habilitado = fonte == Fonte.SHIZUKU)
+
+        Spacer(Modifier.height(12.dp))
+        GravadorDeAlertas(vm, gravador, habilitado = fonte == Fonte.SHIZUKU)
 
         Spacer(Modifier.height(12.dp))
         PorQueAIgnicaoEstaAssim(vm, leituras, simulando = !fonteReal)
@@ -347,6 +366,158 @@ private fun copiar(contexto: Context, texto: String) {
  * tela" precisa distinguir carro que não publica de chave que ninguém marcou no
  * Shisuku — e só a segunda tem conserto ali mesmo, em trinta segundos.
  */
+/**
+ * A medição de energia elétrica, para quem tem PHEV.
+ *
+ * Um interruptor só, e depois nada: a coleta acompanha a ignição sozinha. Quem
+ * vai rodar isto é alguém fazendo um favor, no carro dele — qualquer coisa que
+ * dependa de lembrar de apertar um botão antes de sair volta com dado faltando.
+ * Ver [br.com.hugolumazzini.havaltrip.telemetry.ColetaDeEnergia].
+ */
+@Composable
+private fun MedicaoDeEnergia(
+    vm: TripViewModel,
+    estado: ColetaDeEnergia.Estado,
+    envio: Envio,
+    habilitado: Boolean,
+) {
+    var ligada by remember { mutableStateOf(vm.coletaLigada) }
+
+    Cartao(Modifier.fillMaxWidth()) {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("MEDIÇÃO DE ENERGIA (PHEV)", style = EstiloRotulo, modifier = Modifier.weight(1f))
+                BotaoAcao(
+                    texto = if (ligada) "Ligada" else "Desligada",
+                    onClick = {
+                        ligada = !ligada
+                        vm.ligarColetaDeEnergia(ligada)
+                    },
+                    habilitado = habilitado,
+                    cor = if (ligada) Cores.SuperficieSelecionada else Cores.Campo,
+                    corTexto = if (ligada) Cores.Confirmacao else Cores.Texto,
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                when {
+                    !habilitado ->
+                        "Precisa da fonte \"carro (direto)\": nenhuma propriedade de energia " +
+                            "chega pelo Shisuku sem configuração."
+                    estado is ColetaDeEnergia.Estado.SemLinha ->
+                        "Não deu para começar — ${estado.motivo}."
+                    estado is ColetaDeEnergia.Estado.Gravando ->
+                        "Gravando: ${estado.amostras} amostras · " +
+                            "${"%.3f".format(estado.kwh)} kWh · ${"%.1f".format(estado.km)} km"
+                    estado is ColetaDeEnergia.Estado.Pronta ->
+                        "Viagem fechada: ${"%.2f".format(estado.resumo.km)} km em " +
+                            "${"%.1f".format(estado.resumo.duracaoS / 60)} min · " +
+                            "${"%.3f".format(estado.resumo.kwhIntegrado)} kWh " +
+                            "(${"%.3f".format(estado.resumo.kwhRecuperado)} kWh voltaram na " +
+                            "frenagem). Envie o relatório."
+                    estado is ColetaDeEnergia.Estado.Esperando ->
+                        "Armada. Começa sozinha quando o carro ligar e fecha quando desligar — " +
+                            "não precisa abrir o app."
+                    else ->
+                        "Desligada. Ligue só se este carro tiver tomada: ela lê tensão e " +
+                            "corrente da bateria quatro vezes por segundo durante a viagem " +
+                            "inteira, e num HEV isso não mede custo nenhum."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = when {
+                    !habilitado || estado is ColetaDeEnergia.Estado.SemLinha -> Cores.Atencao
+                    estado is ColetaDeEnergia.Estado.Pronta -> Cores.Confirmacao
+                    else -> Cores.TextoApoio
+                },
+            )
+            if (estado is ColetaDeEnergia.Estado.Pronta) {
+                Spacer(Modifier.height(8.dp))
+                BotaoAcao(
+                    texto = if (envio is Envio.Enviando) "Enviando…" else "Enviar a coleta",
+                    onClick = vm::enviarColetaDeEnergia,
+                    habilitado = envio !is Envio.Enviando,
+                    cor = Cores.SuperficieSelecionada,
+                    corTexto = Cores.Destaque,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * O gravador de diferenças: dois toques com um gesto no meio.
+ *
+ * É ferramenta de investigação, e não recurso — existe para descobrir **qual**
+ * propriedade do carro carrega o aviso de chave removida, porta aberta ou o que
+ * mais o painel resolva mostrar. Nenhuma delas entra em conta de viagem. Ver
+ * [br.com.hugolumazzini.havaltrip.telemetry.GravadorDeMudancas].
+ *
+ * Só funciona na linha direta: é ela que permite perguntar qualquer propriedade
+ * ao carro. Pelo Shisuku só chega o que ele resolveu monitorar.
+ */
+@Composable
+private fun GravadorDeAlertas(vm: TripViewModel, estado: Gravador, habilitado: Boolean) {
+    Cartao(Modifier.fillMaxWidth()) {
+        Column {
+            Text("GRAVADOR DE ALERTAS", style = EstiloRotulo)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                when {
+                    !habilitado ->
+                        "Só funciona com a fonte \"carro (direto)\" — é ela que pergunta " +
+                            "qualquer propriedade ao carro."
+                    estado is Gravador.Marcado ->
+                        "Retrato tirado: ${estado.quantas} propriedades. Agora faça o gesto " +
+                            "no carro (tire a chave, abra a porta) e volte para comparar."
+                    estado is Gravador.Comparado && estado.mudancas.isEmpty() ->
+                        "Nada mudou entre os dois retratos. Ou o gesto não mexe em nenhuma " +
+                            "destas propriedades, ou o aviso mora num nome que ainda não " +
+                            "está na lista."
+                    estado is Gravador.Comparado ->
+                        "${estado.mudancas.size} propriedade(s) mudaram com o gesto:"
+                    else ->
+                        "Tira um retrato das ${GravadorDeMudancas.CANDIDATAS.size} propriedades " +
+                            "com cara de aviso, luz de painel ou fechadura. Marque agora, faça " +
+                            "o gesto no carro e volte: o que tiver mudado responde qual " +
+                            "propriedade carrega aquele alerta."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (habilitado) Cores.TextoApoio else Cores.Atencao,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                BotaoAcao(
+                    texto = if (estado is Gravador.Parado) "Marcar agora" else "Marcar de novo",
+                    onClick = vm::marcarMudancas,
+                    habilitado = habilitado,
+                    cor = Cores.SuperficieSelecionada,
+                    corTexto = Cores.Destaque,
+                )
+                BotaoAcao(
+                    texto = "Ver o que mudou",
+                    onClick = vm::compararMudancas,
+                    habilitado = habilitado && estado !is Gravador.Parado,
+                    cor = Cores.SuperficieSelecionada,
+                    corTexto = Cores.Destaque,
+                )
+                if (estado !is Gravador.Parado) {
+                    BotaoAcao("Limpar", vm::esquecerMudancas)
+                }
+            }
+            if (estado is Gravador.Comparado && estado.mudancas.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                estado.mudancas.forEach { mudanca ->
+                    LinhaCrua(
+                        chave = mudanca.chave,
+                        valor = ou(mudanca.depois),
+                        apoio = "antes: ${ou(mudanca.antes)}",
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun AindaFaltam(chaves: List<String>) {
     Spacer(Modifier.height(12.dp))

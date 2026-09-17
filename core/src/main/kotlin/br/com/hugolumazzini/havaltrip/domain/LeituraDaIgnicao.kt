@@ -76,14 +76,28 @@ object LeituraDaIgnicao {
     ): Veredito {
         val criterio = when {
             numero(prontoParaAndar)?.let { it > 0.0 } == true -> Criterio.PRONTO_PARA_ANDAR
+            velocidadeKmh >= TripMetrics.MOVING_THRESHOLD_KMH -> Criterio.VELOCIDADE
+            // O READY apagado desliga na hora, sem consultar o resto.
+            //
+            // As outras chaves só chegam quando mudam, e no instante em que a
+            // chave sai elas ficam congeladas no último valor que tinham: a
+            // rotação do motor parada em 780 rpm continua dizendo "ligado" até
+            // o carro se lembrar de publicar o zero. Era esse o atraso entre
+            // desligar o carro e o painel se despedir. O `driving_ready_state`
+            // é a única chave que cai no mesmo segundo, e um carro que não está
+            // pronto para andar nem se movendo está desligado, diga o que
+            // disserem os valores velhos.
+            numero(prontoParaAndar) != null -> Criterio.PRONTO_DESLIGADO
             numero(rotacao)?.let { it > 0.0 } == true -> Criterio.ROTACAO
             numero(motor)?.let { it !in MOTOR_DESLIGADO } == true -> Criterio.MOTOR
-            velocidadeKmh >= TripMetrics.MOVING_THRESHOLD_KMH -> Criterio.VELOCIDADE
             numero(modoEnergia)?.let { it >= MODO_ENERGIA_LIGADO } == true -> Criterio.MODO_ENERGIA
             else -> Criterio.NENHUM
         }
         return Veredito(
-            estado = if (criterio == Criterio.NENHUM) IgnitionState.OFF else IgnitionState.ON,
+            estado = when (criterio) {
+                Criterio.NENHUM, Criterio.PRONTO_DESLIGADO -> IgnitionState.OFF
+                else -> IgnitionState.ON
+            },
             criterio = criterio,
             prontoParaAndar = prontoParaAndar,
             motor = motor,
@@ -96,6 +110,7 @@ object LeituraDaIgnicao {
     /** Qual dos critérios decidiu. [NENHUM] é o carro desligado. */
     enum class Criterio(val rotulo: String) {
         PRONTO_PARA_ANDAR("driving_ready_state > 0"),
+        PRONTO_DESLIGADO("driving_ready_state apagado"),
         ROTACAO("engine_speed > 0"),
         MOTOR("engine_state fora de -1, 0 e 15"),
         VELOCIDADE("o carro está se movendo"),

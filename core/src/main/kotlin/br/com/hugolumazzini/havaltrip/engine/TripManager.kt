@@ -100,6 +100,12 @@ class TripManager(
     /** Hodômetro da última gravação, régua do desempate de [hiatoDesdeMs]. */
     private var odometroNoHiatoKm: Double = 0.0
 
+    /** Instante da primeira amostra depois de voltar, marco da carência. */
+    private var primeiraAmostraDepoisDoHiatoMs: Long? = null
+
+    /** Último carimbo de vida enviado ao armazenamento, para não carimbar demais. */
+    private var ultimoSinalDeVidaMs: Long? = null
+
     private var live = VehicleLive()
     private var selectedTripId: String? = null
 
@@ -375,6 +381,8 @@ class TripManager(
 
         live = engine.liveState(sample, average)
 
+        sinalizarVida(sample.timestampMs)
+
         if (policy.shouldSave(distanciaAcumulada(), sample.timestampMs)) {
             salvarAgora(sample.timestampMs)
         }
@@ -456,10 +464,45 @@ class TripManager(
      */
     private fun avaliarHiato(sample: TelemetrySample) {
         val desde = hiatoDesdeMs ?: return
-        hiatoDesdeMs = null
+
+        val chegada = primeiraAmostraDepoisDoHiatoMs ?: sample.timestampMs.also {
+            primeiraAmostraDepoisDoHiatoMs = it
+        }
+
+        if (sample.ignition == IgnitionState.ON) {
+            // Chave dentro: ou o carro nunca desligou, ou já religou. Nos dois
+            // casos não há mais nada a esperar, e o desempate abaixo decide.
+            encerrarHiato()
+        } else if ((sample.timestampMs - chegada) / 1000.0 < CARENCIA_DA_CHAVE_S) {
+            // Chave fora — mas ainda não dá para acreditar.
+            //
+            // Quando a central reinicia com o carro ligado, o Shisuku sobe junto
+            // e leva alguns segundos para reconectar aos serviços da GWM e
+            // reemitir cada propriedade. Nesse intervalo o `driving_ready_state`
+            // simplesmente não chegou, e "não chegou" é lido como desligado — um
+            // carro em movimento pareceria estacionado. Esperar a carência custa
+            // alguns segundos numa zeragem que o motorista nem vê acontecer, e
+            // evita apagar uma viagem que está rolando.
+            return
+        } else {
+            encerrarHiato()
+        }
 
         val paradoS = (sample.timestampMs - desde) / 1000.0
-        if (paradoS <= 0.0) return
+        // Quem manda aqui é a chave, não o relógio.
+        //
+        // Se a primeira amostra já chega com a ignição desligada, o buraco foi
+        // mesmo com o carro parado, e o tempo escolhido pelo motorista vale
+        // inteiro — inclusive "imediato". Nenhum piso pode passar por cima
+        // disso: seria decidir por ele.
+        //
+        // Se a ignição chega ligada, o app não tem como saber se a chave chegou
+        // a sair: tanto faz a central reiniciando no meio da viagem quanto o
+        // carro religando na manhã seguinte. É só neste caso ambíguo que o
+        // tamanho do buraco desempata — poucos minutos é reinício (a chave
+        // nunca saiu, e era esse o defeito visto no carro); horas é o carro
+        // tendo dormido.
+        if (sample.ignition == IgnitionState.ON && paradoS < HIATO_MINIMO_S) return
         val andouKm = sample.odometerTotalKm - odometroNoHiatoKm
         if (andouKm > HIATO_TOLERANCIA_KM) return
 
@@ -473,6 +516,12 @@ class TripManager(
         ignitionOffSinceMs = desde
         aplicarZeragemAutomatica(sample.timestampMs)
         ignitionOffSinceMs = null
+    }
+
+    /** Fecha a investigação do hiato: ela acontece uma vez só por volta. */
+    private fun encerrarHiato() {
+        hiatoDesdeMs = null
+        primeiraAmostraDepoisDoHiatoMs = null
     }
 
     private fun aplicarZeragemAutomatica(atMs: Long) {
@@ -537,6 +586,15 @@ class TripManager(
     private fun salvarAgora(atMs: Long) {
         storage.save(snapshot(atMs))
         policy.mark(distanciaAcumulada(), atMs)
+        sinalizarVida(atMs, forcado = true)
+    }
+
+    /** Carimba "estou vivo", no máximo uma vez por [SINAL_DE_VIDA_MS]. */
+    private fun sinalizarVida(atMs: Long, forcado: Boolean = false) {
+        val ultimo = ultimoSinalDeVidaMs
+        if (!forcado && ultimo != null && atMs - ultimo < SINAL_DE_VIDA_MS) return
+        ultimoSinalDeVidaMs = atMs
+        storage.marcarVivo(atMs)
     }
 
     private fun restaurar(salvo: TripSnapshot) {
@@ -560,7 +618,12 @@ class TripManager(
         // investigar. O caso interessante é o contrário: o app foi desligado no
         // tapa, ainda achando que o carro estava ligado.
         if (salvo.ignitionOffSinceMs == null && salvo.ignition == IgnitionState.ON) {
-            hiatoDesdeMs = salvo.savedAtMs
+            // O buraco começa no último sinal de vida, não na última gravação:
+            // entre uma gravação e outra passam até cinco minutos com o app
+            // funcionando normalmente, e usar a gravação faria uma reinicialização
+            // da central de um minuto parecer seis — tempo de sobra para zerar
+            // uma viagem que nunca foi interrompida.
+            hiatoDesdeMs = maxOf(salvo.savedAtMs, storage.ultimoSinalDeVidaMs() ?: 0L)
             odometroNoHiatoKm = salvo.odometerTotalKm
         }
         // O último instante lido não é restaurado de propósito: entre gravar e
@@ -630,6 +693,37 @@ class TripManager(
          * ficou fora do ar enquanto eu dirigia".
          */
         const val HIATO_TOLERANCIA_KM = 1.0
+
+        /**
+         * De quanto tempo o app precisa ter ficado fora do ar para aceitar que o
+         * carro dormiu **quando a ignição volta ligada**.
+         *
+         * Só vale para esse caso ambíguo, em que o app não viu a chave sair e
+         * não a encontra fora ao voltar: reiniciar a central e atualizar o app
+         * deixam o app fora do ar por perto de um minuto sem a chave ter saído,
+         * e aí a viagem em andamento tem de continuar exatamente onde estava.
+         *
+         * Se a chave está fora na volta, este piso não é consultado: quem manda
+         * é o tempo de zeragem escolhido pelo motorista, mesmo "imediato".
+         */
+        const val HIATO_MINIMO_S = 8 * 60.0
+
+        /**
+         * Quanto tempo a chave precisa aparecer fora, depois de o app voltar,
+         * para valer como prova de que o carro está mesmo desligado.
+         *
+         * Reiniciar a central reinicia também o HavalShisuku, que leva alguns
+         * segundos para reconectar aos serviços da GWM e reemitir cada
+         * propriedade. Enquanto o `driving_ready_state` não chega, "não chegou"
+         * se parece com "apagado", e um carro em plena viagem se passaria por
+         * estacionado — bastando isso para fechar a viagem de quem escolheu
+         * zerar em um minuto. Só a chave que continua fora depois desta
+         * carência é chave fora de verdade.
+         */
+        const val CARENCIA_DA_CHAVE_S = 30.0
+
+        /** De quanto em quanto tempo o app carimba que está vivo. */
+        const val SINAL_DE_VIDA_MS = 60_000L
 
         /** O identificador da Viagem atual, a que zera sozinha. */
         const val ID_AUTOMATICA = "AUTO"

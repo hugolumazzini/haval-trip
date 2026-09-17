@@ -11,6 +11,8 @@ import br.com.hugolumazzini.havaltrip.domain.TripRecord
 import br.com.hugolumazzini.havaltrip.engine.TripState
 import br.com.hugolumazzini.havaltrip.services.TripComparison
 import br.com.hugolumazzini.havaltrip.services.TripComparisonResult
+import br.com.hugolumazzini.havaltrip.telemetry.ColetaDeEnergia
+import br.com.hugolumazzini.havaltrip.telemetry.GravadorDeMudancas
 import br.com.hugolumazzini.havaltrip.telemetry.HavalTelemetrySource
 import br.com.hugolumazzini.havaltrip.telemetry.IdentidadeDoCarro
 import br.com.hugolumazzini.havaltrip.telemetry.ImagensDaCentral
@@ -54,6 +56,18 @@ sealed interface Envio {
     data object Enviando : Envio
     data class Pronto(val endereco: String) : Envio
     data class Falhou(val motivo: String, val arquivo: String) : Envio
+}
+
+/**
+ * Em que pé está o gravador de mudanças do Diagnóstico.
+ *
+ * Três estados porque o gesto acontece **entre** dois toques: marcar, ir lá
+ * fazer a coisa no carro, voltar e comparar. Ver [GravadorDeMudancas].
+ */
+sealed interface Gravador {
+    data object Parado : Gravador
+    data class Marcado(val quantas: Int) : Gravador
+    data class Comparado(val mudancas: List<GravadorDeMudancas.Mudanca>) : Gravador
 }
 
 /** Em que pé está a busca por uma versão nova do app. */
@@ -113,6 +127,12 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _envio = MutableStateFlow<Envio>(Envio.Parado)
     val envio: StateFlow<Envio> = _envio.asStateFlow()
+
+    private val _gravador = MutableStateFlow<Gravador>(Gravador.Parado)
+    val gravador: StateFlow<Gravador> = _gravador.asStateFlow()
+
+    /** O retrato tirado no "marcar", guardado até o "comparar". */
+    private var retratoAnterior: GravadorDeMudancas.Retrato? = null
 
     private val _tela = MutableStateFlow<Tela>(Tela.Painel)
     val tela: StateFlow<Tela> = _tela.asStateFlow()
@@ -272,6 +292,69 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
                 },
             )
         }
+    }
+
+    /** O estado da medição de energia, para a tela de diagnóstico. */
+    val coletaDeEnergia: StateFlow<ColetaDeEnergia.Estado> = motor.coletaDeEnergia.estado
+
+    /** `true` se a medição de energia está armada. Ver [ColetaDeEnergia]. */
+    val coletaLigada: Boolean get() = motor.coletaDeEnergia.ligada
+
+    fun ligarColetaDeEnergia(valor: Boolean) = motor.coletaDeEnergia.ligar(valor)
+
+    /**
+     * Manda a coleta fechada pelo mesmo link público dos outros relatórios.
+     *
+     * O texto leva as contas prontas e a fita rareada para uma amostra por
+     * segundo: a integração já aconteceu dentro do carro, a quatro por segundo,
+     * e mandar tudo só estouraria o tamanho do envio.
+     */
+    fun enviarColetaDeEnergia() {
+        if (_envio.value is Envio.Enviando) return
+        _envio.value = Envio.Enviando
+        viewModelScope.launch {
+            val contexto = getApplication<Application>()
+            val texto = withContext(Dispatchers.IO) { motor.coletaDeEnergia.relato() }
+            val arquivo = runCatching { Relatorio.salvar(contexto, texto) }.getOrNull()
+            _envio.value = Relatorio.enviar(texto).fold(
+                onSuccess = { Envio.Pronto(it) },
+                onFailure = {
+                    Envio.Falhou(
+                        motivo = it.message ?: it::class.java.simpleName,
+                        arquivo = arquivo?.absolutePath ?: "não foi possível gravar",
+                    )
+                },
+            )
+        }
+    }
+
+    /**
+     * Tira o retrato "antes" das propriedades suspeitas de carregar avisos.
+     *
+     * Depois disto o motorista vai fazer o gesto no carro — tirar a chave,
+     * abrir a porta — e voltar para apertar [compararMudancas].
+     */
+    fun marcarMudancas() {
+        viewModelScope.launch {
+            val retrato = withContext(Dispatchers.IO) { GravadorDeMudancas.retratar() }
+            retratoAnterior = retrato
+            _gravador.value = Gravador.Marcado(retrato.valores.size)
+        }
+    }
+
+    /** Tira o retrato "depois" e mostra o que mudou. */
+    fun compararMudancas() {
+        val antes = retratoAnterior ?: return
+        viewModelScope.launch {
+            val depois = withContext(Dispatchers.IO) { GravadorDeMudancas.retratar() }
+            _gravador.value = Gravador.Comparado(GravadorDeMudancas.comparar(antes, depois))
+        }
+    }
+
+    /** Descarta o retrato e some com a lista, para começar outro gesto. */
+    fun esquecerMudancas() {
+        retratoAnterior = null
+        _gravador.value = Gravador.Parado
     }
 
     /**

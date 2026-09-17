@@ -69,7 +69,13 @@ class LeituraDaIgnicaoTest {
 
         val soAMultimidia = LeituraDaIgnicao.explicar("0", "0", "0", "1", 0.0)
         assertEquals(IgnitionState.OFF, soAMultimidia.estado)
-        assertEquals(LeituraDaIgnicao.Criterio.NENHUM, soAMultimidia.criterio)
+        assertEquals(LeituraDaIgnicao.Criterio.PRONTO_DESLIGADO, soAMultimidia.criterio)
+
+        // O instante em que a chave sai: o READY apaga primeiro e as outras
+        // chaves ainda estão congeladas no valor de quando o carro andava.
+        val chaveAcabandoDeSair = LeituraDaIgnicao.explicar("0", "2", "780", "2", 0.0)
+        assertEquals(IgnitionState.OFF, chaveAcabandoDeSair.estado)
+        assertEquals(LeituraDaIgnicao.Criterio.PRONTO_DESLIGADO, chaveAcabandoDeSair.criterio)
 
         // O suspeito do defeito relatado: central ligada, chave fora, e o carro
         // publicando um power_mode que a convenção do Android diz ser "ON".

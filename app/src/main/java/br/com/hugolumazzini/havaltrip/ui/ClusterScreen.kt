@@ -268,6 +268,8 @@ internal fun Painel(
                 unidade = leitura.second,
                 emLinha = emLinha,
                 escala = ajustes.escalaFonte,
+                proporcao = ajustes.proporcaoDoRotulo,
+                tamanhoBase = ajustes.tamanhoBaseDoTexto,
             )
         }
 
@@ -278,7 +280,7 @@ internal fun Painel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 leituras.forEach { (item, leitura) ->
-                    Bloco(item, leitura, tamanho, tinta, emLinha, rotulo, Modifier.weight(1f))
+                    Bloco(item, leitura, tamanho, tinta, emLinha, rotulo, Modifier.weight(1f), ajustes.proporcaoDoRotulo)
                 }
             }
         } else {
@@ -311,7 +313,7 @@ internal fun Painel(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         fila.forEach { (item, leitura) ->
-                            Bloco(item, leitura, tamanho, tinta, emLinha, rotulo, Modifier.weight(1f))
+                            Bloco(item, leitura, tamanho, tinta, emLinha, rotulo, Modifier.weight(1f), ajustes.proporcaoDoRotulo)
                         }
                         // A última fila pode vir incompleta — cinco dados em
                         // duas colunas. O vazio segura o lugar para o dado
@@ -333,9 +335,10 @@ private fun Bloco(
     emLinha: Boolean,
     comoSeIdentifica: RotuloDoCluster,
     modifier: Modifier = Modifier,
+    proporcaoDoRotulo: Float = MedidaDoPainel.PROPORCAO_DO_ROTULO_PADRAO,
 ) {
     val (valor, unidade) = leitura
-    val rotulo = MedidaDoPainel.tamanhoDoRotulo(numero)
+    val rotulo = MedidaDoPainel.tamanhoDoRotulo(numero, proporcaoDoRotulo)
 
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         // A linha do rótulo só existe no modo texto. Nos outros dois ela não

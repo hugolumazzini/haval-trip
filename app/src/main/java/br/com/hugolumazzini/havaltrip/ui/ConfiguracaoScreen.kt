@@ -535,6 +535,44 @@ private fun NumerosNoPainel(estado: TripState) {
         }
 
         Spacer(Modifier.height(14.dp))
+        Text("Tamanho base do texto", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Quanto do espaço fica para a letra: quanto maior, mais esticado fica o número. " +
+                "O padrão é 0.42.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(8.dp))
+        Slider(
+            value = ajustes.tamanhoBaseDoTexto,
+            onValueChange = { Cluster.usarTamanhoBaseDoTexto(it) },
+            valueRange = 0.2f..0.6f,
+            steps = 7,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text("%.2f".format(ajustes.tamanhoBaseDoTexto), style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+
+        Spacer(Modifier.height(14.dp))
+        Text("Proporção do rótulo", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Tamanho do rótulo e da unidade em relação ao número. Quanto maior, " +
+                "mais legível fica o \"km\" ou \"km/L\". O padrão é 0.32.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(8.dp))
+        Slider(
+            value = ajustes.proporcaoDoRotulo,
+            onValueChange = { Cluster.usarProporcaoDoRotulo(it) },
+            valueRange = 0.15f..0.5f,
+            steps = 6,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text("%.2f".format(ajustes.proporcaoDoRotulo), style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+
+        Spacer(Modifier.height(14.dp))
         Text("Cor dos números", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(8.dp))
         FlowRow(

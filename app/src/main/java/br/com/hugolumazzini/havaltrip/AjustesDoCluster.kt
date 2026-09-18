@@ -459,6 +459,10 @@ data class AjustesDoCluster(
         ItemDoCluster.TEMPO,
     ),
     val escalaFonte: Float = 1.0f,
+    /** Quanto do espaço da fatia vira tamanho de letra (0.42 é o padrão). */
+    val tamanhoBaseDoTexto: Float = 0.42f,
+    /** Tamanho do rótulo em relação ao número (0.32 é o padrão). */
+    val proporcaoDoRotulo: Float = 0.32f,
     val cor: CorDoCluster = CorDoCluster.BRANCO,
     val fundo: FundoDoCluster = FundoDoCluster.TRANSPARENTE,
     // Os dois `lugar` são herança: as telas desenham sempre a partir do centro
@@ -597,6 +601,8 @@ object Cluster {
     private const val TRIP = "tripId"
     private const val ITENS = "itens"
     private const val ESCALA = "escalaFonte"
+    private const val TAMANHO_BASE_TEXTO = "tamanhoBaseDoTexto"
+    private const val PROPORCAO_ROTULO = "proporcaoDoRotulo"
     private const val COR = "cor"
     private const val FUNDO = "fundo"
     private const val LUGAR = "lugar"
@@ -738,6 +744,8 @@ object Cluster {
                 ?.mapNotNull { nome -> ItemDoCluster.entries.find { it.name == nome } }
                 ?: padrao.itens,
             escalaFonte = prefs.getFloat(ESCALA, padrao.escalaFonte),
+            tamanhoBaseDoTexto = prefs.getFloat(TAMANHO_BASE_TEXTO, padrao.tamanhoBaseDoTexto),
+            proporcaoDoRotulo = prefs.getFloat(PROPORCAO_ROTULO, padrao.proporcaoDoRotulo),
             cor = prefs.getString(COR, null)
                 ?.let { nome -> CorDoCluster.entries.find { it.name == nome } }
                 ?: padrao.cor,
@@ -822,6 +830,8 @@ object Cluster {
             .putString(TRIP, novo.tripId)
             .putString(ITENS, novo.itens.joinToString(",") { it.name })
             .putFloat(ESCALA, novo.escalaFonte)
+            .putFloat(TAMANHO_BASE_TEXTO, novo.tamanhoBaseDoTexto)
+            .putFloat(PROPORCAO_ROTULO, novo.proporcaoDoRotulo)
             .putString(COR, novo.cor.name)
             .putString(FUNDO, novo.fundo.name)
             .putString(LUGAR, novo.lugar.name)
@@ -892,6 +902,10 @@ object Cluster {
     }
 
     fun usarEscala(escala: Float) = gravar(_ajustes.value.copy(escalaFonte = escala))
+
+    fun usarTamanhoBaseDoTexto(tamanho: Float) = gravar(_ajustes.value.copy(tamanhoBaseDoTexto = tamanho))
+
+    fun usarProporcaoDoRotulo(proporcao: Float) = gravar(_ajustes.value.copy(proporcaoDoRotulo = proporcao))
 
     fun usarCor(cor: CorDoCluster) = gravar(_ajustes.value.copy(cor = cor))
 

@@ -221,59 +221,67 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
         // FUNCIONALIDADES DO PAINEL
         Text("Funcionalidades do painel", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
 
-        // Números
+        // Duas colunas: Números e Carrinho
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Números", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
-            Switch(
-                checked = ajustes.habilitarNumerosNoPainel,
-                onCheckedChange = { Cluster.alternarHabilitarNumerosNoPainel() },
-                modifier = Modifier.scale(0.8f),
-            )
+            // Coluna 1: Números
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Números", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+                    Switch(
+                        checked = ajustes.habilitarNumerosNoPainel,
+                        onCheckedChange = { Cluster.alternarHabilitarNumerosNoPainel() },
+                        modifier = Modifier.scale(0.75f),
+                    )
+                }
+                Text(
+                    "Exibe números de um trip no painel do veículo. Permite ajustar posição, tamanho, cor e itens exibidos.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Cores.TextoApoio,
+                )
+            }
+
+            // Coluna 2: Carrinho
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Carrinho", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+                    Switch(
+                        checked = ajustes.habilitarCarroNoPainel,
+                        onCheckedChange = { Cluster.alternarHabilitarCarroNoPainel() },
+                        modifier = Modifier.scale(0.75f),
+                    )
+                }
+                Text(
+                    "Exibe a miniatura do veículo com alguns status no painel do veículo. Permite ajustar posição e tamanho.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Cores.TextoApoio,
+                )
+            }
         }
-        Text(
-            "Exibe números de um trip no painel do veículo. Permite ajustar posição, tamanho, cor e itens exibidos.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Cores.TextoApoio,
-        )
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
 
-        // Carrinho
+        // Integrar ao painel (largura completa)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("Carrinho", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
-            Switch(
-                checked = ajustes.habilitarCarroNoPainel,
-                onCheckedChange = { Cluster.alternarHabilitarCarroNoPainel() },
-                modifier = Modifier.scale(0.8f),
-            )
-        }
-        Text(
-            "Exibe a miniatura do veículo com alguns status no painel do veículo. Permite ajustar posição e tamanho.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Cores.TextoApoio,
-        )
-
-        Spacer(Modifier.height(10.dp))
-
-        // Integrar ao painel
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
+                .padding(vertical = 2.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -281,7 +289,7 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
             Switch(
                 checked = ajustes.habilitarPaginaComVisoes,
                 onCheckedChange = { Cluster.alternarHabilitarPaginaComVisoes() },
-                modifier = Modifier.scale(0.8f),
+                modifier = Modifier.scale(0.75f),
             )
         }
         Text(

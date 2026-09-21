@@ -60,11 +60,11 @@ fun ClusterCarroScreen(vm: TripViewModel, espiando: Boolean = false) {
     // sobre a bola de mídia de quem só o queria numa. Se o motorista escolheu
     // uma página, a janela se apaga nas outras — como o ar do Impulse faz.
     val pagina by PaginaDoCluster.pagina.collectAsStateWithLifecycle()
-    val paginaEscolhida = ajustes.paginaDoCarro
+    val paginaEscolhida = ajustes.paginaDoCarro ?: PaginaDoCluster.PAGINA_PADRAO
     // `pagina == null` é "o painel ainda não contou nenhuma". Nesse caso
     // aparece: sumir por falta de informação seria uma janela em branco sem
     // explicação, e o motorista não teria como distinguir isso de um defeito.
-    val naPaginaCerta = paginaEscolhida == null || pagina == null || pagina == paginaEscolhida
+    val naPaginaCerta = pagina == null || pagina == paginaEscolhida
     // A espiada na central mostra sempre: lá o que se quer ver é o ajuste, e um
     // retângulo vazio porque o painel está noutra página não ensina nada.
     if (!espiando && !naPaginaCerta) return

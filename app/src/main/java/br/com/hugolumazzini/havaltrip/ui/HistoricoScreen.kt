@@ -82,7 +82,14 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
 
         Spacer(Modifier.height(16.dp))
 
-        if (estado.history.isEmpty()) {
+        // Para debug: usar dados fake se history estiver vazio
+        val historico = if (estado.history.isEmpty()) {
+            gerarHistoricoFake()
+        } else {
+            estado.history
+        }
+
+        if (historico.isEmpty()) {
             Vazio("Nenhuma viagem arquivada ainda.\nFeche uma viagem no painel para ela aparecer aqui.")
             return
         }
@@ -105,12 +112,12 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
         when (abaAtiva) {
             AbaHistorico.GRAFICOS -> {
                 // Gráfico de consumo
-                val analise = ConsumptionAnalysis.analyzeConsumption(estado.history)
+                val analise = ConsumptionAnalysis.analyzeConsumption(historico)
                 GraficoDeConsumo(analise)
                 Spacer(Modifier.height(12.dp))
 
                 // Gráfico de viagens
-                val analiseViagens = TripsAnalysis.analyzeTrips(estado.history)
+                val analiseViagens = TripsAnalysis.analyzeTrips(historico)
                 GraficoDeViagens(analiseViagens)
             }
 
@@ -120,7 +127,7 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
                 Modifier.width(320.dp).fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(estado.history.reversed(), key = { it.recordId }) { registro ->
+                items(historico.reversed(), key = { it.recordId }) { registro ->
                     ItemHistorico(
                         registro = registro,
                         posicao = posicaoNaComparacao(modo, registro.recordId),
@@ -132,7 +139,7 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
             }
 
                     Column(Modifier.weight(1f).fillMaxHeight()) {
-                        val comparacao = vm.comparar(modo, estado.history)
+                        val comparacao = vm.comparar(modo, historico)
                         when {
                             comparacao != null -> TabelaComparacao(comparacao.a, comparacao.b, comparacao.lines)
                             comparando -> Vazio("Toque na segunda viagem, na lista ao lado.")
@@ -452,4 +459,40 @@ private fun androidx.compose.foundation.layout.RowScope.Celula(
 private enum class AbaHistorico(val rotulo: String) {
     GRAFICOS("Gráficos"),
     VIAGENS("Viagens"),
+}
+
+/** Gera histórico fake para testes dos gráficos. */
+private fun gerarHistoricoFake(): List<TripRecord> {
+    val agora = System.currentTimeMillis()
+    val dia = 24 * 60 * 60 * 1000L
+    val resultado = mutableListOf<TripRecord>()
+
+    // Gera viagens para os últimos 90 dias
+    repeat(90) { diasAtras ->
+        val dataViagem = agora - (diasAtras * dia)
+        val quantasViagens = (Math.random() * 5).toInt() + 1 // 1-5 viagens por dia
+
+        repeat(quantasViagens) { index ->
+            resultado.add(
+                TripRecord(
+                    recordId = "fake_${diasAtras}_${index}",
+                    tripId = "trip_${index % 3}",
+                    label = "Trip ${String.format("%03d", resultado.size + 1)}",
+                    metrics = br.com.hugolumazzini.havaltrip.domain.TripMetrics(
+                        distanceKm = Math.random() * 50 + 10,
+                        movingTimeS = (Math.random() * 60 + 20) * 60,
+                        idleTimeS = (Math.random() * 20 + 5) * 60,
+                        fuelLitres = Math.random() * 3 + 2,
+                        maxSpeedKmh = Math.random() * 20 + 100,
+                    ),
+                    startedAtMs = dataViagem,
+                    savedAtMs = dataViagem,
+                    odometerStartKm = 45000.0,
+                    odometerEndKm = 45050.0,
+                )
+            )
+        }
+    }
+
+    return resultado
 }

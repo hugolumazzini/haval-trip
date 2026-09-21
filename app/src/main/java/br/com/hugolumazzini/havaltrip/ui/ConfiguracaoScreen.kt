@@ -140,6 +140,8 @@ private enum class AbaDaConfiguracao(val rotulo: String) {
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
+    val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
+
     // `rememberSaveable` para a aba sobreviver ao giro de tela e à volta de
     // outra tela: reabrir sempre em "Geral" faria perder o lugar a cada
     // espiada em "Ver como fica".
@@ -154,11 +156,32 @@ fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             AbaDaConfiguracao.entries.forEach { qual ->
-                Opcao(qual.rotulo, aba == qual) { aba = qual }
+                val visivel = when (qual) {
+                    AbaDaConfiguracao.NUMEROS -> ajustes.habilitarNumerosNoPainel
+                    AbaDaConfiguracao.CARRO -> ajustes.habilitarCarroNoPainel
+                    AbaDaConfiguracao.PAGINA -> ajustes.habilitarPaginaComVisoes
+                    else -> true // GERAL e DESPEDIDA sempre visíveis
+                }
+                if (visivel) {
+                    Opcao(qual.rotulo, aba == qual) { aba = qual }
+                }
             }
         }
 
         Spacer(Modifier.height(14.dp))
+
+        // Se a aba atual ficar invisível, volta para GERAL
+        LaunchedEffect(ajustes) {
+            val abaVisivel = when (aba) {
+                AbaDaConfiguracao.NUMEROS -> ajustes.habilitarNumerosNoPainel
+                AbaDaConfiguracao.CARRO -> ajustes.habilitarCarroNoPainel
+                AbaDaConfiguracao.PAGINA -> ajustes.habilitarPaginaComVisoes
+                else -> true
+            }
+            if (!abaVisivel) {
+                aba = AbaDaConfiguracao.GERAL
+            }
+        }
 
         // A rolagem vive aqui dentro, e não em volta das abas: as abas ficam
         // paradas no topo enquanto o conteúdo rola, que é o que faz a troca de

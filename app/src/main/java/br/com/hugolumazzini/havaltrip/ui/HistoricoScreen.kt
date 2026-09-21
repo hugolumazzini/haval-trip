@@ -82,17 +82,12 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
 
         Spacer(Modifier.height(16.dp))
 
-        // Para debug: usar dados fake se history estiver vazio
-        val historico = if (estado.history.isEmpty()) {
-            gerarHistoricoFake()
-        } else {
-            estado.history
-        }
-
-        if (historico.isEmpty()) {
+        if (estado.history.isEmpty()) {
             Vazio("Nenhuma viagem arquivada ainda.\nFeche uma viagem no painel para ela aparecer aqui.")
             return
         }
+
+        val historico = estado.history
 
         // Abas
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -459,46 +454,4 @@ private fun androidx.compose.foundation.layout.RowScope.Celula(
 private enum class AbaHistorico(val rotulo: String) {
     GRAFICOS("Gráficos"),
     VIAGENS("Viagens"),
-}
-
-/** Gera histórico fake para testes dos gráficos. */
-private fun gerarHistoricoFake(): List<TripRecord> {
-    val agora = System.currentTimeMillis()
-    val dia = 24 * 60 * 60 * 1000L
-    val resultado = mutableListOf<TripRecord>()
-    var odometerAtual = 45000.0
-
-    // Gera viagens para os últimos 90 dias
-    repeat(90) { diasAtras ->
-        val dataViagem = agora - (diasAtras * dia)
-        val quantasViagens = (Math.random() * 5).toInt() + 1 // 1-5 viagens por dia
-
-        repeat(quantasViagens) { index ->
-            val distancia = Math.random() * 50 + 10
-            val odometerStart = odometerAtual
-            val odometerEnd = odometerAtual + distancia
-            odometerAtual = odometerEnd
-
-            resultado.add(
-                TripRecord(
-                    recordId = "fake_${diasAtras}_${index}",
-                    tripId = "trip_${index % 3}",
-                    label = "Trip ${String.format("%03d", resultado.size + 1)}",
-                    metrics = br.com.hugolumazzini.havaltrip.domain.TripMetrics(
-                        distanceKm = distancia,
-                        movingTimeS = (Math.random() * 60 + 20) * 60,
-                        idleTimeS = (Math.random() * 20 + 5) * 60,
-                        fuelLitres = Math.random() * 3 + 2,
-                        maxSpeedKmh = Math.random() * 20 + 100,
-                    ),
-                    startedAtMs = dataViagem,
-                    savedAtMs = dataViagem,
-                    odometerStartKm = odometerStart,
-                    odometerEndKm = odometerEnd,
-                )
-            )
-        }
-    }
-
-    return resultado
 }

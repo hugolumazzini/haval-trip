@@ -121,10 +121,11 @@ private enum class AbaDaConfiguracao(val rotulo: String) {
     // A ordem é a do uso, não a da implementação: o que o motorista abre todo
     // dia (zerar contador) vem primeiro, depois o que ele abre de vez em quando
     // (versão), e por último o que se acerta uma vez e não se mexe mais.
+    GERAL("Geral"),
     CONTADORES("Contadores"),
     VERSAO("Versão"),
     NUMEROS("Números"),
-    CARRO("Carro"),
+    CARRO("Carrinho"),
     DESPEDIDA("Despedida"),
     PAGINA("Integrar ao painel"),
 }
@@ -139,9 +140,9 @@ private enum class AbaDaConfiguracao(val rotulo: String) {
 @OptIn(ExperimentalLayoutApi::class)
 fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
     // `rememberSaveable` para a aba sobreviver ao giro de tela e à volta de
-    // outra tela: reabrir sempre em "Números" faria perder o lugar a cada
+    // outra tela: reabrir sempre em "Geral" faria perder o lugar a cada
     // espiada em "Ver como fica".
-    var aba by rememberSaveable { mutableStateOf(AbaDaConfiguracao.CONTADORES) }
+    var aba by rememberSaveable { mutableStateOf(AbaDaConfiguracao.GERAL) }
 
     Column(Modifier.fillMaxWidth()) {
         Text("CONFIGURAÇÃO", style = EstiloRotulo)
@@ -164,6 +165,7 @@ fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
             Cartao(Modifier.fillMaxWidth()) {
                 when (aba) {
+                    AbaDaConfiguracao.GERAL -> GeralNoPainel(vm, estado)
                     AbaDaConfiguracao.NUMEROS -> NumerosNoPainel(estado)
                     AbaDaConfiguracao.CARRO -> CarroNoPainel()
                     AbaDaConfiguracao.PAGINA -> PaginaComVisoesNaAba()
@@ -174,6 +176,86 @@ fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
             }
             Spacer(Modifier.height(14.dp))
         }
+    }
+}
+
+/** Visão geral de todas as funcionalidades com seus toggles master. */
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
+    val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
+
+    Column {
+        Text("Funcionalidades do painel", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Ative ou desative cada funcionalidade. Quando desabilitada, ela não aparece no painel.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Cores.TextoApoio,
+        )
+
+        Spacer(Modifier.height(20.dp))
+
+        // Contadores
+        Text("Contadores", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Opcao("Desabilitado", false) { }
+            Opcao("Habilitado", true) { }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // Números
+        Text("Números", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Opcao("Nenhum", !ajustes.habilitarNumerosNoPainel) { Cluster.alternarHabilitarNumerosNoPainel() }
+            Opcao("Habilitar", ajustes.habilitarNumerosNoPainel) { Cluster.alternarHabilitarNumerosNoPainel() }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // Carrinho
+        Text("Carrinho", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Opcao("Nenhum", !ajustes.habilitarCarroNoPainel) { Cluster.alternarHabilitarCarroNoPainel() }
+            Opcao("Habilitar", ajustes.habilitarCarroNoPainel) { Cluster.alternarHabilitarCarroNoPainel() }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // Integrar ao painel
+        Text("Integrar ao painel", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Opcao("Nenhuma", !ajustes.habilitarPaginaComVisoes) { Cluster.alternarHabilitarPaginaComVisoes() }
+            Opcao("Habilitar", ajustes.habilitarPaginaComVisoes) { Cluster.alternarHabilitarPaginaComVisoes() }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // Versão
+        Text("Versão", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Versão do app e atualizações de código.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
     }
 }
 

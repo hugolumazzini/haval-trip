@@ -63,6 +63,7 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
     /** `null` = nenhum diálogo aberto. Estado da tela, não do módulo. */
     var renomeando by remember { mutableStateOf<TripRecord?>(null) }
     var excluindo by remember { mutableStateOf<TripRecord?>(null) }
+    var abaAtiva by remember { mutableStateOf(AbaHistorico.VIAGENS) }
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -86,17 +87,35 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
             return
         }
 
-        // Gráfico de consumo
-        val analise = ConsumptionAnalysis.analyzeConsumption(estado.history)
-        GraficoDeConsumo(analise)
+        // Abas
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AbaHistorico.entries.forEach { aba ->
+                BotaoAcao(
+                    aba.rotulo,
+                    onClick = { abaAtiva = aba },
+                    cor = if (abaAtiva == aba) Cores.SuperficieSelecionada else Cores.Campo,
+                    corTexto = if (abaAtiva == aba) Cores.Destaque else Cores.TextoCorrido,
+                )
+            }
+        }
+
         Spacer(Modifier.height(12.dp))
 
-        // Gráfico de viagens
-        val analiseViagens = TripsAnalysis.analyzeTrips(estado.history)
-        GraficoDeViagens(analiseViagens)
-        Spacer(Modifier.height(12.dp))
+        // Conteúdo das abas
+        when (abaAtiva) {
+            AbaHistorico.GRAFICOS -> {
+                // Gráfico de consumo
+                val analise = ConsumptionAnalysis.analyzeConsumption(estado.history)
+                GraficoDeConsumo(analise)
+                Spacer(Modifier.height(12.dp))
 
-        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Gráfico de viagens
+                val analiseViagens = TripsAnalysis.analyzeTrips(estado.history)
+                GraficoDeViagens(analiseViagens)
+            }
+
+            AbaHistorico.VIAGENS -> {
+                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             LazyColumn(
                 Modifier.width(320.dp).fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -112,18 +131,20 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
                 }
             }
 
-            Column(Modifier.weight(1f).fillMaxHeight()) {
-                val comparacao = vm.comparar(modo, estado.history)
-                when {
-                    comparacao != null -> TabelaComparacao(comparacao.a, comparacao.b, comparacao.lines)
-                    comparando -> Vazio("Toque na segunda viagem, na lista ao lado.")
-                    emFoco != null -> DetalhesDaViagem(
-                        registro = emFoco,
-                        onComparar = { vm.compararComOutra(emFoco.recordId) },
-                        onRenomear = { renomeando = emFoco },
-                        onExcluir = { excluindo = emFoco },
-                    )
-                    else -> Vazio("Escolha uma viagem na lista ao lado.")
+                    Column(Modifier.weight(1f).fillMaxHeight()) {
+                        val comparacao = vm.comparar(modo, estado.history)
+                        when {
+                            comparacao != null -> TabelaComparacao(comparacao.a, comparacao.b, comparacao.lines)
+                            comparando -> Vazio("Toque na segunda viagem, na lista ao lado.")
+                            emFoco != null -> DetalhesDaViagem(
+                                registro = emFoco,
+                                onComparar = { vm.compararComOutra(emFoco.recordId) },
+                                onRenomear = { renomeando = emFoco },
+                                onExcluir = { excluindo = emFoco },
+                            )
+                            else -> Vazio("Escolha uma viagem na lista ao lado.")
+                        }
+                    }
                 }
             }
         }
@@ -425,4 +446,10 @@ private fun androidx.compose.foundation.layout.RowScope.Celula(
         maxLines = 1,
         modifier = Modifier.weight(peso),
     )
+}
+
+/** Abas da tela de histórico. */
+private enum class AbaHistorico(val rotulo: String) {
+    GRAFICOS("Gráficos"),
+    VIAGENS("Viagens"),
 }

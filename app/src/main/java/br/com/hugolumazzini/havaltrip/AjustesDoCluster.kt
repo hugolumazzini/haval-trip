@@ -66,7 +66,6 @@ enum class CorDoCluster(val rotulo: String, val argb: Long) {
     VERDE("Verde", 0xFF34C759),
     AMBAR("Âmbar", 0xFFFFB020),
     VERMELHO("Vermelho", 0xFFFF453A),
-    PERSONALIZADA("Personalizada (RGB)", 0xFFF5F5F5),
     DO_IMPULSE("Seguir o Impulse", 0xFFF5F5F5),
 }
 
@@ -477,8 +476,6 @@ data class AjustesDoCluster(
     /** Tamanho do rótulo em relação ao número (0.32 é o padrão). */
     val proporcaoDoRotulo: Float = 0.32f,
     val cor: CorDoCluster = CorDoCluster.BRANCO,
-    /** Cor RGB customizada para os números, quando [cor] for [CorDoCluster.PERSONALIZADA]. */
-    val corPersonalizadaArgb: Long? = null,
     val fundo: FundoDoCluster = FundoDoCluster.TRANSPARENTE,
     /** Transparência do fundo em percentual: 0 = totalmente transparente, 100 = totalmente opaco. */
     val fundoTransparencia: Float = 100f,
@@ -622,7 +619,6 @@ object Cluster {
     private const val TAMANHO_BASE_TEXTO = "tamanhoBaseDoTexto"
     private const val PROPORCAO_ROTULO = "proporcaoDoRotulo"
     private const val COR = "cor"
-    private const val COR_PERSONALIZADA = "corPersonalizada"
     private const val FUNDO = "fundo"
     private const val FUNDO_TRANSPARENCIA = "fundoTransparencia"
     private const val LUGAR = "lugar"
@@ -770,7 +766,6 @@ object Cluster {
             cor = prefs.getString(COR, null)
                 ?.let { nome -> CorDoCluster.entries.find { it.name == nome } }
                 ?: padrao.cor,
-            corPersonalizadaArgb = prefs.getLong(COR_PERSONALIZADA, -1L).takeIf { it != -1L },
             fundo = prefs.getString(FUNDO, null)
                 ?.let { nome -> FundoDoCluster.entries.find { it.name == nome } }
                 ?: padrao.fundo,
@@ -859,7 +854,6 @@ object Cluster {
             .putFloat(TAMANHO_BASE_TEXTO, novo.tamanhoBaseDoTexto)
             .putFloat(PROPORCAO_ROTULO, novo.proporcaoDoRotulo)
             .putString(COR, novo.cor.name)
-            .putLong(COR_PERSONALIZADA, novo.corPersonalizadaArgb ?: -1L)
             .putString(FUNDO, novo.fundo.name)
             .putFloat(FUNDO_TRANSPARENCIA, novo.fundoTransparencia)
             .putString(LUGAR, novo.lugar.name)
@@ -937,8 +931,6 @@ object Cluster {
     fun usarProporcaoDoRotulo(proporcao: Float) = gravar(_ajustes.value.copy(proporcaoDoRotulo = proporcao))
 
     fun usarCor(cor: CorDoCluster) = gravar(_ajustes.value.copy(cor = cor))
-
-    fun usarCorPersonalizada(argb: Long) = gravar(_ajustes.value.copy(corPersonalizadaArgb = argb))
 
     fun usarFundo(fundo: FundoDoCluster) = gravar(_ajustes.value.copy(fundo = fundo))
 

@@ -431,10 +431,6 @@ internal data class Tinta(val cor: Color, val halo: Color? = null)
  * aparece na tela de configuracao, que e onde da para fazer algo a respeito.
  */
 internal fun tinta(ajustes: AjustesDoCluster, paleta: PaletaDoImpulse.Resultado?): Tinta {
-    // Se for cor personalizada, usa a cor RGB customizada
-    if (ajustes.cor == CorDoCluster.PERSONALIZADA) {
-        return Tinta(Color(ajustes.corPersonalizadaArgb ?: 0xFFF5F5F5))
-    }
     if (ajustes.cor != CorDoCluster.DO_IMPULSE) return Tinta(Color(ajustes.cor.argb))
     val achada = (paleta as? PaletaDoImpulse.Resultado.Achou)?.paleta
         ?: return Tinta(Color(CorDoCluster.DO_IMPULSE.argb))

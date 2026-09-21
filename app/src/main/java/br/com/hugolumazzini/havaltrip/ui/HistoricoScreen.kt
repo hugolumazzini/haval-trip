@@ -37,6 +37,7 @@ import br.com.hugolumazzini.havaltrip.domain.TripRecord
 import br.com.hugolumazzini.havaltrip.engine.TripState
 import br.com.hugolumazzini.havaltrip.format.TripFormat
 import br.com.hugolumazzini.havaltrip.services.ComparisonLine
+import br.com.hugolumazzini.havaltrip.services.ConsumptionAnalysis
 import br.com.hugolumazzini.havaltrip.ui.theme.Cores
 import br.com.hugolumazzini.havaltrip.ui.theme.EstiloRotulo
 import java.text.SimpleDateFormat
@@ -83,6 +84,11 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
             Vazio("Nenhuma viagem arquivada ainda.\nFeche uma viagem no painel para ela aparecer aqui.")
             return
         }
+
+        // Gráfico de consumo
+        val analise = ConsumptionAnalysis.analyzeConsumption(estado.history)
+        GraficoDeConsumo(analise)
+        Spacer(Modifier.height(12.dp))
 
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             LazyColumn(

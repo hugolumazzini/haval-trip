@@ -255,6 +255,8 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
         Spacer(Modifier.height(20.dp))
 
         // VERSÃO - Sempre visível
+        Text("Versão", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
         SobreEAtualizacao(vm)
     }
 }

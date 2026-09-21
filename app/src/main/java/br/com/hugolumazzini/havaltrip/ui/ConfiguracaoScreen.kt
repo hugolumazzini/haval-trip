@@ -472,9 +472,6 @@ private fun NumerosNoPainel(estado: TripState) {
         )
 
         Spacer(Modifier.height(14.dp))
-        Projecao(JanelaDoPainel.NUMEROS, ajustes.telaDosNumeros)
-
-        Spacer(Modifier.height(14.dp))
         Text("Qual contador", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(8.dp))
         FlowRow(
@@ -514,27 +511,6 @@ private fun NumerosNoPainel(estado: TripState) {
         }
 
         Spacer(Modifier.height(14.dp))
-        Text("Tamanho da letra", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Normal já se ajusta sozinho ao tamanho da janela. As outras opções " +
-                "só puxam esse cálculo para cima ou para baixo.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Cores.TextoApoio,
-        )
-        Spacer(Modifier.height(8.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            ESCALAS.forEach { (rotulo, escala) ->
-                Opcao(rotulo, kotlin.math.abs(ajustes.escalaFonte - escala) < 0.01f) {
-                    Cluster.usarEscala(escala)
-                }
-            }
-        }
-
-        Spacer(Modifier.height(14.dp))
         Text("Tamanho base do texto", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(8.dp))
         Text(
@@ -554,40 +530,17 @@ private fun NumerosNoPainel(estado: TripState) {
         Text("%.2f".format(ajustes.tamanhoBaseDoTexto), style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
 
         Spacer(Modifier.height(14.dp))
-        Text("Proporção do rótulo", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Tamanho do rótulo e da unidade em relação ao número. Quanto maior, " +
-                "mais legível fica o \"km\" ou \"km/L\". O padrão é 0.32.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Cores.TextoApoio,
-        )
-        Spacer(Modifier.height(8.dp))
-        Slider(
-            value = ajustes.proporcaoDoRotulo,
-            onValueChange = { Cluster.usarProporcaoDoRotulo(it) },
-            valueRange = 0.15f..0.5f,
-            steps = 6,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text("%.2f".format(ajustes.proporcaoDoRotulo), style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
-
-        Spacer(Modifier.height(14.dp))
         Text("Cor dos números", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(8.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            CorDoCluster.entries.forEach { cor ->
+            CorDoCluster.entries.filter { it != CorDoCluster.DO_IMPULSE }.forEach { cor ->
                 OpcaoColorida(cor.rotulo, ajustes.cor == cor, Color(corDaAmostra(cor, paleta))) {
                     Cluster.usarCor(cor)
                 }
             }
-        }
-        if (ajustes.cor == CorDoCluster.DO_IMPULSE) {
-            Spacer(Modifier.height(6.dp))
-            Text(recadoDaPaleta(paleta), style = MaterialTheme.typography.bodyMedium, color = Cores.TextoApoio)
         }
 
         Spacer(Modifier.height(14.dp))
@@ -678,14 +631,6 @@ private fun DespedidaNoPainel() {
                 }
             }
         }
-        Spacer(Modifier.height(10.dp))
-        BotaoAcao("Ver a despedida", onClick = {
-            contexto.startActivity(
-                Intent(contexto, ClusterActivity::class.java)
-                    .putExtra(ESPIANDO, true)
-                    .putExtra(DESPEDIDA, true),
-            )
-        })
     }
 }
 
@@ -715,23 +660,6 @@ private fun CarroNoPainel() {
         )
 
         Spacer(Modifier.height(14.dp))
-        Projecao(JanelaDoPainel.CARRO, ajustes.telaDoCarro)
-
-        Spacer(Modifier.height(14.dp))
-        Text("Tamanho do carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(8.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            TamanhoDoCarro.Escolhiveis.forEach { tamanho ->
-                Opcao(tamanho.rotulo, ajustes.tamanhoDoCarro == tamanho) {
-                    Cluster.usarTamanhoDoCarro(tamanho)
-                }
-            }
-        }
-
-        Spacer(Modifier.height(14.dp))
         Text("Fundo do carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(4.dp))
         Text(
@@ -750,15 +678,6 @@ private fun CarroNoPainel() {
                 Opcao(fundo.rotulo, ajustes.fundoDoCarro == fundo) { Cluster.usarFundoDoCarro(fundo) }
             }
         }
-
-        Spacer(Modifier.height(14.dp))
-        PaginaDoPainel(ajustes.paginaDoCarro)
-
-        Spacer(Modifier.height(14.dp))
-        AjusteFino(JanelaDoPainel.CARRO, ajustes.empurraoDoCarro, ajustes.zoomDoCarro)
-
-        Spacer(Modifier.height(12.dp))
-        BotaoAcao("Ver como fica o carro", onClick = { espiar(contexto, ClusterCarroActivity::class.java) })
     }
 }
 

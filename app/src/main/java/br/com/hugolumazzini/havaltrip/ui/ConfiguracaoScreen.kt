@@ -22,6 +22,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -220,36 +221,48 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
         Text("Funcionalidades do painel", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
 
         Spacer(Modifier.height(14.dp))
-        Text("Números", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(6.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Opcao("Nenhum", !ajustes.habilitarNumerosNoPainel) { Cluster.alternarHabilitarNumerosNoPainel() }
-            Opcao("Habilitar", ajustes.habilitarNumerosNoPainel) { Cluster.alternarHabilitarNumerosNoPainel() }
+            Text("Números", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+            Switch(
+                checked = ajustes.habilitarNumerosNoPainel,
+                onCheckedChange = { Cluster.alternarHabilitarNumerosNoPainel() },
+            )
         }
 
         Spacer(Modifier.height(12.dp))
-        Text("Carrinho", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(6.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Opcao("Nenhum", !ajustes.habilitarCarroNoPainel) { Cluster.alternarHabilitarCarroNoPainel() }
-            Opcao("Habilitar", ajustes.habilitarCarroNoPainel) { Cluster.alternarHabilitarCarroNoPainel() }
+            Text("Carrinho", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+            Switch(
+                checked = ajustes.habilitarCarroNoPainel,
+                onCheckedChange = { Cluster.alternarHabilitarCarroNoPainel() },
+            )
         }
 
         Spacer(Modifier.height(12.dp))
-        Text("Integrar ao painel", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(6.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Opcao("Nenhuma", !ajustes.habilitarPaginaComVisoes) { Cluster.alternarHabilitarPaginaComVisoes() }
-            Opcao("Habilitar", ajustes.habilitarPaginaComVisoes) { Cluster.alternarHabilitarPaginaComVisoes() }
+            Text("Integrar ao painel", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+            Switch(
+                checked = ajustes.habilitarPaginaComVisoes,
+                onCheckedChange = { Cluster.alternarHabilitarPaginaComVisoes() },
+            )
         }
 
         Spacer(Modifier.height(20.dp))

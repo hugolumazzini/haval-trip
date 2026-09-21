@@ -843,33 +843,51 @@ private fun CarroNoPainel() {
         if (ajustes.habilitarCarroNoPainel) {
             Spacer(Modifier.height(14.dp))
             Text("Fundo do carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Na bola do ar o fundo opaco é redondo, do tamanho da bola: é ele que " +
-                "tapa a tela do ar-condicionado por baixo. Transparente deixa os dois " +
-                "desenhos aparecerem um sobre o outro.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Cores.TextoApoio,
-        )
-        Spacer(Modifier.height(8.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            FundoDoCluster.entries.forEach { fundo ->
-                Opcao(fundo.rotulo, ajustes.fundoDoCarro == fundo) { Cluster.usarFundoDoCarro(fundo) }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Na bola do ar o fundo opaco é redondo, do tamanho da bola: é ele que " +
+                    "tapa a tela do ar-condicionado por baixo. Transparente deixa os dois " +
+                    "desenhos aparecerem um sobre o outro.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Cores.TextoApoio,
+            )
+            Spacer(Modifier.height(8.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                FundoDoCluster.entries.forEach { fundo ->
+                    Opcao(fundo.rotulo, ajustes.fundoDoCarro == fundo) { Cluster.usarFundoDoCarro(fundo) }
+                }
             }
-        }
 
-        Spacer(Modifier.height(14.dp))
-        Text("Formato do carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Escolha o estilo visual do desenho do carro: quadrado com bordas retas, " +
-                "redondo com bordas arredondadas, ou com a borda azul original do Impulse.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Cores.TextoApoio,
-        )
+            Spacer(Modifier.height(14.dp))
+            Text("Transparência do fundo", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "0% é opaco, 100% é totalmente transparente.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Cores.TextoApoio,
+            )
+            Spacer(Modifier.height(8.dp))
+            Slider(
+                value = ajustes.fundoTransparencia,
+                onValueChange = { Cluster.usarFundoTransparencia(it) },
+                valueRange = 0f..100f,
+                steps = 99,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text("${ajustes.fundoTransparencia.toInt()}%", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+
+            Spacer(Modifier.height(14.dp))
+            Text("Formato do carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Escolha o estilo visual do desenho do carro: quadrado com bordas retas, " +
+                    "redondo com bordas arredondadas, ou com a borda azul original do Impulse.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Cores.TextoApoio,
+            )
             Spacer(Modifier.height(8.dp))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -879,6 +897,21 @@ private fun CarroNoPainel() {
                     Opcao(formato.rotulo, ajustes.formatoDoCarro == formato) { Cluster.usarFormatoDoCarro(formato) }
                 }
             }
+
+            Spacer(Modifier.height(14.dp))
+            Text("Quanto espaço ocupa", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+            Spacer(Modifier.height(8.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                TamanhoDoCarro.entries.forEach { tamanho ->
+                    Opcao(tamanho.rotulo, ajustes.tamanhoDoCarro == tamanho) { Cluster.usarTamanhoDoCarro(tamanho) }
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+            AjusteFino(JanelaDoPainel.CARRO, ajustes.empurraoDoCarro, ajustes.zoomDoCarro)
         }
     }
 }

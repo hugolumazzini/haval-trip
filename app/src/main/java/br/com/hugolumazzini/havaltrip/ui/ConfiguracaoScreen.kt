@@ -127,8 +127,8 @@ private enum class AbaDaConfiguracao(val rotulo: String) {
     GERAL("Geral"),
     NUMEROS("Números"),
     CARRO("Carrinho"),
-    DESPEDIDA("Despedida"),
     PAGINA("Integrar ao painel"),
+    DESPEDIDA("Despedida"),
 }
 
 /**

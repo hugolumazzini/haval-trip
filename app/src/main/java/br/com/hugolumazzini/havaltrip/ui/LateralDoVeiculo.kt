@@ -103,7 +103,6 @@ fun Diagrama(
     painel: PainelDoVeiculo,
     modifier: Modifier = Modifier,
     legenda: Boolean = true,
-    mostrarNumeros: Boolean = true,
 ) {
     val pneus = painel.pneus.associateBy { it.roda }
 
@@ -130,20 +129,18 @@ fun Diagrama(
                 // dos dois lados até quase tocar a lataria — mas só até "quase",
                 // porque as portas abertas avançam para fora do contorno do carro e
                 // passariam por baixo do número se ele avançasse mais.
-                if (mostrarNumeros) {
-                    Column(
-                        Modifier.fillMaxHeight(0.80f).fillMaxWidth(APROXIMACAO),
-                        verticalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        LinhaDePneus(painel, pneus, Roda.DIANTEIRA_ESQ, Roda.DIANTEIRA_DIR, corpo)
-                        LinhaDePneus(painel, pneus, Roda.TRASEIRA_ESQ, Roda.TRASEIRA_DIR, corpo)
-                    }
+                Column(
+                    Modifier.fillMaxHeight(0.80f).fillMaxWidth(APROXIMACAO),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    LinhaDePneus(painel, pneus, Roda.DIANTEIRA_ESQ, Roda.DIANTEIRA_DIR, corpo)
+                    LinhaDePneus(painel, pneus, Roda.TRASEIRA_ESQ, Roda.TRASEIRA_DIR, corpo)
                 }
             }
             // A legenda da unidade fica de fora na janela do painel: lá o espaço é
             // curto e a unidade não muda de uma leitura para a outra, então a linha
             // só tirava altura do desenho.
-            if (legenda && mostrarNumeros) {
+            if (legenda) {
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "pressão em ${painel.unidadeDePressao.rotulo}",

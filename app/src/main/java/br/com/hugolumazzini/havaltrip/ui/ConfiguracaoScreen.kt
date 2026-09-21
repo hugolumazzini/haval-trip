@@ -475,8 +475,18 @@ private fun NumerosNoPainel(estado: TripState) {
         )
 
         Spacer(Modifier.height(14.dp))
-        Text("Qual tela", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Opcao("Nenhuma", !ajustes.habilitarNumerosNoPainel) { Cluster.alternarHabilitarNumerosNoPainel() }
+            Opcao("Habilitar", ajustes.habilitarNumerosNoPainel) { Cluster.alternarHabilitarNumerosNoPainel() }
+        }
+
+        if (ajustes.habilitarNumerosNoPainel) {
+            Spacer(Modifier.height(14.dp))
+            Text("Qual tela", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+            Spacer(Modifier.height(8.dp))
         Text(
             "Tela 1: fica por trás dos desenhos do painel, não sobrepõe ADAS.",
             style = MaterialTheme.typography.bodySmall,
@@ -606,7 +616,8 @@ private fun NumerosNoPainel(estado: TripState) {
         }
 
         Spacer(Modifier.height(14.dp))
-        AjusteFino(JanelaDoPainel.NUMEROS, ajustes.empurraoDosNumeros, ajustes.zoomDosNumeros)
+            AjusteFino(JanelaDoPainel.NUMEROS, ajustes.empurraoDosNumeros, ajustes.zoomDosNumeros)
+        }
 
         Spacer(Modifier.height(12.dp))
         BotaoAcao("Ver como fica", onClick = { espiar(contexto, ClusterActivity::class.java) })
@@ -690,7 +701,17 @@ private fun CarroNoPainel() {
         )
 
         Spacer(Modifier.height(14.dp))
-        Text("Fundo do carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Opcao("Nenhum", !ajustes.habilitarCarroNoPainel) { Cluster.alternarHabilitarCarroNoPainel() }
+            Opcao("Habilitar", ajustes.habilitarCarroNoPainel) { Cluster.alternarHabilitarCarroNoPainel() }
+        }
+
+        if (ajustes.habilitarCarroNoPainel) {
+            Spacer(Modifier.height(14.dp))
+            Text("Fundo do carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(4.dp))
         Text(
             "Na bola do ar o fundo opaco é redondo, do tamanho da bola: é ele que " +
@@ -718,31 +739,15 @@ private fun CarroNoPainel() {
             style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
-        Spacer(Modifier.height(8.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            FormatoDoCarro.entries.forEach { formato ->
-                Opcao(formato.rotulo, ajustes.formatoDoCarro == formato) { Cluster.usarFormatoDoCarro(formato) }
+            Spacer(Modifier.height(8.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                FormatoDoCarro.entries.forEach { formato ->
+                    Opcao(formato.rotulo, ajustes.formatoDoCarro == formato) { Cluster.usarFormatoDoCarro(formato) }
+                }
             }
-        }
-
-        Spacer(Modifier.height(14.dp))
-        Text("Números no carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Mostrar ou ocultar as pressões dos pneus e temperaturas no diagrama do carro.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Cores.TextoApoio,
-        )
-        Spacer(Modifier.height(8.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Opcao("Mostrar", ajustes.mostrarNumerosNoCarro) { Cluster.alternarMostrarNumerosNoCarro() }
-            Opcao("Ocultar", !ajustes.mostrarNumerosNoCarro) { Cluster.alternarMostrarNumerosNoCarro() }
         }
     }
 }
@@ -789,7 +794,17 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
     )
 
     Spacer(Modifier.height(14.dp))
-    BolaDeUmaVez(agora, ouvindoPagina)
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Opcao("Nenhuma", !ajustes.habilitarPaginaComVisoes) { Cluster.alternarHabilitarPaginaComVisoes() }
+        Opcao("Habilitar", ajustes.habilitarPaginaComVisoes) { Cluster.alternarHabilitarPaginaComVisoes() }
+    }
+
+    if (ajustes.habilitarPaginaComVisoes) {
+        Spacer(Modifier.height(14.dp))
+        BolaDeUmaVez(agora, ouvindoPagina)
 
     Spacer(Modifier.height(14.dp))
     Projecao(JanelaDoPainel.MENU, ajustes.telaDoMenu)
@@ -955,6 +970,7 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
             style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
+        }
     }
 
     Spacer(Modifier.height(12.dp))

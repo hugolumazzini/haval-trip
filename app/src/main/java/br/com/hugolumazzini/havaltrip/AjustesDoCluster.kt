@@ -558,11 +558,23 @@ data class AjustesDoCluster(
      */
     val fundoDoMenu: FundoDoCluster = FundoDoCluster.PRETO,
     /**
-     * Se os números (pressões e temperaturas) devem ser mostrados no diagrama do carro.
+     * Se a janela de números está habilitada no painel.
      *
-     * Quando desabilitado, mostra apenas o desenho do carro sem os números das pressões.
+     * Quando desabilitado, nenhuma janela de números é projetada.
      */
-    val mostrarNumerosNoCarro: Boolean = true,
+    val habilitarNumerosNoPainel: Boolean = true,
+    /**
+     * Se a janela de carro está habilitada no painel.
+     *
+     * Quando desabilitado, nenhuma janela de carro é projetada.
+     */
+    val habilitarCarroNoPainel: Boolean = true,
+    /**
+     * Se a página com visões (integrada ao painel) está habilitada.
+     *
+     * Quando desabilitado, a página não é projetada.
+     */
+    val habilitarPaginaComVisoes: Boolean = true,
     /**
      * Como os dados se identificam dentro da bola. Ver [RotuloDoCluster].
      *
@@ -657,7 +669,9 @@ object Cluster {
     private const val ROTULO_MENU = "rotuloDoMenu"
     private const val AFASTAMENTO_MENU = "afastamentoDoMenu"
     private const val ITENS_DESPEDIDA = "itensDaDespedida"
-    private const val MOSTRAR_NUMEROS_CARRO = "mostrarNumerosNoCarro"
+    private const val HABILITAR_NUMEROS = "habilitarNumerosNoPainel"
+    private const val HABILITAR_CARRO = "habilitarCarroNoPainel"
+    private const val HABILITAR_PAGINA = "habilitarPaginaComVisoes"
 
     /**
      * O que se grava no lugar de "nenhuma tela".
@@ -849,7 +863,9 @@ object Cluster {
                 ?.split(",")
                 ?.mapNotNull { nome -> ItemDoCluster.entries.find { it.name == nome } }
                 ?: padrao.itensDaDespedida,
-            mostrarNumerosNoCarro = prefs.getBoolean(MOSTRAR_NUMEROS_CARRO, padrao.mostrarNumerosNoCarro),
+            habilitarNumerosNoPainel = prefs.getBoolean(HABILITAR_NUMEROS, padrao.habilitarNumerosNoPainel),
+            habilitarCarroNoPainel = prefs.getBoolean(HABILITAR_CARRO, padrao.habilitarCarroNoPainel),
+            habilitarPaginaComVisoes = prefs.getBoolean(HABILITAR_PAGINA, padrao.habilitarPaginaComVisoes),
         )
     }
 
@@ -894,7 +910,9 @@ object Cluster {
             .putString(ROTULO_MENU, novo.rotuloDoMenu.name)
             .putInt(AFASTAMENTO_MENU, novo.afastamentoDoMenu.porcento)
             .putString(ITENS_DESPEDIDA, novo.itensDaDespedida.joinToString(",") { it.name })
-            .putBoolean(MOSTRAR_NUMEROS_CARRO, novo.mostrarNumerosNoCarro)
+            .putBoolean(HABILITAR_NUMEROS, novo.habilitarNumerosNoPainel)
+            .putBoolean(HABILITAR_CARRO, novo.habilitarCarroNoPainel)
+            .putBoolean(HABILITAR_PAGINA, novo.habilitarPaginaComVisoes)
             .apply()
     }
 
@@ -1003,8 +1021,14 @@ object Cluster {
     fun usarRotuloDoMenu(rotulo: RotuloDoCluster) =
         gravar(_ajustes.value.copy(rotuloDoMenu = rotulo))
 
-    fun alternarMostrarNumerosNoCarro() =
-        gravar(_ajustes.value.copy(mostrarNumerosNoCarro = !_ajustes.value.mostrarNumerosNoCarro))
+    fun alternarHabilitarNumerosNoPainel() =
+        gravar(_ajustes.value.copy(habilitarNumerosNoPainel = !_ajustes.value.habilitarNumerosNoPainel))
+
+    fun alternarHabilitarCarroNoPainel() =
+        gravar(_ajustes.value.copy(habilitarCarroNoPainel = !_ajustes.value.habilitarCarroNoPainel))
+
+    fun alternarHabilitarPaginaComVisoes() =
+        gravar(_ajustes.value.copy(habilitarPaginaComVisoes = !_ajustes.value.habilitarPaginaComVisoes))
 
     /**
      * Em qual página do carrossel do painel a janela do carro aparece.

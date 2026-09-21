@@ -569,16 +569,8 @@ private fun NumerosNoPainel(estado: TripState) {
             color = Cores.TextoApoio,
         )
 
-        Spacer(Modifier.height(14.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Opcao("Nenhuma", !ajustes.habilitarNumerosNoPainel) { Cluster.alternarHabilitarNumerosNoPainel() }
-            Opcao("Habilitar", ajustes.habilitarNumerosNoPainel) { Cluster.alternarHabilitarNumerosNoPainel() }
-        }
-
         if (ajustes.habilitarNumerosNoPainel) {
+            Spacer(Modifier.height(14.dp))
             Spacer(Modifier.height(14.dp))
             Text("Qual tela", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
             Spacer(Modifier.height(8.dp))
@@ -795,15 +787,6 @@ private fun CarroNoPainel() {
             color = Cores.TextoApoio,
         )
 
-        Spacer(Modifier.height(14.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Opcao("Nenhum", !ajustes.habilitarCarroNoPainel) { Cluster.alternarHabilitarCarroNoPainel() }
-            Opcao("Habilitar", ajustes.habilitarCarroNoPainel) { Cluster.alternarHabilitarCarroNoPainel() }
-        }
-
         if (ajustes.habilitarCarroNoPainel) {
             Spacer(Modifier.height(14.dp))
             Text("Fundo do carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
@@ -887,15 +870,6 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
         style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
-
-    Spacer(Modifier.height(14.dp))
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Opcao("Nenhuma", !ajustes.habilitarPaginaComVisoes) { Cluster.alternarHabilitarPaginaComVisoes() }
-        Opcao("Habilitar", ajustes.habilitarPaginaComVisoes) { Cluster.alternarHabilitarPaginaComVisoes() }
-    }
 
     if (ajustes.habilitarPaginaComVisoes) {
         Spacer(Modifier.height(14.dp))

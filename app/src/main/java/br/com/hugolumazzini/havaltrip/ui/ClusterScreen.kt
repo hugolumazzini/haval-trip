@@ -131,7 +131,7 @@ fun ClusterScreen(
                 painelDoCarro,
                 Modifier
                     .fillMaxSize()
-                    .background(Color(ajustes.fundo.argb))
+                    .background(Color(ajustes.fundo.argb).copy(alpha = ajustes.fundoTransparencia / 100f))
                     .medindo(
                         JanelaDoPainel.NUMEROS,
                         constraints.maxWidth,
@@ -184,7 +184,8 @@ fun ClusterScreen(
                 // O fundo é do bloco, e não da janela: a janela é a tela
                 // inteira do painel, e pintá-la inteira apagaria o carro em
                 // vez de tapar só o pedaço que atrapalha.
-                .background(Color(ajustes.fundo.argb))
+                // A transparência é aplicada como fração do alpha da cor (0-100% => 0-1)
+                .background(Color(ajustes.fundo.argb).copy(alpha = ajustes.fundoTransparencia / 100f))
                 // Conta à central onde caiu. Ver `QuadroDeMedidas`.
                 .medindo(
                     JanelaDoPainel.NUMEROS,

@@ -120,10 +120,8 @@ private fun paradaMaisProxima(segundos: Double?): Int {
 private enum class AbaDaConfiguracao(val rotulo: String) {
     // A ordem é a do uso, não a da implementação: o que o motorista abre todo
     // dia (zerar contador) vem primeiro, depois o que ele abre de vez em quando
-    // (versão), e por último o que se acerta uma vez e não se mexe mais.
+    // (nuances), e por último o que se acerta uma vez e não se mexe mais.
     GERAL("Geral"),
-    CONTADORES("Contadores"),
-    VERSAO("Versão"),
     NUMEROS("Números"),
     CARRO("Carrinho"),
     DESPEDIDA("Despedida"),
@@ -170,8 +168,6 @@ fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
                     AbaDaConfiguracao.CARRO -> CarroNoPainel()
                     AbaDaConfiguracao.PAGINA -> PaginaComVisoesNaAba()
                     AbaDaConfiguracao.DESPEDIDA -> DespedidaNoPainel()
-                    AbaDaConfiguracao.CONTADORES -> Contadores(vm, estado)
-                    AbaDaConfiguracao.VERSAO -> SobreEAtualizacao(vm)
                 }
             }
             Spacer(Modifier.height(14.dp))
@@ -179,39 +175,51 @@ fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
     }
 }
 
-/** Visão geral de todas as funcionalidades com seus toggles master. */
+/** Visão geral com contadores, toggles de funcionalidades e versão. */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
     val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
 
     Column {
-        Text("Funcionalidades do painel", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Ative ou desative cada funcionalidade. Quando desabilitada, ela não aparece no painel.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Cores.TextoApoio,
-        )
+        Text("Geral", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
 
         Spacer(Modifier.height(20.dp))
 
-        // Contadores
-        Text("Contadores", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(8.dp))
+        // CONTADORES MANUAIS
+        Text("Contadores manuais", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Quantos contadores aparecem na lateral, fora a Viagem atual. " +
+                "Os que saem da lista param de contar, mas guardam o que já mediram.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(12.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Opcao("Desabilitado", false) { }
-            Opcao("Habilitado", true) { }
+            (1..TripSnapshot.MAX_CONTADORES_MANUAIS).forEach { quantos ->
+                Opcao(
+                    texto = quantos.toString(),
+                    marcada = estado.contadoresManuais == quantos,
+                    onClick = { vm.definirContadoresManuais(quantos) },
+                )
+            }
         }
+
+        Spacer(Modifier.height(18.dp))
+        ZeragemAutomatica(vm, estado)
 
         Spacer(Modifier.height(20.dp))
 
-        // Números
-        Text("Números", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(8.dp))
+        // FUNCIONALIDADES DO PAINEL
+        Text("Funcionalidades do painel", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+
+        Spacer(Modifier.height(14.dp))
+        Text("Números", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(6.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -220,11 +228,9 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
             Opcao("Habilitar", ajustes.habilitarNumerosNoPainel) { Cluster.alternarHabilitarNumerosNoPainel() }
         }
 
-        Spacer(Modifier.height(20.dp))
-
-        // Carrinho
-        Text("Carrinho", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
+        Text("Carrinho", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(6.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -233,11 +239,9 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
             Opcao("Habilitar", ajustes.habilitarCarroNoPainel) { Cluster.alternarHabilitarCarroNoPainel() }
         }
 
-        Spacer(Modifier.height(20.dp))
-
-        // Integrar ao painel
-        Text("Integrar ao painel", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
+        Text("Integrar ao painel", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(6.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -248,14 +252,10 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
 
         Spacer(Modifier.height(20.dp))
 
-        // Versão
+        // VERSÃO
         Text("Versão", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(8.dp))
-        Text(
-            "Versão do app e atualizações de código.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Cores.TextoApoio,
-        )
+        SobreEAtualizacao(vm)
     }
 }
 

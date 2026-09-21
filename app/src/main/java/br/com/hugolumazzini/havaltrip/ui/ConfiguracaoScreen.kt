@@ -186,33 +186,35 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
 
         Spacer(Modifier.height(20.dp))
 
-        // CONTADORES MANUAIS
-        Text("Contadores manuais", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Quantos contadores aparecem na lateral, fora a Viagem atual. " +
-                "Os que saem da lista param de contar, mas guardam o que já mediram.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Cores.TextoApoio,
-        )
-        Spacer(Modifier.height(12.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            (1..TripSnapshot.MAX_CONTADORES_MANUAIS).forEach { quantos ->
-                Opcao(
-                    texto = quantos.toString(),
-                    marcada = estado.contadoresManuais == quantos,
-                    onClick = { vm.definirContadoresManuais(quantos) },
-                )
+        // CONTADORES MANUAIS - Só aparece se Números estiver habilitado
+        if (ajustes.habilitarNumerosNoPainel) {
+            Text("Contadores manuais", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Quantos contadores aparecem na lateral, fora a Viagem atual. " +
+                    "Os que saem da lista param de contar, mas guardam o que já mediram.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Cores.TextoApoio,
+            )
+            Spacer(Modifier.height(12.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                (1..TripSnapshot.MAX_CONTADORES_MANUAIS).forEach { quantos ->
+                    Opcao(
+                        texto = quantos.toString(),
+                        marcada = estado.contadoresManuais == quantos,
+                        onClick = { vm.definirContadoresManuais(quantos) },
+                    )
+                }
             }
+
+            Spacer(Modifier.height(18.dp))
+            ZeragemAutomatica(vm, estado)
+
+            Spacer(Modifier.height(20.dp))
         }
-
-        Spacer(Modifier.height(18.dp))
-        ZeragemAutomatica(vm, estado)
-
-        Spacer(Modifier.height(20.dp))
 
         // FUNCIONALIDADES DO PAINEL
         Text("Funcionalidades do painel", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
@@ -252,7 +254,7 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
 
         Spacer(Modifier.height(20.dp))
 
-        // VERSÃO
+        // VERSÃO - Sempre visível
         Text("Versão", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(8.dp))
         SobreEAtualizacao(vm)

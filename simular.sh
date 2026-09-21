@@ -35,8 +35,9 @@ echo "    instalado"
 # navegação", por exemplo) caem em lugar diferente do que cairiam no carro, e a
 # conferência não vale nada. Daí criar o display secundário aqui, no tamanho
 # certo, em vez de depender de quem o criou à mão no emulador.
-adb shell settings put global overlay_display_devices "1920x720/320" >/dev/null
-sleep 2
+# Desabilitado: overlay não é necessário, o painel é criado manualmente
+# adb shell settings put global overlay_display_devices "1920x720/320" >/dev/null
+# sleep 2
 
 # O primeiro display que não é o 0. O display 0 é a tela do emulador, que faz
 # o papel da central; qualquer outro só existe porque foi criado à mão para

@@ -466,6 +466,7 @@ private fun gerarHistoricoFake(): List<TripRecord> {
     val agora = System.currentTimeMillis()
     val dia = 24 * 60 * 60 * 1000L
     val resultado = mutableListOf<TripRecord>()
+    var odometerAtual = 45000.0
 
     // Gera viagens para os últimos 90 dias
     repeat(90) { diasAtras ->
@@ -473,13 +474,18 @@ private fun gerarHistoricoFake(): List<TripRecord> {
         val quantasViagens = (Math.random() * 5).toInt() + 1 // 1-5 viagens por dia
 
         repeat(quantasViagens) { index ->
+            val distancia = Math.random() * 50 + 10
+            val odometerStart = odometerAtual
+            val odometerEnd = odometerAtual + distancia
+            odometerAtual = odometerEnd
+
             resultado.add(
                 TripRecord(
                     recordId = "fake_${diasAtras}_${index}",
                     tripId = "trip_${index % 3}",
                     label = "Trip ${String.format("%03d", resultado.size + 1)}",
                     metrics = br.com.hugolumazzini.havaltrip.domain.TripMetrics(
-                        distanceKm = Math.random() * 50 + 10,
+                        distanceKm = distancia,
                         movingTimeS = (Math.random() * 60 + 20) * 60,
                         idleTimeS = (Math.random() * 20 + 5) * 60,
                         fuelLitres = Math.random() * 3 + 2,
@@ -487,8 +493,8 @@ private fun gerarHistoricoFake(): List<TripRecord> {
                     ),
                     startedAtMs = dataViagem,
                     savedAtMs = dataViagem,
-                    odometerStartKm = 45000.0,
-                    odometerEndKm = 45050.0,
+                    odometerStartKm = odometerStart,
+                    odometerEndKm = odometerEnd,
                 )
             )
         }

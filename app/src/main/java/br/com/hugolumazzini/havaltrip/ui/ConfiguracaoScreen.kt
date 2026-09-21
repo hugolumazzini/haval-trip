@@ -475,15 +475,20 @@ private fun NumerosNoPainel(estado: TripState) {
         )
 
         Spacer(Modifier.height(14.dp))
-        Text("Qual contador", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Text("Qual tela", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Tela 1: fica por trás dos desenhos do painel, não sobrepõe ADAS.\n" +
+            "Tela 3: fica por cima de tudo, inclusive ADAS. Use quando tela 1 ficar escondida.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
         Spacer(Modifier.height(8.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // "O da tela" é o padrão porque acompanha quem troca de contador na
-            // central, sem obrigar a vir aqui de novo.
-            Opcao("O da tela", ajustes.tripId == null) { Cluster.usarTrip(null) }
+            Opcao("Tela 1", ajustes.tripId == null) { Cluster.usarTrip(null) }
             estado.trips.forEach { trip ->
                 Opcao(trip.label, ajustes.tripId == trip.id) { Cluster.usarTrip(trip.id) }
             }

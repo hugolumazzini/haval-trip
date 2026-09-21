@@ -184,10 +184,6 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
     val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
 
     Column {
-        Text("Geral", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
-
-        Spacer(Modifier.height(20.dp))
-
         // FUNCIONALIDADES DO PAINEL - Ocupa 50% da largura
         Column(modifier = Modifier.fillMaxWidth(0.5f)) {
             Text("Funcionalidades do painel", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
@@ -259,8 +255,6 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
         Spacer(Modifier.height(20.dp))
 
         // VERSÃO - Sempre visível
-        Text("Versão", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(8.dp))
         SobreEAtualizacao(vm)
     }
 }
@@ -310,8 +304,6 @@ private fun SobreEAtualizacao(vm: TripViewModel) {
     val situacao by vm.atualizador.collectAsStateWithLifecycle()
 
     Column {
-        Text("Versão", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
-        Spacer(Modifier.height(4.dp))
         Text(
             "$nome (código $codigo)",
             style = MaterialTheme.typography.bodyMedium,

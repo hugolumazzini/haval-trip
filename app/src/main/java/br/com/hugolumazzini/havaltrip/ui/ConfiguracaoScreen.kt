@@ -232,7 +232,9 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
         }
 
         Spacer(Modifier.height(14.dp))
-        ZeragemAutomatica(vm, estado)
+        Column(modifier = Modifier.fillMaxWidth(0.5f)) {
+            ZeragemAutomatica(vm, estado)
+        }
 
         Spacer(Modifier.height(20.dp))
 

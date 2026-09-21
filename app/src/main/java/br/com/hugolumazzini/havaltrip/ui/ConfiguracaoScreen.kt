@@ -208,6 +208,34 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
     val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
 
     Column {
+        // CONTADORES - Quantos e tempo de zeragem
+        Text("Contadores", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Quantos contadores aparecem na lateral, fora a Viagem atual. " +
+                "Os que saem da lista param de contar, mas guardam o que já mediram.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(12.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            (1..TripSnapshot.MAX_CONTADORES_MANUAIS).forEach { quantos ->
+                Opcao(
+                    texto = quantos.toString(),
+                    marcada = estado.contadoresManuais == quantos,
+                    onClick = { vm.definirContadoresManuais(quantos) },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        ZeragemAutomatica(vm, estado)
+
+        Spacer(Modifier.height(20.dp))
+
         // FUNCIONALIDADES DO PAINEL - Ocupa 50% da largura
         Column(modifier = Modifier.fillMaxWidth(0.5f)) {
             Text("Funcionalidades do painel", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)

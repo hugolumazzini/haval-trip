@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -42,6 +43,7 @@ import br.com.hugolumazzini.havaltrip.Atualizador
 import br.com.hugolumazzini.havaltrip.Cluster
 import androidx.compose.runtime.LaunchedEffect
 import br.com.hugolumazzini.havaltrip.CorDoCluster
+import br.com.hugolumazzini.havaltrip.FormatoDoCarro
 import br.com.hugolumazzini.havaltrip.telemetry.PaletaDoImpulse
 import br.com.hugolumazzini.havaltrip.FundoDoCluster
 import br.com.hugolumazzini.havaltrip.MAXIMO_DE_ITENS
@@ -543,6 +545,14 @@ private fun NumerosNoPainel(estado: TripState) {
             }
         }
 
+        // RGB Color Picker para cor personalizada
+        if (ajustes.cor == CorDoCluster.PERSONALIZADA) {
+            Spacer(Modifier.height(14.dp))
+            SeletorRGB(ajustes.corPersonalizadaArgb ?: 0xFFF5F5F5) { novaArgb ->
+                Cluster.usarCorPersonalizada(novaArgb)
+            }
+        }
+
         Spacer(Modifier.height(14.dp))
         Text("Fundo do bloco", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(4.dp))
@@ -562,6 +572,24 @@ private fun NumerosNoPainel(estado: TripState) {
                 Opcao(fundo.rotulo, ajustes.fundo == fundo) { Cluster.usarFundo(fundo) }
             }
         }
+
+        Spacer(Modifier.height(14.dp))
+        Text("Transparência do fundo", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "0% é totalmente transparente, 100% é totalmente opaco.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(8.dp))
+        Slider(
+            value = ajustes.fundoTransparencia,
+            onValueChange = { Cluster.usarFundoTransparencia(it) },
+            valueRange = 0f..100f,
+            steps = 99,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text("${ajustes.fundoTransparencia.toInt()}%", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
 
         Spacer(Modifier.height(14.dp))
         Text("Quanto espaço ocupa", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
@@ -676,6 +704,25 @@ private fun CarroNoPainel() {
         ) {
             FundoDoCluster.entries.forEach { fundo ->
                 Opcao(fundo.rotulo, ajustes.fundoDoCarro == fundo) { Cluster.usarFundoDoCarro(fundo) }
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        Text("Formato do carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Escolha o estilo visual do desenho do carro: quadrado com bordas retas, " +
+                "redondo com bordas arredondadas, ou com a borda azul original do Impulse.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            FormatoDoCarro.entries.forEach { formato ->
+                Opcao(formato.rotulo, ajustes.formatoDoCarro == formato) { Cluster.usarFormatoDoCarro(formato) }
             }
         }
     }
@@ -1468,6 +1515,93 @@ private fun recadoDaProjecao(
         "Projetada na tela ${resultado.tela}. Ela volta sozinha a cada partida do carro."
     resultado is ProjetorDoPainel.Resultado.Falhou -> "Não deu: ${resultado.motivo}."
     else -> null
+}
+
+/**
+ * Seletor RGB para cores customizadas.
+ *
+ * Mostra três sliders independentes para controlar Red, Green e Blue de 0 a 255,
+ * e uma amostra da cor resultante.
+ */
+@Composable
+private fun SeletorRGB(corArgb: Long, onChange: (Long) -> Unit) {
+    // Extrai RGB da cor ARGB (ignorando alpha)
+    var r by remember { mutableFloatStateOf(((corArgb shr 16) and 0xFF).toFloat()) }
+    var g by remember { mutableFloatStateOf(((corArgb shr 8) and 0xFF).toFloat()) }
+    var b by remember { mutableFloatStateOf((corArgb and 0xFF).toFloat()) }
+
+    Column {
+        Text("Seletor RGB", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
+
+        // Amostra de cor
+        Box(
+            Modifier
+                .size(60.dp)
+                .background(Color(0xFF000000L or ((r.toInt().toLong() and 0xFF) shl 16) or ((g.toInt().toLong() and 0xFF) shl 8) or (b.toInt().toLong() and 0xFF)))
+                .clip(RoundedCornerShape(8.dp)),
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        // Slider Vermelho (Red)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("R", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido, modifier = Modifier.widthIn(min = 24.dp))
+            Slider(
+                value = r,
+                onValueChange = {
+                    r = it
+                    onChange(0xFF000000L or ((r.toInt().toLong() and 0xFF) shl 16) or ((g.toInt().toLong() and 0xFF) shl 8) or (b.toInt().toLong() and 0xFF))
+                },
+                valueRange = 0f..255f,
+                steps = 254,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp),
+            )
+            Text("${r.toInt()}", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio, modifier = Modifier.widthIn(min = 40.dp))
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Slider Verde (Green)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("G", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido, modifier = Modifier.widthIn(min = 24.dp))
+            Slider(
+                value = g,
+                onValueChange = {
+                    g = it
+                    onChange(0xFF000000L or ((r.toInt().toLong() and 0xFF) shl 16) or ((g.toInt().toLong() and 0xFF) shl 8) or (b.toInt().toLong() and 0xFF))
+                },
+                valueRange = 0f..255f,
+                steps = 254,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp),
+            )
+            Text("${g.toInt()}", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio, modifier = Modifier.widthIn(min = 40.dp))
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Slider Azul (Blue)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("B", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido, modifier = Modifier.widthIn(min = 24.dp))
+            Slider(
+                value = b,
+                onValueChange = {
+                    b = it
+                    onChange(0xFF000000L or ((r.toInt().toLong() and 0xFF) shl 16) or ((g.toInt().toLong() and 0xFF) shl 8) or (b.toInt().toLong() and 0xFF))
+                },
+                valueRange = 0f..255f,
+                steps = 254,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp),
+            )
+            Text("${b.toInt()}", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio, modifier = Modifier.widthIn(min = 40.dp))
+        }
+    }
 }
 
 /** Os tamanhos de letra oferecidos, como multiplicador do cálculo automático. */

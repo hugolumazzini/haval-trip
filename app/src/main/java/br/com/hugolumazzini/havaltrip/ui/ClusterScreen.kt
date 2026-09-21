@@ -131,7 +131,7 @@ fun ClusterScreen(
                 painelDoCarro,
                 Modifier
                     .fillMaxSize()
-                    .background(Color(ajustes.fundo.argb))
+                    .background(Color(ajustes.fundo.argb).copy(alpha = ajustes.fundoTransparencia / 100f))
                     .medindo(
                         JanelaDoPainel.NUMEROS,
                         constraints.maxWidth,
@@ -184,7 +184,8 @@ fun ClusterScreen(
                 // O fundo é do bloco, e não da janela: a janela é a tela
                 // inteira do painel, e pintá-la inteira apagaria o carro em
                 // vez de tapar só o pedaço que atrapalha.
-                .background(Color(ajustes.fundo.argb))
+                // A transparência é aplicada como fração do alpha da cor (0-100% => 0-1)
+                .background(Color(ajustes.fundo.argb).copy(alpha = ajustes.fundoTransparencia / 100f))
                 // Conta à central onde caiu. Ver `QuadroDeMedidas`.
                 .medindo(
                     JanelaDoPainel.NUMEROS,
@@ -430,6 +431,10 @@ internal data class Tinta(val cor: Color, val halo: Color? = null)
  * aparece na tela de configuracao, que e onde da para fazer algo a respeito.
  */
 internal fun tinta(ajustes: AjustesDoCluster, paleta: PaletaDoImpulse.Resultado?): Tinta {
+    // Se for cor personalizada, usa a cor RGB customizada
+    if (ajustes.cor == CorDoCluster.PERSONALIZADA) {
+        return Tinta(Color(ajustes.corPersonalizadaArgb ?: 0xFFF5F5F5))
+    }
     if (ajustes.cor != CorDoCluster.DO_IMPULSE) return Tinta(Color(ajustes.cor.argb))
     val achada = (paleta as? PaletaDoImpulse.Resultado.Achou)?.paleta
         ?: return Tinta(Color(CorDoCluster.DO_IMPULSE.argb))

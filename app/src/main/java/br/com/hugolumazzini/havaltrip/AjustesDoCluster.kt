@@ -66,6 +66,7 @@ enum class CorDoCluster(val rotulo: String, val argb: Long) {
     VERDE("Verde", 0xFF34C759),
     AMBAR("Âmbar", 0xFFFFB020),
     VERMELHO("Vermelho", 0xFFFF453A),
+    PERSONALIZADA("Personalizada (RGB)", 0xFFF5F5F5),
     DO_IMPULSE("Seguir o Impulse", 0xFFF5F5F5),
 }
 
@@ -97,6 +98,18 @@ enum class RotuloDoCluster(val rotulo: String) {
     TEXTO("Texto"),
     ICONE("Ícone ao lado"),
     NENHUM("Só o número"),
+}
+
+/**
+ * Formato visual do desenho do carro.
+ *
+ * Oferece diferentes estilos para o carrinho: quadrado, redondo ou com a borda
+ * azul original do Impulse.
+ */
+enum class FormatoDoCarro(val rotulo: String) {
+    QUADRADO("Quadrado"),
+    REDONDO("Redondo"),
+    BORDA_AZUL_ORIGINAL("Borda azul original"),
 }
 
 enum class FundoDoCluster(val rotulo: String, val argb: Long) {
@@ -464,7 +477,11 @@ data class AjustesDoCluster(
     /** Tamanho do rótulo em relação ao número (0.32 é o padrão). */
     val proporcaoDoRotulo: Float = 0.32f,
     val cor: CorDoCluster = CorDoCluster.BRANCO,
+    /** Cor RGB customizada para os números, quando [cor] for [CorDoCluster.PERSONALIZADA]. */
+    val corPersonalizadaArgb: Long? = null,
     val fundo: FundoDoCluster = FundoDoCluster.TRANSPARENTE,
+    /** Transparência do fundo em percentual: 0 = totalmente transparente, 100 = totalmente opaco. */
+    val fundoTransparencia: Float = 100f,
     // Os dois `lugar` são herança: as telas desenham sempre a partir do centro
     // desde que os cantos prontos saíram da configuração (ver [Empurrao]). O
     // campo continua gravado porque `lugarDoCarro` ainda distingue um caso — a
@@ -474,6 +491,7 @@ data class AjustesDoCluster(
     val lugarDoCarro: LugarNoPainel = LugarNoPainel.MEIO_CENTRO,
     val tamanhoDoCarro: TamanhoDoCarro = TamanhoDoCarro.MEDIO,
     val fundoDoCarro: FundoDoCluster = FundoDoCluster.TRANSPARENTE,
+    val formatoDoCarro: FormatoDoCarro = FormatoDoCarro.REDONDO,
     val telaDosNumeros: Int? = null,
     val telaDoCarro: Int? = null,
     val empurraoDosNumeros: Empurrao = Empurrao(),
@@ -604,12 +622,15 @@ object Cluster {
     private const val TAMANHO_BASE_TEXTO = "tamanhoBaseDoTexto"
     private const val PROPORCAO_ROTULO = "proporcaoDoRotulo"
     private const val COR = "cor"
+    private const val COR_PERSONALIZADA = "corPersonalizada"
     private const val FUNDO = "fundo"
+    private const val FUNDO_TRANSPARENCIA = "fundoTransparencia"
     private const val LUGAR = "lugar"
     private const val TAMANHO = "tamanho"
     private const val LUGAR_CARRO = "lugarDoCarro"
     private const val TAMANHO_CARRO = "tamanhoDoCarro"
     private const val FUNDO_CARRO = "fundoDoCarro"
+    private const val FORMATO_CARRO = "formatoDoCarro"
     private const val TELA_NUMEROS = "telaDosNumeros"
     private const val TELA_CARRO = "telaDoCarro"
     private const val EMPURRAO_NUMEROS_X = "empurraoDosNumerosX"
@@ -749,9 +770,11 @@ object Cluster {
             cor = prefs.getString(COR, null)
                 ?.let { nome -> CorDoCluster.entries.find { it.name == nome } }
                 ?: padrao.cor,
+            corPersonalizadaArgb = prefs.getLong(COR_PERSONALIZADA, -1L).takeIf { it != -1L },
             fundo = prefs.getString(FUNDO, null)
                 ?.let { nome -> FundoDoCluster.entries.find { it.name == nome } }
                 ?: padrao.fundo,
+            fundoTransparencia = prefs.getFloat(FUNDO_TRANSPARENCIA, padrao.fundoTransparencia),
             lugar = prefs.getString(LUGAR, null)
                 ?.let { nome -> LugarNoPainel.entries.find { it.name == nome } }
                 ?: padrao.lugar,
@@ -767,6 +790,9 @@ object Cluster {
             fundoDoCarro = prefs.getString(FUNDO_CARRO, null)
                 ?.let { nome -> FundoDoCluster.entries.find { it.name == nome } }
                 ?: padrao.fundoDoCarro,
+            formatoDoCarro = prefs.getString(FORMATO_CARRO, null)
+                ?.let { nome -> FormatoDoCarro.entries.find { it.name == nome } }
+                ?: padrao.formatoDoCarro,
             telaDosNumeros = prefs.getInt(TELA_NUMEROS, SEM_TELA).takeIf { it != SEM_TELA },
             telaDoCarro = prefs.getInt(TELA_CARRO, SEM_TELA).takeIf { it != SEM_TELA },
             // Passa pelo `mais` de propósito: é ele que contém no limite, e
@@ -833,12 +859,15 @@ object Cluster {
             .putFloat(TAMANHO_BASE_TEXTO, novo.tamanhoBaseDoTexto)
             .putFloat(PROPORCAO_ROTULO, novo.proporcaoDoRotulo)
             .putString(COR, novo.cor.name)
+            .putLong(COR_PERSONALIZADA, novo.corPersonalizadaArgb ?: -1L)
             .putString(FUNDO, novo.fundo.name)
+            .putFloat(FUNDO_TRANSPARENCIA, novo.fundoTransparencia)
             .putString(LUGAR, novo.lugar.name)
             .putString(TAMANHO, novo.tamanho.name)
             .putString(LUGAR_CARRO, novo.lugarDoCarro.name)
             .putString(TAMANHO_CARRO, novo.tamanhoDoCarro.name)
             .putString(FUNDO_CARRO, novo.fundoDoCarro.name)
+            .putString(FORMATO_CARRO, novo.formatoDoCarro.name)
             .putInt(TELA_NUMEROS, novo.telaDosNumeros ?: SEM_TELA)
             .putInt(TELA_CARRO, novo.telaDoCarro ?: SEM_TELA)
             .putInt(EMPURRAO_NUMEROS_X, novo.empurraoDosNumeros.x)
@@ -909,7 +938,11 @@ object Cluster {
 
     fun usarCor(cor: CorDoCluster) = gravar(_ajustes.value.copy(cor = cor))
 
+    fun usarCorPersonalizada(argb: Long) = gravar(_ajustes.value.copy(corPersonalizadaArgb = argb))
+
     fun usarFundo(fundo: FundoDoCluster) = gravar(_ajustes.value.copy(fundo = fundo))
+
+    fun usarFundoTransparencia(transparencia: Float) = gravar(_ajustes.value.copy(fundoTransparencia = transparencia))
 
     fun usarLugar(lugar: LugarNoPainel) = gravar(_ajustes.value.copy(lugar = lugar))
 
@@ -937,6 +970,9 @@ object Cluster {
 
     fun usarFundoDoCarro(fundo: FundoDoCluster) =
         gravar(_ajustes.value.copy(fundoDoCarro = fundo))
+
+    fun usarFormatoDoCarro(formato: FormatoDoCarro) =
+        gravar(_ajustes.value.copy(formatoDoCarro = formato))
 
     fun usarFundoDoMenu(fundo: FundoDoCluster) =
         gravar(_ajustes.value.copy(fundoDoMenu = fundo))

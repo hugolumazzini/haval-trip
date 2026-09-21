@@ -476,9 +476,14 @@ private fun NumerosNoPainel(estado: TripState) {
 
         Spacer(Modifier.height(14.dp))
         Text("Qual tela", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Tela 1: fica por trás dos desenhos do painel, não sobrepõe ADAS.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Cores.TextoApoio,
+        )
         Spacer(Modifier.height(4.dp))
         Text(
-            "Tela 1: fica por trás dos desenhos do painel, não sobrepõe ADAS.\n" +
             "Tela 3: fica por cima de tudo, inclusive ADAS. Use quando tela 1 ficar escondida.",
             style = MaterialTheme.typography.bodySmall,
             color = Cores.TextoApoio,

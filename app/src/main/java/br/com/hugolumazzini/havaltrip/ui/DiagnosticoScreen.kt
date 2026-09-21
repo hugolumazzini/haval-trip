@@ -170,8 +170,8 @@ fun DiagnosticoScreen(vm: TripViewModel) {
 
         Spacer(Modifier.height(12.dp))
 
-        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Cartao(Modifier.weight(1f).fillMaxHeight()) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Cartao(Modifier.weight(1f)) {
                 Column {
                     Text("VALOR ATUAL DE CADA CHAVE", style = EstiloRotulo)
                     Spacer(Modifier.height(6.dp))
@@ -191,7 +191,7 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     } else {
-                        LazyColumn {
+                        LazyColumn(Modifier.fillMaxWidth()) {
                             items(leituras.keys.sorted()) { chave ->
                                 val leitura = leituras.getValue(chave)
                                 LinhaCrua(
@@ -212,7 +212,7 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                 }
             }
 
-            Cartao(Modifier.weight(1f).fillMaxHeight()) {
+            Cartao(Modifier.weight(1f)) {
                 Column {
                     Text("FITA DOS ÚLTIMOS EVENTOS", style = EstiloRotulo)
                     Text(
@@ -221,7 +221,7 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                         color = Cores.TextoApoio,
                     )
                     Spacer(Modifier.height(6.dp))
-                    LazyColumn(reverseLayout = true) {
+                    LazyColumn(Modifier.fillMaxWidth(), reverseLayout = true) {
                         items(fita) { evento ->
                             Text(
                                 "${hora.format(Date(evento.emMs))}  " +
@@ -236,6 +236,8 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                 }
             }
         }
+
+        Spacer(Modifier.height(20.dp))
     }
 }
 

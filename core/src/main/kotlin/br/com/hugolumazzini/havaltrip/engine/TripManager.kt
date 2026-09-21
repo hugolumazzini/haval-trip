@@ -354,7 +354,9 @@ class TripManager(
 
         val deltaS = engine.deltaSeconds(anterior, sample.timestampMs)
         lastSampleMs = sample.timestampMs
-        odometerTotalKm = maxOf(odometerTotalKm, sample.odometerTotalKm)
+        // Se o carro tiver um valor, usa sempre. `maxOf()` prende num valor velho
+        // se o carro resetou ou foi trocado.
+        odometerTotalKm = sample.odometerTotalKm
         odometerKnown = true
 
         if (ignition == IgnitionState.ON) {
@@ -507,8 +509,8 @@ class TripManager(
         if (andouKm > HIATO_TOLERANCIA_KM) return
 
         // A Trip que recomeça precisa marcar a quilometragem de agora, não a de
-        // ontem, então o hodômetro entra antes.
-        odometerTotalKm = maxOf(odometerTotalKm, sample.odometerTotalKm)
+        // ontem, então o hodômetro entra antes. Sempre usa o valor do carro.
+        odometerTotalKm = sample.odometerTotalKm
         odometerKnown = true
 
         // A partir daqui é indistinguível de ter visto a chave sair naquele

@@ -880,6 +880,29 @@ private fun CarroNoPainel() {
             Text("${ajustes.fundoTransparencia.toInt()}%", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
 
             Spacer(Modifier.height(14.dp))
+            Text("Qual tela", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Tela 1: fica por trás dos desenhos do painel, não sobrepõe ADAS.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Cores.TextoApoio,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Tela 3: fica por cima de tudo, inclusive ADAS. Use quando tela 1 ficar escondida.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Cores.TextoApoio,
+            )
+            Spacer(Modifier.height(8.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Opcao("Tela 1", ajustes.paginaDoCarro == null) { Cluster.usarPaginaDoCarro(null) }
+                Opcao("Tela 3", ajustes.paginaDoCarro != null) { Cluster.usarPaginaDoCarro(ajustes.paginaDoCarro) }
+            }
+
+            Spacer(Modifier.height(14.dp))
             Text("Formato do carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
             Spacer(Modifier.height(4.dp))
             Text(

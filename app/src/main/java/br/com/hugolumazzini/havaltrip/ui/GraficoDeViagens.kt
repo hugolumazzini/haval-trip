@@ -27,12 +27,9 @@ import br.com.hugolumazzini.havaltrip.ui.theme.Cores
 import br.com.hugolumazzini.havaltrip.ui.theme.EstiloRotulo
 
 /**
- * Gráfico de contagem de viagens por dia, semana e mês.
+ * Gráfico de contagem de viagens por mês.
  *
- * Mostra três gráficos de barras lado a lado:
- * - Esquerda: últimos 30 dias
- * - Centro: últimas 12 semanas
- * - Direita: últimos 12 meses
+ * Mostra um gráfico de barras dos últimos 12 meses de forma clara.
  */
 @Composable
 fun GraficoDeViagens(analise: TripsAnalysisResult) {
@@ -42,7 +39,7 @@ fun GraficoDeViagens(analise: TripsAnalysisResult) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            if (analise.dailyData.isEmpty() && analise.weeklyData.isEmpty() && analise.monthlyData.isEmpty()) {
+            if (analise.monthlyData.isEmpty()) {
                 Text(
                     "Sem dados",
                     style = MaterialTheme.typography.bodyMedium,
@@ -50,79 +47,18 @@ fun GraficoDeViagens(analise: TripsAnalysisResult) {
                     modifier = Modifier.fillMaxWidth(),
                 )
             } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    // Gráfico de dias
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Últimos 30 dias",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Cores.TextoApoio,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        if (analise.dailyData.isEmpty()) {
-                            Text(
-                                "Sem dados",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Cores.TextoApoio,
-                            )
-                        } else {
-                            GraficoBarrasViagens(
-                                dados = analise.dailyData,
-                                maxValor = analise.maxDailyCount,
-                                altura = 100.dp,
-                            )
-                        }
-                    }
-
-                    // Gráfico de semanas
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Últimas 12 semanas",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Cores.TextoApoio,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        if (analise.weeklyData.isEmpty()) {
-                            Text(
-                                "Sem dados",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Cores.TextoApoio,
-                            )
-                        } else {
-                            GraficoBarrasViagens(
-                                dados = analise.weeklyData,
-                                maxValor = analise.maxWeeklyCount,
-                                altura = 100.dp,
-                            )
-                        }
-                    }
-
-                    // Gráfico de meses
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Últimos 12 meses",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Cores.TextoApoio,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        if (analise.monthlyData.isEmpty()) {
-                            Text(
-                                "Sem dados",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Cores.TextoApoio,
-                            )
-                        } else {
-                            GraficoBarrasViagens(
-                                dados = analise.monthlyData,
-                                maxValor = analise.maxMonthlyCount,
-                                altura = 100.dp,
-                            )
-                        }
-                    }
-                }
+                // Gráfico de meses
+                Text(
+                    "Últimos 12 meses",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Cores.TextoApoio,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                GraficoBarrasViagens(
+                    dados = analise.monthlyData,
+                    maxValor = analise.maxMonthlyCount,
+                    altura = 120.dp,
+                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -191,28 +127,31 @@ private fun DrawScope.drawGraficoViagens(
     yMax: Int,
 ) {
     val barraLargura = size.width / dados.size
-    val margemLateral = 4.dp.toPx()
+    val margemLateral = 6.dp.toPx()
     val alturaBarra = barraLargura - 2 * margemLateral
+    val alturaDados = size.height - 8
 
-    // Eixos
-    drawLine(
-        color = Cores.Contorno,
-        start = Offset(0f, size.height - 5),
-        end = Offset(size.width, size.height - 5),
-        strokeWidth = 1.0f,
-    )
+    // Eixo Y (esquerda)
     drawLine(
         color = Cores.Contorno,
         start = Offset(0f, 0f),
-        end = Offset(0f, size.height - 5),
-        strokeWidth = 1.0f,
+        end = Offset(0f, alturaDados),
+        strokeWidth = 1.5f,
     )
 
-    // Barras
+    // Eixo X (baixo)
+    drawLine(
+        color = Cores.Contorno,
+        start = Offset(0f, alturaDados),
+        end = Offset(size.width, alturaDados),
+        strokeWidth = 1.5f,
+    )
+
+    // Barras com cantos arredondados
     dados.forEachIndexed { index, ponto ->
         val x = index * barraLargura + margemLateral
-        val alturaNormalizada = (ponto.count.toFloat() / yMax) * (size.height - 5)
-        val yTopo = size.height - 5 - alturaNormalizada
+        val alturaNormalizada = (ponto.count.toFloat() / yMax) * alturaDados
+        val yTopo = alturaDados - alturaNormalizada
 
         drawRect(
             color = Cores.Destaque,

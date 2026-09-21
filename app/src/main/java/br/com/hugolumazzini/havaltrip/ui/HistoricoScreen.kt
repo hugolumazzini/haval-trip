@@ -183,7 +183,7 @@ private fun ItemHistorico(
                     // O "auto" diz que ninguém arquivou: a viagem se fechou.
                     formatoData.format(Date(registro.savedAtMs)) +
                         if (registro.automatic) "  auto" else "",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = Cores.TextoApoio,
                 )
             }
@@ -192,7 +192,7 @@ private fun ItemHistorico(
                 "${TripFormat.km(registro.metrics.distanceKm)}  •  " +
                     "${TripFormat.kml(registro.metrics.avgFuelConsumptionKml)}  •  " +
                     TripFormat.litros(registro.metrics.fuelLitres),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 color = Cores.TextoApoio,
             )
         }

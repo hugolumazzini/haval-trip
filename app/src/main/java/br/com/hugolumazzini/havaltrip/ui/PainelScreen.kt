@@ -46,7 +46,7 @@ fun PainelScreen(vm: TripViewModel, estado: TripState) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
             CelulaVeiculo("HODÔMETRO", TripFormat.km(estado.live.odometerTotalKm))
             CelulaVeiculo("CONSUMO AGORA", TripFormat.kml(estado.live.instantFuelConsumptionKml))
-            CelulaVeiculo("AUTONOMIA", TripFormat.km(estado.live.autonomyDteKm))
+            CelulaVeiculo("AUTONOMIA", TripFormat.kmInteiro(estado.live.autonomyDteKm))
             Spacer(Modifier.weight(1f))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PontoStatus(trip.status, tamanho = 12)

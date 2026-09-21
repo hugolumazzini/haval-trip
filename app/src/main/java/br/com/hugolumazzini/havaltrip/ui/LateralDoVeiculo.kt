@@ -684,6 +684,15 @@ internal fun CarroEmCamadas(
             // carro, e nenhuma peça pode passar na frente deles.
             Cintos(painel.semCinto, Modifier.fillMaxSize())
 
+            // As imagens de farol quando aceso
+            if (painel.luzes.baixo == true || painel.luzes.alto == true) {
+                val recurso = if (painel.luzes.alto == true)
+                    R.drawable.farol_alto
+                else
+                    R.drawable.farol
+                camada(recurso)
+            }
+
             // As luzes por último: o feixe do farol sai para fora da lataria e a
             // seta encosta na borda, então qualquer camada desenhada depois
             // passaria por cima justamente da parte que interessa.

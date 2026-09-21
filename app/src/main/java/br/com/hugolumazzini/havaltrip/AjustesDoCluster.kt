@@ -558,6 +558,12 @@ data class AjustesDoCluster(
      */
     val fundoDoMenu: FundoDoCluster = FundoDoCluster.PRETO,
     /**
+     * Se os números (pressões e temperaturas) devem ser mostrados no diagrama do carro.
+     *
+     * Quando desabilitado, mostra apenas o desenho do carro sem os números das pressões.
+     */
+    val mostrarNumerosNoCarro: Boolean = true,
+    /**
      * Como os dados se identificam dentro da bola. Ver [RotuloDoCluster].
      *
      * Só na bola: nas janelinhas soltas o espaço não é redondo nem tão apertado,
@@ -651,6 +657,7 @@ object Cluster {
     private const val ROTULO_MENU = "rotuloDoMenu"
     private const val AFASTAMENTO_MENU = "afastamentoDoMenu"
     private const val ITENS_DESPEDIDA = "itensDaDespedida"
+    private const val MOSTRAR_NUMEROS_CARRO = "mostrarNumerosNoCarro"
 
     /**
      * O que se grava no lugar de "nenhuma tela".
@@ -842,6 +849,7 @@ object Cluster {
                 ?.split(",")
                 ?.mapNotNull { nome -> ItemDoCluster.entries.find { it.name == nome } }
                 ?: padrao.itensDaDespedida,
+            mostrarNumerosNoCarro = prefs.getBoolean(MOSTRAR_NUMEROS_CARRO, padrao.mostrarNumerosNoCarro),
         )
     }
 
@@ -886,6 +894,7 @@ object Cluster {
             .putString(ROTULO_MENU, novo.rotuloDoMenu.name)
             .putInt(AFASTAMENTO_MENU, novo.afastamentoDoMenu.porcento)
             .putString(ITENS_DESPEDIDA, novo.itensDaDespedida.joinToString(",") { it.name })
+            .putBoolean(MOSTRAR_NUMEROS_CARRO, novo.mostrarNumerosNoCarro)
             .apply()
     }
 
@@ -993,6 +1002,9 @@ object Cluster {
     /** Troca o jeito de identificar cada dado na bola. Ver [RotuloDoCluster]. */
     fun usarRotuloDoMenu(rotulo: RotuloDoCluster) =
         gravar(_ajustes.value.copy(rotuloDoMenu = rotulo))
+
+    fun alternarMostrarNumerosNoCarro() =
+        gravar(_ajustes.value.copy(mostrarNumerosNoCarro = !_ajustes.value.mostrarNumerosNoCarro))
 
     /**
      * Em qual página do carrossel do painel a janela do carro aparece.

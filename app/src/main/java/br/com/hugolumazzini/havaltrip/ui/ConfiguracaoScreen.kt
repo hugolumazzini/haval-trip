@@ -494,9 +494,7 @@ private fun NumerosNoPainel(estado: TripState) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Opcao("Tela 1", ajustes.tripId == null) { Cluster.usarTrip(null) }
-            estado.trips.forEach { trip ->
-                Opcao(trip.label, ajustes.tripId == trip.id) { Cluster.usarTrip(trip.id) }
-            }
+            Opcao("Tela 3", ajustes.tripId != null) { Cluster.usarTrip(ajustes.tripId) }
         }
 
         Spacer(Modifier.height(14.dp))
@@ -728,6 +726,23 @@ private fun CarroNoPainel() {
             FormatoDoCarro.entries.forEach { formato ->
                 Opcao(formato.rotulo, ajustes.formatoDoCarro == formato) { Cluster.usarFormatoDoCarro(formato) }
             }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        Text("Números no carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Mostrar ou ocultar as pressões dos pneus e temperaturas no diagrama do carro.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Opcao("Mostrar", ajustes.mostrarNumerosNoCarro) { Cluster.alternarMostrarNumerosNoCarro() }
+            Opcao("Ocultar", !ajustes.mostrarNumerosNoCarro) { Cluster.alternarMostrarNumerosNoCarro() }
         }
     }
 }
@@ -1434,7 +1449,7 @@ private fun Projecao(janela: JanelaDoPainel, escolhida: Int?) {
             Cluster.usarTela(janela, null)
             ProjetorDoPainel.recolher(janela)
         }
-        telas.forEach { tela ->
+        telas.filter { it.id == 1 || it.id == 3 }.forEach { tela ->
             Opcao(tela.descricao, escolhida == tela.id) { Cluster.usarTela(janela, tela.id) }
         }
     }

@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.Atualizador
@@ -545,13 +546,6 @@ private fun NumerosNoPainel(estado: TripState) {
             }
         }
 
-        // RGB Color Picker para cor personalizada
-        if (ajustes.cor == CorDoCluster.PERSONALIZADA) {
-            Spacer(Modifier.height(14.dp))
-            SeletorRGB(ajustes.corPersonalizadaArgb ?: 0xFFF5F5F5) { novaArgb ->
-                Cluster.usarCorPersonalizada(novaArgb)
-            }
-        }
 
         Spacer(Modifier.height(14.dp))
         Text("Fundo do bloco", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
@@ -1525,82 +1519,99 @@ private fun recadoDaProjecao(
  */
 @Composable
 private fun SeletorRGB(corArgb: Long, onChange: (Long) -> Unit) {
-    // Extrai RGB da cor ARGB (ignorando alpha)
-    var r by remember { mutableFloatStateOf(((corArgb shr 16) and 0xFF).toFloat()) }
-    var g by remember { mutableFloatStateOf(((corArgb shr 8) and 0xFF).toFloat()) }
-    var b by remember { mutableFloatStateOf((corArgb and 0xFF).toFloat()) }
+    val rgb = corArgb and 0xFFFFFF
+
+    val initialHsv = remember(corArgb) {
+        FloatArray(3).apply {
+            android.graphics.Color.RGBToHSV((rgb shr 16).toInt(), (rgb shr 8).toInt(), rgb.toInt(), this)
+        }
+    }
+
+    var hue by remember(corArgb) { mutableFloatStateOf(initialHsv[0]) }
+    var saturation by remember(corArgb) { mutableFloatStateOf(initialHsv[1]) }
+    var value by remember(corArgb) { mutableFloatStateOf(initialHsv[2]) }
+
+    LaunchedEffect(hue, saturation, value) {
+        val rgb = android.graphics.Color.HSVToColor(floatArrayOf(hue, saturation, value))
+        val newArgb = 0xFF000000L or ((rgb.toLong()) and 0xFFFFFF)
+        onChange(newArgb)
+    }
+
+    val currentArgb = remember(hue, saturation, value) {
+        val rgb = android.graphics.Color.HSVToColor(floatArrayOf(hue, saturation, value))
+        0xFF000000L or ((rgb.toLong()) and 0xFFFFFF)
+    }
+
+    val gradientColors = remember(saturation, value) {
+        val sat = saturation / 255f
+        val val_ = value / 255f
+        listOf(
+            Color.hsv(0f, sat, val_),
+            Color.hsv(60f, sat, val_),
+            Color.hsv(120f, sat, val_),
+            Color.hsv(180f, sat, val_),
+            Color.hsv(240f, sat, val_),
+            Color.hsv(300f, sat, val_),
+            Color.hsv(360f, sat, val_),
+        )
+    }
 
     Column {
-        Text("Seletor RGB", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Text("Cor", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(8.dp))
 
-        // Amostra de cor
         Box(
             Modifier
-                .size(60.dp)
-                .background(Color(0xFF000000L or ((r.toInt().toLong() and 0xFF) shl 16) or ((g.toInt().toLong() and 0xFF) shl 8) or (b.toInt().toLong() and 0xFF)))
-                .clip(RoundedCornerShape(8.dp)),
+                .fillMaxWidth()
+                .height(40.dp)
+                .background(androidx.compose.ui.graphics.Brush.horizontalGradient(gradientColors))
+                .clip(RoundedCornerShape(8.dp))
+        )
+
+        Slider(
+            value = hue,
+            onValueChange = { hue = it },
+            valueRange = 0f..360f,
+            steps = 359,
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
         )
 
         Spacer(Modifier.height(12.dp))
 
-        // Slider Vermelho (Red)
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("R", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido, modifier = Modifier.widthIn(min = 24.dp))
+            Text("Brilho", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido, modifier = Modifier.widthIn(min = 50.dp))
             Slider(
-                value = r,
-                onValueChange = {
-                    r = it
-                    onChange(0xFF000000L or ((r.toInt().toLong() and 0xFF) shl 16) or ((g.toInt().toLong() and 0xFF) shl 8) or (b.toInt().toLong() and 0xFF))
-                },
+                value = value,
+                onValueChange = { value = it },
                 valueRange = 0f..255f,
                 steps = 254,
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = 8.dp),
             )
-            Text("${r.toInt()}", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio, modifier = Modifier.widthIn(min = 40.dp))
         }
 
-        Spacer(Modifier.height(8.dp))
-
-        // Slider Verde (Green)
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("G", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido, modifier = Modifier.widthIn(min = 24.dp))
+            Text("Saturação", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido, modifier = Modifier.widthIn(min = 50.dp))
             Slider(
-                value = g,
-                onValueChange = {
-                    g = it
-                    onChange(0xFF000000L or ((r.toInt().toLong() and 0xFF) shl 16) or ((g.toInt().toLong() and 0xFF) shl 8) or (b.toInt().toLong() and 0xFF))
-                },
+                value = saturation,
+                onValueChange = { saturation = it },
                 valueRange = 0f..255f,
                 steps = 254,
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = 8.dp),
             )
-            Text("${g.toInt()}", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio, modifier = Modifier.widthIn(min = 40.dp))
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
 
-        // Slider Azul (Blue)
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("B", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido, modifier = Modifier.widthIn(min = 24.dp))
-            Slider(
-                value = b,
-                onValueChange = {
-                    b = it
-                    onChange(0xFF000000L or ((r.toInt().toLong() and 0xFF) shl 16) or ((g.toInt().toLong() and 0xFF) shl 8) or (b.toInt().toLong() and 0xFF))
-                },
-                valueRange = 0f..255f,
-                steps = 254,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 8.dp),
-            )
-            Text("${b.toInt()}", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio, modifier = Modifier.widthIn(min = 40.dp))
-        }
+        Box(
+            Modifier
+                .size(60.dp)
+                .background(Color(currentArgb))
+                .clip(RoundedCornerShape(8.dp)),
+        )
     }
 }
 

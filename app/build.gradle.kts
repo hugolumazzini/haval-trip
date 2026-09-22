@@ -24,8 +24,8 @@ android {
         //
         // A numeração é 0.x: a `v1.0.0` de 31/08/2026 foi a primeira tentativa,
         // e a contagem recomeçou em 0.2.0 no dia seguinte.
-        versionCode = 34
-        versionName = "0.9.21"
+        versionCode = 35
+        versionName = "0.9.22"
     }
 
     signingConfigs {

@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.ModoHistorico
 import br.com.hugolumazzini.havaltrip.TripViewModel
@@ -44,7 +45,9 @@ import br.com.hugolumazzini.havaltrip.format.TripFormat
 import br.com.hugolumazzini.havaltrip.services.ComparisonLine
 import br.com.hugolumazzini.havaltrip.ui.theme.Cores
 import br.com.hugolumazzini.havaltrip.ui.theme.EstiloRotulo
+import androidx.compose.foundation.Canvas
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -522,6 +525,66 @@ private fun OpcaoAbas(
     }
 }
 
+private data class DadosPeriodo(
+    val label: String,
+    val distancia: Double,
+    val consumo: Double,
+    val combustivel: Double,
+)
+
+private fun agruparPorDia(history: List<TripRecord>): List<DadosPeriodo> {
+    return history
+        .groupBy { registro ->
+            val cal = Calendar.getInstance().apply { timeInMillis = registro.savedAtMs }
+            "%02d/%02d".format(cal.get(Calendar.DAY_OF_MONTH), cal.get(Calendar.MONTH) + 1)
+        }
+        .map { (data, viagens) ->
+            DadosPeriodo(
+                label = data,
+                distancia = viagens.sumOf { it.metrics.distanceKm },
+                consumo = if (viagens.isNotEmpty()) viagens.mapNotNull { it.metrics.avgFuelConsumptionKml }.average() else 0.0,
+                combustivel = viagens.sumOf { it.metrics.fuelLitres },
+            )
+        }
+        .sortedBy { it.label }
+}
+
+private fun agruparPorSemana(history: List<TripRecord>): List<DadosPeriodo> {
+    return history
+        .groupBy { registro ->
+            val cal = Calendar.getInstance().apply { timeInMillis = registro.savedAtMs }
+            val semana = cal.get(Calendar.WEEK_OF_YEAR)
+            val ano = cal.get(Calendar.YEAR)
+            "S$semana/$ano"
+        }
+        .map { (semana, viagens) ->
+            DadosPeriodo(
+                label = semana,
+                distancia = viagens.sumOf { it.metrics.distanceKm },
+                consumo = if (viagens.isNotEmpty()) viagens.mapNotNull { it.metrics.avgFuelConsumptionKml }.average() else 0.0,
+                combustivel = viagens.sumOf { it.metrics.fuelLitres },
+            )
+        }
+        .sortedBy { it.label }
+}
+
+private fun agruparPorMes(history: List<TripRecord>): List<DadosPeriodo> {
+    return history
+        .groupBy { registro ->
+            val cal = Calendar.getInstance().apply { timeInMillis = registro.savedAtMs }
+            "%02d/%04d".format(cal.get(Calendar.MONTH) + 1, cal.get(Calendar.YEAR))
+        }
+        .map { (mes, viagens) ->
+            DadosPeriodo(
+                label = mes,
+                distancia = viagens.sumOf { it.metrics.distanceKm },
+                consumo = if (viagens.isNotEmpty()) viagens.mapNotNull { it.metrics.avgFuelConsumptionKml }.average() else 0.0,
+                combustivel = viagens.sumOf { it.metrics.fuelLitres },
+            )
+        }
+        .sortedBy { it.label }
+}
+
 @Composable
 private fun TelaGraficos(estado: TripState) {
     var periodo by remember { mutableStateOf(PeriodoGrafico.DIA) }
@@ -543,43 +606,31 @@ private fun TelaGraficos(estado: TripState) {
         Spacer(Modifier.height(16.dp))
 
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            when (periodo) {
-                PeriodoGrafico.DIA -> {
-                    Text("Gráficos por Dia", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Aqui virão gráficos mostrando dados de cada dia:\n" +
-                            "• Distância total por dia\n" +
-                            "• Consumo médio por dia\n" +
-                            "• Combustível gasto por dia",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Cores.TextoApoio,
-                    )
-                }
-                PeriodoGrafico.SEMANA -> {
-                    Text("Gráficos por Semana", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Aqui virão gráficos mostrando dados de cada semana:\n" +
-                            "• Distância total por semana\n" +
-                            "• Consumo médio por semana\n" +
-                            "• Combustível gasto por semana",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Cores.TextoApoio,
-                    )
-                }
-                PeriodoGrafico.MES -> {
-                    Text("Gráficos por Mês", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Aqui virão gráficos mostrando dados de cada mês:\n" +
-                            "• Distância total por mês\n" +
-                            "• Consumo médio por mês\n" +
-                            "• Combustível gasto por mês",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Cores.TextoApoio,
-                    )
-                }
+            val dados = when (periodo) {
+                PeriodoGrafico.DIA -> agruparPorDia(estado.history)
+                PeriodoGrafico.SEMANA -> agruparPorSemana(estado.history)
+                PeriodoGrafico.MES -> agruparPorMes(estado.history)
+            }
+
+            if (dados.isEmpty()) {
+                Text("Nenhuma viagem neste período", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoApoio)
+            } else {
+                // Gráfico de Distância
+                Text("Distância (km)", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
+                Spacer(Modifier.height(8.dp))
+                GraficoDistancia(dados)
+                Spacer(Modifier.height(24.dp))
+
+                // Gráfico de Consumo
+                Text("Consumo Médio (km/L)", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
+                Spacer(Modifier.height(8.dp))
+                GraficoConsumo(dados)
+                Spacer(Modifier.height(24.dp))
+
+                // Gráfico de Combustível
+                Text("Combustível (L)", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
+                Spacer(Modifier.height(8.dp))
+                GraficoCombustivel(dados)
             }
 
             Spacer(Modifier.height(16.dp))
@@ -587,6 +638,75 @@ private fun TelaGraficos(estado: TripState) {
                 "Total de viagens: ${estado.history.size}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Cores.TextoApoio,
+            )
+        }
+    }
+}
+
+@Composable
+private fun GraficoDistancia(dados: List<DadosPeriodo>) {
+    val maxDistancia = (dados.maxOfOrNull { it.distancia } ?: 1.0).toFloat()
+    Canvas(Modifier.fillMaxWidth().height(250.dp)) {
+        val barWidth = size.width / (dados.size * 1.5f)
+        val spacing = barWidth * 0.5f
+        val totalBarWidth = barWidth + spacing
+        val maxHeight = size.height * 0.8f
+
+        dados.forEachIndexed { index, d ->
+            val x = (index * totalBarWidth + spacing).toFloat()
+            val barHeight = ((d.distancia / maxDistancia) * maxHeight).toFloat()
+            val y = (size.height - barHeight - 20f).toFloat()
+
+            drawRect(
+                color = Cores.Destaque,
+                topLeft = androidx.compose.ui.geometry.Offset(x, y),
+                size = androidx.compose.ui.geometry.Size(barWidth, barHeight),
+            )
+        }
+    }
+}
+
+@Composable
+private fun GraficoConsumo(dados: List<DadosPeriodo>) {
+    val maxConsumo = (dados.maxOfOrNull { it.consumo } ?: 1.0).toFloat()
+    Canvas(Modifier.fillMaxWidth().height(250.dp)) {
+        val barWidth = size.width / (dados.size * 1.5f)
+        val spacing = barWidth * 0.5f
+        val totalBarWidth = barWidth + spacing
+        val maxHeight = size.height * 0.8f
+
+        dados.forEachIndexed { index, d ->
+            val x = (index * totalBarWidth + spacing).toFloat()
+            val barHeight = ((d.consumo / maxConsumo) * maxHeight).toFloat()
+            val y = (size.height - barHeight - 20f).toFloat()
+
+            drawRect(
+                color = Cores.Destaque,
+                topLeft = androidx.compose.ui.geometry.Offset(x, y),
+                size = androidx.compose.ui.geometry.Size(barWidth, barHeight),
+            )
+        }
+    }
+}
+
+@Composable
+private fun GraficoCombustivel(dados: List<DadosPeriodo>) {
+    val maxCombustivel = (dados.maxOfOrNull { it.combustivel } ?: 1.0).toFloat()
+    Canvas(Modifier.fillMaxWidth().height(250.dp)) {
+        val barWidth = size.width / (dados.size * 1.5f)
+        val spacing = barWidth * 0.5f
+        val totalBarWidth = barWidth + spacing
+        val maxHeight = size.height * 0.8f
+
+        dados.forEachIndexed { index, d ->
+            val x = (index * totalBarWidth + spacing).toFloat()
+            val barHeight = ((d.combustivel / maxCombustivel) * maxHeight).toFloat()
+            val y = (size.height - barHeight - 20f).toFloat()
+
+            drawRect(
+                color = Cores.Destaque,
+                topLeft = androidx.compose.ui.geometry.Offset(x, y),
+                size = androidx.compose.ui.geometry.Size(barWidth, barHeight),
             )
         }
     }

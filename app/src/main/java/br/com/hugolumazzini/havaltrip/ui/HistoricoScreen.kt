@@ -71,7 +71,10 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
 
     val modo by vm.modoHistorico.collectAsStateWithLifecycle()
     val comparando = modo is ModoHistorico.Comparando
-    val emFoco = vm.registroEmFoco(modo, estado.history)
+
+    // Usar dados fictícios se o histórico está vazio (para testes)
+    val historyParaExibir = if (estado.history.isEmpty()) gerarDadosFicticios() else estado.history
+    val emFoco = vm.registroEmFoco(modo, historyParaExibir)
 
     /** `null` = nenhum diálogo aberto. Estado da tela, não do módulo. */
     var renomeando by remember { mutableStateOf<TripRecord?>(null) }
@@ -110,22 +113,17 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
 
         Spacer(Modifier.height(16.dp))
 
-        if (estado.history.isEmpty()) {
-            Vazio("Nenhuma viagem arquivada ainda.\nFeche uma viagem no painel para ela aparecer aqui.")
-            return
-        }
-
         when (aba) {
             AbaHistorico.VIAGENS -> TelaViagensHistorico(
                 vm = vm,
-                estado = estado,
+                estado = estado.copy(history = historyParaExibir),
                 modo = modo,
                 emFoco = emFoco,
                 comparando = comparando,
                 onRenomear = { renomeando = it },
                 onExcluir = { excluindo = it },
             )
-            AbaHistorico.GRAFICOS -> TelaGraficos(estado = estado)
+            AbaHistorico.GRAFICOS -> TelaGraficos(estado = estado.copy(history = historyParaExibir))
         }
             LazyColumn(
                 Modifier.width(320.dp).fillMaxHeight(),
@@ -531,6 +529,116 @@ private data class DadosPeriodo(
     val consumo: Double,
     val combustivel: Double,
 )
+
+private fun gerarDadosFicticios(): List<TripRecord> {
+    val agora = System.currentTimeMillis()
+    val umDia = 24 * 60 * 60 * 1000L
+
+    return listOf(
+        TripRecord(
+            recordId = "fake-1",
+            tripId = "Trip A",
+            label = "Trip A",
+            metrics = br.com.hugolumazzini.havaltrip.domain.TripMetrics(
+                distanceKm = 150.0,
+                movingTimeS = 7200.0,
+                idleTimeS = 900.0,
+                fuelLitres = 12.5,
+                maxSpeedKmh = 120.0,
+            ),
+            startedAtMs = agora - umDia * 6,
+            savedAtMs = agora - umDia * 6,
+            odometerStartKm = 50000.0,
+            odometerEndKm = 50150.0,
+            automatic = false,
+        ),
+        TripRecord(
+            recordId = "fake-2",
+            tripId = "Trip B",
+            label = "Trip B",
+            metrics = br.com.hugolumazzini.havaltrip.domain.TripMetrics(
+                distanceKm = 220.0,
+                movingTimeS = 9000.0,
+                idleTimeS = 1200.0,
+                fuelLitres = 18.5,
+                maxSpeedKmh = 130.0,
+            ),
+            startedAtMs = agora - umDia * 5,
+            savedAtMs = agora - umDia * 5,
+            odometerStartKm = 50150.0,
+            odometerEndKm = 50370.0,
+            automatic = false,
+        ),
+        TripRecord(
+            recordId = "fake-3",
+            tripId = "Trip C",
+            label = "Trip C",
+            metrics = br.com.hugolumazzini.havaltrip.domain.TripMetrics(
+                distanceKm = 85.0,
+                movingTimeS = 4200.0,
+                idleTimeS = 300.0,
+                fuelLitres = 7.2,
+                maxSpeedKmh = 110.0,
+            ),
+            startedAtMs = agora - umDia * 4,
+            savedAtMs = agora - umDia * 4,
+            odometerStartKm = 50370.0,
+            odometerEndKm = 50455.0,
+            automatic = true,
+        ),
+        TripRecord(
+            recordId = "fake-4",
+            tripId = "Trip D",
+            label = "Trip D",
+            metrics = br.com.hugolumazzini.havaltrip.domain.TripMetrics(
+                distanceKm = 310.0,
+                movingTimeS = 11700.0,
+                idleTimeS = 1800.0,
+                fuelLitres = 26.0,
+                maxSpeedKmh = 140.0,
+            ),
+            startedAtMs = agora - umDia * 3,
+            savedAtMs = agora - umDia * 3,
+            odometerStartKm = 50455.0,
+            odometerEndKm = 50765.0,
+            automatic = false,
+        ),
+        TripRecord(
+            recordId = "fake-5",
+            tripId = "Trip E",
+            label = "Trip E",
+            metrics = br.com.hugolumazzini.havaltrip.domain.TripMetrics(
+                distanceKm = 165.0,
+                movingTimeS = 8100.0,
+                idleTimeS = 600.0,
+                fuelLitres = 14.0,
+                maxSpeedKmh = 125.0,
+            ),
+            startedAtMs = agora - umDia * 2,
+            savedAtMs = agora - umDia * 2,
+            odometerStartKm = 50765.0,
+            odometerEndKm = 50930.0,
+            automatic = false,
+        ),
+        TripRecord(
+            recordId = "fake-6",
+            tripId = "Trip F",
+            label = "Trip F",
+            metrics = br.com.hugolumazzini.havaltrip.domain.TripMetrics(
+                distanceKm = 275.0,
+                movingTimeS = 10800.0,
+                idleTimeS = 1500.0,
+                fuelLitres = 23.0,
+                maxSpeedKmh = 135.0,
+            ),
+            startedAtMs = agora - umDia,
+            savedAtMs = agora - umDia,
+            odometerStartKm = 50930.0,
+            odometerEndKm = 51205.0,
+            automatic = false,
+        ),
+    )
+}
 
 private fun agruparPorDia(history: List<TripRecord>): List<DadosPeriodo> {
     return history

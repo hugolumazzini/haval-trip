@@ -28,12 +28,20 @@ android {
         versionName = "0.9.19"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("haval-trip-release.jks")
+            storePassword = System.getenv("HAVAL_TRIP_KEYSTORE_PASS") ?: ""
+            keyAlias = "haval-trip"
+            keyPassword = System.getenv("HAVAL_TRIP_KEYSTORE_PASS") ?: ""
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Assinatura de release fica de fora até existir uma chave própria
-            // deste app: reaproveitar a chave da loja misturaria as identidades.
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 

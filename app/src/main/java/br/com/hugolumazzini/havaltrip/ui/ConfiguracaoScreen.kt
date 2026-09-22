@@ -125,8 +125,6 @@ private enum class AbaDaConfiguracao(val rotulo: String) {
     // dia (zerar contador) vem primeiro, depois o que ele abre de vez em quando
     // (versão), e por último o que se acerta uma vez e não se mexe mais.
     GERAL("Geral"),
-    CONTADORES("Contadores"),
-    VERSAO("Versão"),
     NUMEROS("Números"),
     CARRO("Carro"),
     DESPEDIDA("Despedida"),
@@ -155,7 +153,7 @@ fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
                 AbaDaConfiguracao.NUMEROS -> ajustes.habilitarNumerosNoPainel
                 AbaDaConfiguracao.CARRO -> ajustes.habilitarCarroNoPainel
                 AbaDaConfiguracao.PAGINA -> ajustes.habilitarPaginaComVisoes
-                else -> true // GERAL, CONTADORES, VERSAO, DESPEDIDA sempre visíveis
+                else -> true // GERAL, DESPEDIDA sempre visíveis
             }
         }
     }
@@ -193,8 +191,6 @@ fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
                     AbaDaConfiguracao.CARRO -> CarroNoPainel()
                     AbaDaConfiguracao.PAGINA -> PaginaComVisoesNaAba()
                     AbaDaConfiguracao.DESPEDIDA -> DespedidaNoPainel()
-                    AbaDaConfiguracao.CONTADORES -> Contadores(vm, estado)
-                    AbaDaConfiguracao.VERSAO -> SobreEAtualizacao(vm)
                 }
             }
             Spacer(Modifier.height(14.dp))

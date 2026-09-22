@@ -749,9 +749,6 @@ private fun CarroNoPainel() {
         )
 
         Spacer(Modifier.height(14.dp))
-        PaginaDoPainel(ajustes.paginaDoCarro)
-
-        Spacer(Modifier.height(14.dp))
         AjusteFino(JanelaDoPainel.CARRO, ajustes.empurraoDoCarro, ajustes.zoomDoCarro)
 
         Spacer(Modifier.height(12.dp))

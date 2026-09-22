@@ -1,7 +1,9 @@
 package br.com.hugolumazzini.havaltrip.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -28,6 +31,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,6 +50,11 @@ import java.util.Locale
 
 private val formatoData = SimpleDateFormat("dd/MM HH:mm", Locale.forLanguageTag("pt-BR"))
 
+private enum class AbaHistorico(val rotulo: String) {
+    VIAGENS("Todas as viagens"),
+    GRAFICOS("Gráficos"),
+}
+
 /**
  * Histórico à esquerda, a viagem escolhida à direita.
  *
@@ -54,6 +64,8 @@ private val formatoData = SimpleDateFormat("dd/MM HH:mm", Locale.forLanguageTag(
  */
 @Composable
 fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
+    var aba by remember { mutableStateOf(AbaHistorico.VIAGENS) }
+
     val modo by vm.modoHistorico.collectAsStateWithLifecycle()
     val comparando = modo is ModoHistorico.Comparando
     val emFoco = vm.registroEmFoco(modo, estado.history)
@@ -77,6 +89,22 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
             else BotaoAcao("Voltar ao painel", vm::voltarAoPainel)
         }
 
+        Spacer(Modifier.height(12.dp))
+
+        // Abas de navegação
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            AbaHistorico.entries.forEach { abaPossivel ->
+                OpcaoAbas(
+                    texto = abaPossivel.rotulo,
+                    marcada = aba == abaPossivel,
+                    onClick = { aba = abaPossivel },
+                )
+            }
+        }
+
         Spacer(Modifier.height(16.dp))
 
         if (estado.history.isEmpty()) {
@@ -84,7 +112,18 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
             return
         }
 
-        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        when (aba) {
+            AbaHistorico.VIAGENS -> TelaViagensHistorico(
+                vm = vm,
+                estado = estado,
+                modo = modo,
+                emFoco = emFoco,
+                comparando = comparando,
+                onRenomear = { renomeando = it },
+                onExcluir = { excluindo = it },
+            )
+            AbaHistorico.GRAFICOS -> TelaGraficos(estado = estado)
+        }
             LazyColumn(
                 Modifier.width(320.dp).fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -115,8 +154,6 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
                 }
             }
         }
-    }
-
     renomeando?.let { registro ->
         DialogoRenomear(
             registro = registro,
@@ -413,4 +450,144 @@ private fun androidx.compose.foundation.layout.RowScope.Celula(
         maxLines = 1,
         modifier = Modifier.weight(peso),
     )
+}
+
+@Composable
+private fun TelaViagensHistorico(
+    vm: TripViewModel,
+    estado: TripState,
+    modo: ModoHistorico,
+    emFoco: TripRecord?,
+    comparando: Boolean,
+    onRenomear: (TripRecord) -> Unit,
+    onExcluir: (TripRecord) -> Unit,
+) {
+    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        LazyColumn(
+            Modifier.width(320.dp).fillMaxHeight(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(estado.history.reversed(), key = { it.recordId }) { registro ->
+                ItemHistorico(
+                    registro = registro,
+                    posicao = posicaoNaComparacao(modo, registro.recordId),
+                    selecionado = registro.recordId == emFoco?.recordId ||
+                        (modo as? ModoHistorico.Comparando)?.bId == registro.recordId,
+                    onClick = { vm.tocarNoRegistro(registro.recordId) },
+                )
+            }
+        }
+
+        Column(Modifier.weight(1f).fillMaxHeight()) {
+            val comparacao = vm.comparar(modo, estado.history)
+            when {
+                comparacao != null -> TabelaComparacao(comparacao.a, comparacao.b, comparacao.lines)
+                comparando -> Vazio("Toque na segunda viagem, na lista ao lado.")
+                emFoco != null -> DetalhesDaViagem(
+                    registro = emFoco,
+                    onComparar = { vm.compararComOutra(emFoco.recordId) },
+                    onRenomear = { onRenomear(emFoco) },
+                    onExcluir = { onExcluir(emFoco) },
+                )
+                else -> Vazio("Escolha uma viagem na lista ao lado.")
+            }
+        }
+    }
+}
+
+private enum class PeriodoGrafico(val rotulo: String) {
+    DIA("Dia"),
+    SEMANA("Semana"),
+    MES("Mês"),
+}
+
+@Composable
+private fun OpcaoAbas(
+    texto: String,
+    marcada: Boolean,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (marcada) Cores.SuperficieSelecionada else Cores.Campo)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Text(
+            texto,
+            style = MaterialTheme.typography.titleMedium,
+            color = if (marcada) Cores.Destaque else Cores.TextoCorrido,
+        )
+    }
+}
+
+@Composable
+private fun TelaGraficos(estado: TripState) {
+    var periodo by remember { mutableStateOf(PeriodoGrafico.DIA) }
+
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            PeriodoGrafico.entries.forEach { p ->
+                OpcaoAbas(
+                    texto = p.rotulo,
+                    marcada = periodo == p,
+                    onClick = { periodo = p },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            when (periodo) {
+                PeriodoGrafico.DIA -> {
+                    Text("Gráficos por Dia", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Aqui virão gráficos mostrando dados de cada dia:\n" +
+                            "• Distância total por dia\n" +
+                            "• Consumo médio por dia\n" +
+                            "• Combustível gasto por dia",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Cores.TextoApoio,
+                    )
+                }
+                PeriodoGrafico.SEMANA -> {
+                    Text("Gráficos por Semana", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Aqui virão gráficos mostrando dados de cada semana:\n" +
+                            "• Distância total por semana\n" +
+                            "• Consumo médio por semana\n" +
+                            "• Combustível gasto por semana",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Cores.TextoApoio,
+                    )
+                }
+                PeriodoGrafico.MES -> {
+                    Text("Gráficos por Mês", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Aqui virão gráficos mostrando dados de cada mês:\n" +
+                            "• Distância total por mês\n" +
+                            "• Consumo médio por mês\n" +
+                            "• Combustível gasto por mês",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Cores.TextoApoio,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Total de viagens: ${estado.history.size}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Cores.TextoApoio,
+            )
+        }
+    }
 }

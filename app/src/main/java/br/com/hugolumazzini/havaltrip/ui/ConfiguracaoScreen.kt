@@ -520,10 +520,10 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
                     verticalAlignment = Alignment.Top,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Números", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+                        Text("Números", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "Exibe números de um trip no painel do veículo.",
+                            "Exibe números de um trip no painel do veículo. Permite ajustar posição, tamanho, cor e itens exibidos.",
                             style = MaterialTheme.typography.bodySmall,
                             color = Cores.TextoApoio,
                         )
@@ -545,10 +545,10 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
                     verticalAlignment = Alignment.Top,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Carrinho", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+                        Text("Carrinho", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "Exibe a miniatura do veículo no painel.",
+                            "Exibe a miniatura do veículo com alguns status no painel do veículo. Permite ajustar posição e tamanho.",
                             style = MaterialTheme.typography.bodySmall,
                             color = Cores.TextoApoio,
                         )
@@ -570,10 +570,10 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
                     verticalAlignment = Alignment.Top,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Integrar ao painel", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+                        Text("Integrar ao painel", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "Exibe carro e trips integrados ao painel.",
+                            "Ativa a exibição da miniatura do carro e de todos os trips de maneira integrada ao painel do veículo, em posição fixa (na bola da direita) na segunda página. Permite navegação entre os itens.",
                             style = MaterialTheme.typography.bodySmall,
                             color = Cores.TextoApoio,
                         )

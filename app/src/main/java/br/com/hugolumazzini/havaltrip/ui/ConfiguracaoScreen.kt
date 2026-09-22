@@ -1427,7 +1427,18 @@ private fun Projecao(janela: JanelaDoPainel, escolhida: Int?) {
             ProjetorDoPainel.recolher(janela)
         }
         telas.forEach { tela ->
-            Opcao(tela.descricao, escolhida == tela.id) { Cluster.usarTela(janela, tela.id) }
+            Opcao(tela.descricao, escolhida == tela.id) {
+                Cluster.usarTela(janela, tela.id)
+                escopo.launch(Dispatchers.IO) {
+                    ProjetorDoPainel.projetar(
+                        contexto,
+                        janela,
+                        tela.id,
+                        insistir = true,
+                    )
+                    releituras++
+                }
+            }
         }
     }
 
@@ -1440,43 +1451,6 @@ private fun Projecao(janela: JanelaDoPainel, escolhida: Int?) {
             color = Cores.TextoApoio,
         )
     }
-
-    Spacer(Modifier.height(10.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        BotaoAcao(
-            texto = "Projetar ${janela.rotulo.lowercase()}",
-            habilitado = escolhida != null,
-            onClick = {
-                // Fora da thread principal: abre um processo pelo Shizuku e
-                // espera por ele. Na principal, isso congelaria a tela.
-                escopo.launch(Dispatchers.IO) {
-                    // `insistir`: quem toca no botão quer a janela lá e à vista.
-                    // Sem isso, com ela já projetada o toque não mexeria na
-                    // ordem — e é justamente a ordem que decide quem aparece.
-                    ProjetorDoPainel.projetar(
-                        contexto,
-                        janela,
-                        escolhida ?: return@launch,
-                        insistir = true,
-                    )
-                    // Uma tentativa pode revelar que o Shizuku caiu no meio-tempo.
-                    releituras++
-                }
-            },
-        )
-        BotaoAcao("Recolher", onClick = { ProjetorDoPainel.recolher(janela) })
-    }
-
-    Spacer(Modifier.height(6.dp))
-    Text(
-        "Se o painel do Impulse aparecer por cima desta janela: os dois apps usam o " +
-            "mesmo caminho, e quem projeta por último fica em cima. Toque em " +
-            "\"Projetar\" de novo para trazer a nossa para a frente. Na partida do " +
-            "carro isso é feito sozinho, meio minuto depois de ligar — que é o tempo " +
-            "de o Impulse terminar de subir.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = Cores.TextoApoio,
-    )
 
     val recado = recadoDaProjecao(situacao, resultados[janela])
     if (recado != null) {

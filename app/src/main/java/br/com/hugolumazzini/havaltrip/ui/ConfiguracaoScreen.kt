@@ -758,12 +758,12 @@ private fun CarroNoPainel() {
         )
         Spacer(Modifier.height(8.dp))
         FlowRowSimples {
-            Seta("−", "mais perto") { Cluster.afastarDoCarro(-5) }
-            Seta("+", "mais longe") { Cluster.afastarDoCarro(5) }
+            Seta("−", "mais perto") { Cluster.afastarDoCarroSolto(-5) }
+            Seta("+", "mais longe") { Cluster.afastarDoCarroSolto(5) }
         }
         Spacer(Modifier.height(6.dp))
         Text(
-            "${ajustes.afastamentoDoCarro}% da proximidade máxima.",
+            "${ajustes.afastamentoDoCarroSolto}% da proximidade máxima.",
             style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )

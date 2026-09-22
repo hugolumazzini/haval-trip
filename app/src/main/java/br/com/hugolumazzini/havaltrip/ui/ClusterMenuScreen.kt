@@ -395,7 +395,7 @@ private fun Conteudo(
                                 .aspectRatio(LARGURA_POR_ALTURA)
                         },
                         legenda = false,
-                        aproximacao = ajustes.afastamentoDoCarro / 100f,
+                        aproximacao = ajustes.afastamentoDoCarroNaBola / 100f,
                     )
 
                     is Visao.DeTrip -> Painel(

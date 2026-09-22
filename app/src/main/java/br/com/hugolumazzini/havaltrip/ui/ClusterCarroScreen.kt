@@ -174,7 +174,7 @@ fun ClusterCarroScreen(vm: TripViewModel, espiando: Boolean = false) {
                 // A legenda "pressão em psi" só na tela da central: aqui ela
                 // rouba altura do desenho para dizer uma unidade que não muda.
                 legenda = false,
-                aproximacao = ajustes.afastamentoDoCarro / 100f,
+                aproximacao = ajustes.afastamentoDoCarroSolto / 100f,
             )
         }
     }

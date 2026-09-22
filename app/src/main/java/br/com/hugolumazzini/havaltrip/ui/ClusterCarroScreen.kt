@@ -17,12 +17,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.Cluster
-import br.com.hugolumazzini.havaltrip.FormatoDoCarro
 import br.com.hugolumazzini.havaltrip.LugarNoPainel
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
 import br.com.hugolumazzini.havaltrip.painel.PaginaDoCluster
@@ -84,7 +81,7 @@ fun ClusterCarroScreen(vm: TripViewModel, espiando: Boolean = false) {
                 estado.live,
                 tinta(ajustes, paleta),
                 painel,
-                Modifier.fillMaxSize().background(Color(ajustes.fundoDoCarro.argb).copy(alpha = ajustes.fundoTransparencia / 100f)),
+                Modifier.fillMaxSize().background(Color(ajustes.fundoDoCarro.argb)),
             )
         }
         return
@@ -129,14 +126,9 @@ fun ClusterCarroScreen(vm: TripViewModel, espiando: Boolean = false) {
                 // Reto nos dois casos, agora: na bola o que se quer esconder é
                 // justamente um quadrado, e canto redondo deixa as quinas dele
                 // vazarem. O arredondado leve só evita a aresta viva.
-                // A forma varia conforme o formatoDoCarro escolhido
                 .background(
-                    Color(ajustes.fundoDoCarro.argb).copy(alpha = ajustes.fundoTransparencia / 100f),
-                    when (ajustes.formatoDoCarro) {
-                        FormatoDoCarro.REDONDO -> if (naBola) RoundedCornerShape(CANTO_DA_TAPA) else RoundedCornerShape(12.dp)
-                        FormatoDoCarro.QUADRADO -> RectangleShape
-                        FormatoDoCarro.BORDA_AZUL_ORIGINAL -> if (naBola) RoundedCornerShape(CANTO_DA_TAPA) else RectangleShape
-                    },
+                    Color(ajustes.fundoDoCarro.argb),
+                    if (naBola) RoundedCornerShape(CANTO_DA_TAPA) else RectangleShape,
                 )
                 // Conta à central onde caiu. Ver `QuadroDeMedidas`.
                 .medindo(
@@ -163,24 +155,6 @@ fun ClusterCarroScreen(vm: TripViewModel, espiando: Boolean = false) {
                     drawCircle(
                         color = AZUL_DO_PAINEL,
                         radius = (size.minDimension - traco) / 2f,
-                        style = Stroke(width = traco),
-                    )
-                }
-            } else if (ajustes.formatoDoCarro == FormatoDoCarro.BORDA_AZUL_ORIGINAL) {
-                // Borda azul para formato original, mas fora da bola
-                Canvas(
-                    Modifier
-                        .fillMaxHeight(1f)
-                        .aspectRatio(LARGURA_POR_ALTURA),
-                ) {
-                    val traco = size.minDimension * 0.08f  // 8% da dimensão
-                    drawRect(
-                        color = AZUL_DO_PAINEL,
-                        topLeft = Offset(traco / 2, traco / 2),
-                        size = Size(
-                            size.width - traco,
-                            size.height - traco,
-                        ),
                         style = Stroke(width = traco),
                     )
                 }

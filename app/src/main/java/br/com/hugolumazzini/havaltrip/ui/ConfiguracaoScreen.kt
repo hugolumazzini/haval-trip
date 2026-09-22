@@ -12,9 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,7 +21,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,16 +35,13 @@ import android.content.Intent
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.Atualizador
 import br.com.hugolumazzini.havaltrip.Cluster
 import androidx.compose.runtime.LaunchedEffect
 import br.com.hugolumazzini.havaltrip.CorDoCluster
-import br.com.hugolumazzini.havaltrip.FormatoDoCarro
 import br.com.hugolumazzini.havaltrip.telemetry.PaletaDoImpulse
 import br.com.hugolumazzini.havaltrip.FundoDoCluster
 import br.com.hugolumazzini.havaltrip.MAXIMO_DE_ITENS
@@ -123,12 +117,13 @@ private fun paradaMaisProxima(segundos: Double?): Int {
 private enum class AbaDaConfiguracao(val rotulo: String) {
     // A ordem é a do uso, não a da implementação: o que o motorista abre todo
     // dia (zerar contador) vem primeiro, depois o que ele abre de vez em quando
-    // (nuances), e por último o que se acerta uma vez e não se mexe mais.
-    GERAL("Geral"),
+    // (versão), e por último o que se acerta uma vez e não se mexe mais.
+    CONTADORES("Contadores"),
+    VERSAO("Versão"),
     NUMEROS("Números"),
-    CARRO("Carrinho"),
-    PAGINA("Integrar ao painel"),
+    CARRO("Carro"),
     DESPEDIDA("Despedida"),
+    PAGINA("Integrar ao painel"),
 }
 
 /**
@@ -140,12 +135,10 @@ private enum class AbaDaConfiguracao(val rotulo: String) {
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
-    val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
-
     // `rememberSaveable` para a aba sobreviver ao giro de tela e à volta de
-    // outra tela: reabrir sempre em "Geral" faria perder o lugar a cada
+    // outra tela: reabrir sempre em "Números" faria perder o lugar a cada
     // espiada em "Ver como fica".
-    var aba by rememberSaveable { mutableStateOf(AbaDaConfiguracao.GERAL) }
+    var aba by rememberSaveable { mutableStateOf(AbaDaConfiguracao.CONTADORES) }
 
     Column(Modifier.fillMaxWidth()) {
         Text("CONFIGURAÇÃO", style = EstiloRotulo)
@@ -156,32 +149,11 @@ fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             AbaDaConfiguracao.entries.forEach { qual ->
-                val visivel = when (qual) {
-                    AbaDaConfiguracao.NUMEROS -> ajustes.habilitarNumerosNoPainel
-                    AbaDaConfiguracao.CARRO -> ajustes.habilitarCarroNoPainel
-                    AbaDaConfiguracao.PAGINA -> ajustes.habilitarPaginaComVisoes
-                    else -> true // GERAL e DESPEDIDA sempre visíveis
-                }
-                if (visivel) {
-                    Opcao(qual.rotulo, aba == qual) { aba = qual }
-                }
+                Opcao(qual.rotulo, aba == qual) { aba = qual }
             }
         }
 
         Spacer(Modifier.height(14.dp))
-
-        // Se a aba atual ficar invisível, volta para GERAL
-        LaunchedEffect(ajustes) {
-            val abaVisivel = when (aba) {
-                AbaDaConfiguracao.NUMEROS -> ajustes.habilitarNumerosNoPainel
-                AbaDaConfiguracao.CARRO -> ajustes.habilitarCarroNoPainel
-                AbaDaConfiguracao.PAGINA -> ajustes.habilitarPaginaComVisoes
-                else -> true
-            }
-            if (!abaVisivel) {
-                aba = AbaDaConfiguracao.GERAL
-            }
-        }
 
         // A rolagem vive aqui dentro, e não em volta das abas: as abas ficam
         // paradas no topo enquanto o conteúdo rola, que é o que faz a troca de
@@ -189,141 +161,16 @@ fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
             Cartao(Modifier.fillMaxWidth()) {
                 when (aba) {
-                    AbaDaConfiguracao.GERAL -> GeralNoPainel(vm, estado)
                     AbaDaConfiguracao.NUMEROS -> NumerosNoPainel(estado)
                     AbaDaConfiguracao.CARRO -> CarroNoPainel()
                     AbaDaConfiguracao.PAGINA -> PaginaComVisoesNaAba()
                     AbaDaConfiguracao.DESPEDIDA -> DespedidaNoPainel()
+                    AbaDaConfiguracao.CONTADORES -> Contadores(vm, estado)
+                    AbaDaConfiguracao.VERSAO -> SobreEAtualizacao(vm)
                 }
             }
             Spacer(Modifier.height(14.dp))
         }
-    }
-}
-
-/** Visão geral com contadores, toggles de funcionalidades e versão. */
-@Composable
-@OptIn(ExperimentalLayoutApi::class)
-private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
-    val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
-
-    Column {
-        // CONTADORES - Quantos e tempo de zeragem
-        Text("Contadores", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Quantos contadores aparecem na lateral, fora a Viagem atual. " +
-                "Os que saem da lista param de contar, mas guardam o que já mediram.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Cores.TextoApoio,
-        )
-        Spacer(Modifier.height(12.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            (1..TripSnapshot.MAX_CONTADORES_MANUAIS).forEach { quantos ->
-                Opcao(
-                    texto = quantos.toString(),
-                    marcada = estado.contadoresManuais == quantos,
-                    onClick = { vm.definirContadoresManuais(quantos) },
-                )
-            }
-        }
-
-        Spacer(Modifier.height(14.dp))
-        Column(modifier = Modifier.fillMaxWidth(0.5f)) {
-            ZeragemAutomatica(vm, estado)
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        // FUNCIONALIDADES DO PAINEL - Ocupa 50% da largura
-        Column(modifier = Modifier.fillMaxWidth(0.5f)) {
-            Text("Funcionalidades do painel", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-
-            Spacer(Modifier.height(12.dp))
-
-            // Números
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Números", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Exibe números de um trip no painel do veículo. Permite ajustar posição, tamanho, cor e itens exibidos.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Cores.TextoApoio,
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Switch(
-                    checked = ajustes.habilitarNumerosNoPainel,
-                    onCheckedChange = { Cluster.alternarHabilitarNumerosNoPainel() },
-                    modifier = Modifier.scale(0.75f),
-                )
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            // Carrinho
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Carrinho", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Exibe a miniatura do veículo com alguns status no painel do veículo. Permite ajustar posição e tamanho.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Cores.TextoApoio,
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Switch(
-                    checked = ajustes.habilitarCarroNoPainel,
-                    onCheckedChange = { Cluster.alternarHabilitarCarroNoPainel() },
-                    modifier = Modifier.scale(0.75f),
-                )
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            // Integrar ao painel
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Integrar ao painel", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Ativa a exibição da miniatura do carro e de todos os trips de maneira integrada ao painel do veículo, em posição fixa (na bola da direita) na segunda página. Permite navegação entre os itens.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Cores.TextoApoio,
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Switch(
-                    checked = ajustes.habilitarPaginaComVisoes,
-                    onCheckedChange = { Cluster.alternarHabilitarPaginaComVisoes() },
-                    modifier = Modifier.scale(0.75f),
-                )
-            }
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        // VERSÃO - Sempre visível
-        Text("Versão", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(8.dp))
-        SobreEAtualizacao(vm)
     }
 }
 
@@ -372,6 +219,8 @@ private fun SobreEAtualizacao(vm: TripViewModel) {
     val situacao by vm.atualizador.collectAsStateWithLifecycle()
 
     Column {
+        Text("Versão", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
+        Spacer(Modifier.height(4.dp))
         Text(
             "$nome (código $codigo)",
             style = MaterialTheme.typography.bodyMedium,
@@ -622,29 +471,22 @@ private fun NumerosNoPainel(estado: TripState) {
             color = Cores.TextoApoio,
         )
 
-        if (ajustes.habilitarNumerosNoPainel) {
-            Spacer(Modifier.height(14.dp))
-            Spacer(Modifier.height(14.dp))
-            Text("Qual tela", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-            Spacer(Modifier.height(8.dp))
-        Text(
-            "Tela 1: fica por trás dos desenhos do painel, não sobrepõe ADAS.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Cores.TextoApoio,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Tela 3: fica por cima de tudo, inclusive ADAS. Use quando tela 1 ficar escondida.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Cores.TextoApoio,
-        )
+        Spacer(Modifier.height(14.dp))
+        Projecao(JanelaDoPainel.NUMEROS, ajustes.telaDosNumeros)
+
+        Spacer(Modifier.height(14.dp))
+        Text("Qual contador", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(8.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Opcao("Tela 1", ajustes.tripId == null) { Cluster.usarTrip(null) }
-            Opcao("Tela 3", ajustes.tripId != null) { Cluster.usarTrip(ajustes.tripId) }
+            // "O da tela" é o padrão porque acompanha quem troca de contador na
+            // central, sem obrigar a vir aqui de novo.
+            Opcao("O da tela", ajustes.tripId == null) { Cluster.usarTrip(null) }
+            estado.trips.forEach { trip ->
+                Opcao(trip.label, ajustes.tripId == trip.id) { Cluster.usarTrip(trip.id) }
+            }
         }
 
         Spacer(Modifier.height(14.dp))
@@ -672,23 +514,25 @@ private fun NumerosNoPainel(estado: TripState) {
         }
 
         Spacer(Modifier.height(14.dp))
-        Text("Tamanho base do texto", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(8.dp))
+        Text("Tamanho da letra", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(4.dp))
         Text(
-            "Quanto do espaço fica para a letra: quanto maior, mais esticado fica o número. " +
-                "O padrão é 0.42.",
+            "Normal já se ajusta sozinho ao tamanho da janela. As outras opções " +
+                "só puxam esse cálculo para cima ou para baixo.",
             style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
         Spacer(Modifier.height(8.dp))
-        Slider(
-            value = ajustes.tamanhoBaseDoTexto,
-            onValueChange = { Cluster.usarTamanhoBaseDoTexto(it) },
-            valueRange = 0.2f..0.6f,
-            steps = 7,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text("%.2f".format(ajustes.tamanhoBaseDoTexto), style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ESCALAS.forEach { (rotulo, escala) ->
+                Opcao(rotulo, kotlin.math.abs(ajustes.escalaFonte - escala) < 0.01f) {
+                    Cluster.usarEscala(escala)
+                }
+            }
+        }
 
         Spacer(Modifier.height(14.dp))
         Text("Cor dos números", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
@@ -697,13 +541,16 @@ private fun NumerosNoPainel(estado: TripState) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            CorDoCluster.entries.filter { it != CorDoCluster.DO_IMPULSE }.forEach { cor ->
+            CorDoCluster.entries.forEach { cor ->
                 OpcaoColorida(cor.rotulo, ajustes.cor == cor, Color(corDaAmostra(cor, paleta))) {
                     Cluster.usarCor(cor)
                 }
             }
         }
-
+        if (ajustes.cor == CorDoCluster.DO_IMPULSE) {
+            Spacer(Modifier.height(6.dp))
+            Text(recadoDaPaleta(paleta), style = MaterialTheme.typography.bodyMedium, color = Cores.TextoApoio)
+        }
 
         Spacer(Modifier.height(14.dp))
         Text("Fundo do bloco", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
@@ -726,24 +573,6 @@ private fun NumerosNoPainel(estado: TripState) {
         }
 
         Spacer(Modifier.height(14.dp))
-        Text("Transparência do fundo", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "0% é totalmente transparente, 100% é totalmente opaco.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Cores.TextoApoio,
-        )
-        Spacer(Modifier.height(8.dp))
-        Slider(
-            value = ajustes.fundoTransparencia,
-            onValueChange = { Cluster.usarFundoTransparencia(it) },
-            valueRange = 0f..100f,
-            steps = 99,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text("${ajustes.fundoTransparencia.toInt()}%", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
-
-        Spacer(Modifier.height(14.dp))
         Text("Quanto espaço ocupa", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
         Spacer(Modifier.height(8.dp))
         FlowRow(
@@ -756,8 +585,7 @@ private fun NumerosNoPainel(estado: TripState) {
         }
 
         Spacer(Modifier.height(14.dp))
-            AjusteFino(JanelaDoPainel.NUMEROS, ajustes.empurraoDosNumeros, ajustes.zoomDosNumeros)
-        }
+        AjusteFino(JanelaDoPainel.NUMEROS, ajustes.empurraoDosNumeros, ajustes.zoomDosNumeros)
 
         Spacer(Modifier.height(12.dp))
         BotaoAcao("Ver como fica", onClick = { espiar(contexto, ClusterActivity::class.java) })
@@ -812,6 +640,14 @@ private fun DespedidaNoPainel() {
                 }
             }
         }
+        Spacer(Modifier.height(10.dp))
+        BotaoAcao("Ver a despedida", onClick = {
+            contexto.startActivity(
+                Intent(contexto, ClusterActivity::class.java)
+                    .putExtra(ESPIANDO, true)
+                    .putExtra(DESPEDIDA, true),
+            )
+        })
     }
 }
 
@@ -840,102 +676,51 @@ private fun CarroNoPainel() {
             color = Cores.TextoApoio,
         )
 
-        if (ajustes.habilitarCarroNoPainel) {
-            Spacer(Modifier.height(14.dp))
-            Text("Fundo do carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Na bola do ar o fundo opaco é redondo, do tamanho da bola: é ele que " +
-                    "tapa a tela do ar-condicionado por baixo. Transparente deixa os dois " +
-                    "desenhos aparecerem um sobre o outro.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Cores.TextoApoio,
-            )
-            Spacer(Modifier.height(8.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                FundoDoCluster.entries.forEach { fundo ->
-                    Opcao(fundo.rotulo, ajustes.fundoDoCarro == fundo) { Cluster.usarFundoDoCarro(fundo) }
+        Spacer(Modifier.height(14.dp))
+        Projecao(JanelaDoPainel.CARRO, ajustes.telaDoCarro)
+
+        Spacer(Modifier.height(14.dp))
+        Text("Tamanho do carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            TamanhoDoCarro.Escolhiveis.forEach { tamanho ->
+                Opcao(tamanho.rotulo, ajustes.tamanhoDoCarro == tamanho) {
+                    Cluster.usarTamanhoDoCarro(tamanho)
                 }
             }
-
-            Spacer(Modifier.height(14.dp))
-            Text("Transparência do fundo", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "0% é opaco, 100% é totalmente transparente.",
-                style = MaterialTheme.typography.bodySmall,
-                color = Cores.TextoApoio,
-            )
-            Spacer(Modifier.height(8.dp))
-            Slider(
-                value = ajustes.fundoTransparencia,
-                onValueChange = { Cluster.usarFundoTransparencia(it) },
-                valueRange = 0f..100f,
-                steps = 99,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text("${ajustes.fundoTransparencia.toInt()}%", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
-
-            Spacer(Modifier.height(14.dp))
-            Text("Qual tela", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Tela 1: fica por trás dos desenhos do painel, não sobrepõe ADAS.",
-                style = MaterialTheme.typography.bodySmall,
-                color = Cores.TextoApoio,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Tela 3: fica por cima de tudo, inclusive ADAS. Use quando tela 1 ficar escondida.",
-                style = MaterialTheme.typography.bodySmall,
-                color = Cores.TextoApoio,
-            )
-            Spacer(Modifier.height(8.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Opcao("Tela 1", ajustes.paginaDoCarro == null) { Cluster.usarPaginaDoCarro(null) }
-                Opcao("Tela 3", ajustes.paginaDoCarro != null) { Cluster.usarPaginaDoCarro(ajustes.paginaDoCarro) }
-            }
-
-            Spacer(Modifier.height(14.dp))
-            Text("Formato do carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Escolha o estilo visual do desenho do carro: quadrado com bordas retas, " +
-                    "redondo com bordas arredondadas, ou com a borda azul original do Impulse.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Cores.TextoApoio,
-            )
-            Spacer(Modifier.height(8.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                FormatoDoCarro.entries.forEach { formato ->
-                    Opcao(formato.rotulo, ajustes.formatoDoCarro == formato) { Cluster.usarFormatoDoCarro(formato) }
-                }
-            }
-
-            Spacer(Modifier.height(14.dp))
-            Text("Quanto espaço ocupa", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-            Spacer(Modifier.height(8.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                TamanhoDoCarro.entries.forEach { tamanho ->
-                    Opcao(tamanho.rotulo, ajustes.tamanhoDoCarro == tamanho) { Cluster.usarTamanhoDoCarro(tamanho) }
-                }
-            }
-
-            Spacer(Modifier.height(14.dp))
-            AjusteFino(JanelaDoPainel.CARRO, ajustes.empurraoDoCarro, ajustes.zoomDoCarro)
         }
+
+        Spacer(Modifier.height(14.dp))
+        Text("Fundo do carro", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Na bola do ar o fundo opaco é redondo, do tamanho da bola: é ele que " +
+                "tapa a tela do ar-condicionado por baixo. Transparente deixa os dois " +
+                "desenhos aparecerem um sobre o outro.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            FundoDoCluster.entries.forEach { fundo ->
+                Opcao(fundo.rotulo, ajustes.fundoDoCarro == fundo) { Cluster.usarFundoDoCarro(fundo) }
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        PaginaDoPainel(ajustes.paginaDoCarro)
+
+        Spacer(Modifier.height(14.dp))
+        AjusteFino(JanelaDoPainel.CARRO, ajustes.empurraoDoCarro, ajustes.zoomDoCarro)
+
+        Spacer(Modifier.height(12.dp))
+        BotaoAcao("Ver como fica o carro", onClick = { espiar(contexto, ClusterCarroActivity::class.java) })
     }
 }
 
@@ -980,9 +765,8 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
         color = Cores.TextoApoio,
     )
 
-    if (ajustes.habilitarPaginaComVisoes) {
-        Spacer(Modifier.height(14.dp))
-        BolaDeUmaVez(agora, ouvindoPagina)
+    Spacer(Modifier.height(14.dp))
+    BolaDeUmaVez(agora, ouvindoPagina)
 
     Spacer(Modifier.height(14.dp))
     Projecao(JanelaDoPainel.MENU, ajustes.telaDoMenu)
@@ -1148,7 +932,6 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
             style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
-        }
     }
 
     Spacer(Modifier.height(12.dp))
@@ -1643,7 +1426,7 @@ private fun Projecao(janela: JanelaDoPainel, escolhida: Int?) {
             Cluster.usarTela(janela, null)
             ProjetorDoPainel.recolher(janela)
         }
-        telas.filter { it.id == 1 || it.id == 3 }.forEach { tela ->
+        telas.forEach { tela ->
             Opcao(tela.descricao, escolhida == tela.id) { Cluster.usarTela(janela, tela.id) }
         }
     }
@@ -1729,13 +1512,6 @@ private fun recadoDaProjecao(
     resultado is ProjetorDoPainel.Resultado.Falhou -> "Não deu: ${resultado.motivo}."
     else -> null
 }
-
-/**
- * Seletor RGB para cores customizadas.
- *
- * Mostra três sliders independentes para controlar Red, Green e Blue de 0 a 255,
- * e uma amostra da cor resultante.
- */
 
 /** Os tamanhos de letra oferecidos, como multiplicador do cálculo automático. */
 private val ESCALAS = listOf(

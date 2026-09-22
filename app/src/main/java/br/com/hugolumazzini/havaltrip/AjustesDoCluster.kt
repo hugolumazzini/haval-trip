@@ -99,18 +99,6 @@ enum class RotuloDoCluster(val rotulo: String) {
     NENHUM("Só o número"),
 }
 
-/**
- * Formato visual do desenho do carro.
- *
- * Oferece diferentes estilos para o carrinho: quadrado, redondo ou com a borda
- * azul original do Impulse.
- */
-enum class FormatoDoCarro(val rotulo: String) {
-    QUADRADO("Quadrado"),
-    REDONDO("Redondo"),
-    BORDA_AZUL_ORIGINAL("Borda azul original"),
-}
-
 enum class FundoDoCluster(val rotulo: String, val argb: Long) {
     TRANSPARENTE("Transparente", 0x00000000),
     ESCURO("Escuro", 0xCC000000),
@@ -471,14 +459,8 @@ data class AjustesDoCluster(
         ItemDoCluster.TEMPO,
     ),
     val escalaFonte: Float = 1.0f,
-    /** Quanto do espaço da fatia vira tamanho de letra (0.42 é o padrão). */
-    val tamanhoBaseDoTexto: Float = 0.42f,
-    /** Tamanho do rótulo em relação ao número (0.32 é o padrão). */
-    val proporcaoDoRotulo: Float = 0.32f,
     val cor: CorDoCluster = CorDoCluster.BRANCO,
     val fundo: FundoDoCluster = FundoDoCluster.TRANSPARENTE,
-    /** Transparência do fundo em percentual: 0 = totalmente transparente, 100 = totalmente opaco. */
-    val fundoTransparencia: Float = 100f,
     // Os dois `lugar` são herança: as telas desenham sempre a partir do centro
     // desde que os cantos prontos saíram da configuração (ver [Empurrao]). O
     // campo continua gravado porque `lugarDoCarro` ainda distingue um caso — a
@@ -488,7 +470,6 @@ data class AjustesDoCluster(
     val lugarDoCarro: LugarNoPainel = LugarNoPainel.MEIO_CENTRO,
     val tamanhoDoCarro: TamanhoDoCarro = TamanhoDoCarro.MEDIO,
     val fundoDoCarro: FundoDoCluster = FundoDoCluster.TRANSPARENTE,
-    val formatoDoCarro: FormatoDoCarro = FormatoDoCarro.REDONDO,
     val telaDosNumeros: Int? = null,
     val telaDoCarro: Int? = null,
     val empurraoDosNumeros: Empurrao = Empurrao(),
@@ -558,24 +539,6 @@ data class AjustesDoCluster(
      */
     val fundoDoMenu: FundoDoCluster = FundoDoCluster.PRETO,
     /**
-     * Se a janela de números está habilitada no painel.
-     *
-     * Quando desabilitado, nenhuma janela de números é projetada.
-     */
-    val habilitarNumerosNoPainel: Boolean = true,
-    /**
-     * Se a janela de carro está habilitada no painel.
-     *
-     * Quando desabilitado, nenhuma janela de carro é projetada.
-     */
-    val habilitarCarroNoPainel: Boolean = true,
-    /**
-     * Se a página com visões (integrada ao painel) está habilitada.
-     *
-     * Quando desabilitado, a página não é projetada.
-     */
-    val habilitarPaginaComVisoes: Boolean = true,
-    /**
      * Como os dados se identificam dentro da bola. Ver [RotuloDoCluster].
      *
      * Só na bola: nas janelinhas soltas o espaço não é redondo nem tão apertado,
@@ -634,17 +597,13 @@ object Cluster {
     private const val TRIP = "tripId"
     private const val ITENS = "itens"
     private const val ESCALA = "escalaFonte"
-    private const val TAMANHO_BASE_TEXTO = "tamanhoBaseDoTexto"
-    private const val PROPORCAO_ROTULO = "proporcaoDoRotulo"
     private const val COR = "cor"
     private const val FUNDO = "fundo"
-    private const val FUNDO_TRANSPARENCIA = "fundoTransparencia"
     private const val LUGAR = "lugar"
     private const val TAMANHO = "tamanho"
     private const val LUGAR_CARRO = "lugarDoCarro"
     private const val TAMANHO_CARRO = "tamanhoDoCarro"
     private const val FUNDO_CARRO = "fundoDoCarro"
-    private const val FORMATO_CARRO = "formatoDoCarro"
     private const val TELA_NUMEROS = "telaDosNumeros"
     private const val TELA_CARRO = "telaDoCarro"
     private const val EMPURRAO_NUMEROS_X = "empurraoDosNumerosX"
@@ -669,9 +628,6 @@ object Cluster {
     private const val ROTULO_MENU = "rotuloDoMenu"
     private const val AFASTAMENTO_MENU = "afastamentoDoMenu"
     private const val ITENS_DESPEDIDA = "itensDaDespedida"
-    private const val HABILITAR_NUMEROS = "habilitarNumerosNoPainel"
-    private const val HABILITAR_CARRO = "habilitarCarroNoPainel"
-    private const val HABILITAR_PAGINA = "habilitarPaginaComVisoes"
 
     /**
      * O que se grava no lugar de "nenhuma tela".
@@ -782,15 +738,12 @@ object Cluster {
                 ?.mapNotNull { nome -> ItemDoCluster.entries.find { it.name == nome } }
                 ?: padrao.itens,
             escalaFonte = prefs.getFloat(ESCALA, padrao.escalaFonte),
-            tamanhoBaseDoTexto = prefs.getFloat(TAMANHO_BASE_TEXTO, padrao.tamanhoBaseDoTexto),
-            proporcaoDoRotulo = prefs.getFloat(PROPORCAO_ROTULO, padrao.proporcaoDoRotulo),
             cor = prefs.getString(COR, null)
                 ?.let { nome -> CorDoCluster.entries.find { it.name == nome } }
                 ?: padrao.cor,
             fundo = prefs.getString(FUNDO, null)
                 ?.let { nome -> FundoDoCluster.entries.find { it.name == nome } }
                 ?: padrao.fundo,
-            fundoTransparencia = prefs.getFloat(FUNDO_TRANSPARENCIA, padrao.fundoTransparencia),
             lugar = prefs.getString(LUGAR, null)
                 ?.let { nome -> LugarNoPainel.entries.find { it.name == nome } }
                 ?: padrao.lugar,
@@ -806,9 +759,6 @@ object Cluster {
             fundoDoCarro = prefs.getString(FUNDO_CARRO, null)
                 ?.let { nome -> FundoDoCluster.entries.find { it.name == nome } }
                 ?: padrao.fundoDoCarro,
-            formatoDoCarro = prefs.getString(FORMATO_CARRO, null)
-                ?.let { nome -> FormatoDoCarro.entries.find { it.name == nome } }
-                ?: padrao.formatoDoCarro,
             telaDosNumeros = prefs.getInt(TELA_NUMEROS, SEM_TELA).takeIf { it != SEM_TELA },
             telaDoCarro = prefs.getInt(TELA_CARRO, SEM_TELA).takeIf { it != SEM_TELA },
             // Passa pelo `mais` de propósito: é ele que contém no limite, e
@@ -863,9 +813,6 @@ object Cluster {
                 ?.split(",")
                 ?.mapNotNull { nome -> ItemDoCluster.entries.find { it.name == nome } }
                 ?: padrao.itensDaDespedida,
-            habilitarNumerosNoPainel = prefs.getBoolean(HABILITAR_NUMEROS, padrao.habilitarNumerosNoPainel),
-            habilitarCarroNoPainel = prefs.getBoolean(HABILITAR_CARRO, padrao.habilitarCarroNoPainel),
-            habilitarPaginaComVisoes = prefs.getBoolean(HABILITAR_PAGINA, padrao.habilitarPaginaComVisoes),
         )
     }
 
@@ -875,17 +822,13 @@ object Cluster {
             .putString(TRIP, novo.tripId)
             .putString(ITENS, novo.itens.joinToString(",") { it.name })
             .putFloat(ESCALA, novo.escalaFonte)
-            .putFloat(TAMANHO_BASE_TEXTO, novo.tamanhoBaseDoTexto)
-            .putFloat(PROPORCAO_ROTULO, novo.proporcaoDoRotulo)
             .putString(COR, novo.cor.name)
             .putString(FUNDO, novo.fundo.name)
-            .putFloat(FUNDO_TRANSPARENCIA, novo.fundoTransparencia)
             .putString(LUGAR, novo.lugar.name)
             .putString(TAMANHO, novo.tamanho.name)
             .putString(LUGAR_CARRO, novo.lugarDoCarro.name)
             .putString(TAMANHO_CARRO, novo.tamanhoDoCarro.name)
             .putString(FUNDO_CARRO, novo.fundoDoCarro.name)
-            .putString(FORMATO_CARRO, novo.formatoDoCarro.name)
             .putInt(TELA_NUMEROS, novo.telaDosNumeros ?: SEM_TELA)
             .putInt(TELA_CARRO, novo.telaDoCarro ?: SEM_TELA)
             .putInt(EMPURRAO_NUMEROS_X, novo.empurraoDosNumeros.x)
@@ -910,9 +853,6 @@ object Cluster {
             .putString(ROTULO_MENU, novo.rotuloDoMenu.name)
             .putInt(AFASTAMENTO_MENU, novo.afastamentoDoMenu.porcento)
             .putString(ITENS_DESPEDIDA, novo.itensDaDespedida.joinToString(",") { it.name })
-            .putBoolean(HABILITAR_NUMEROS, novo.habilitarNumerosNoPainel)
-            .putBoolean(HABILITAR_CARRO, novo.habilitarCarroNoPainel)
-            .putBoolean(HABILITAR_PAGINA, novo.habilitarPaginaComVisoes)
             .apply()
     }
 
@@ -953,15 +893,9 @@ object Cluster {
 
     fun usarEscala(escala: Float) = gravar(_ajustes.value.copy(escalaFonte = escala))
 
-    fun usarTamanhoBaseDoTexto(tamanho: Float) = gravar(_ajustes.value.copy(tamanhoBaseDoTexto = tamanho))
-
-    fun usarProporcaoDoRotulo(proporcao: Float) = gravar(_ajustes.value.copy(proporcaoDoRotulo = proporcao))
-
     fun usarCor(cor: CorDoCluster) = gravar(_ajustes.value.copy(cor = cor))
 
     fun usarFundo(fundo: FundoDoCluster) = gravar(_ajustes.value.copy(fundo = fundo))
-
-    fun usarFundoTransparencia(transparencia: Float) = gravar(_ajustes.value.copy(fundoTransparencia = transparencia))
 
     fun usarLugar(lugar: LugarNoPainel) = gravar(_ajustes.value.copy(lugar = lugar))
 
@@ -990,9 +924,6 @@ object Cluster {
     fun usarFundoDoCarro(fundo: FundoDoCluster) =
         gravar(_ajustes.value.copy(fundoDoCarro = fundo))
 
-    fun usarFormatoDoCarro(formato: FormatoDoCarro) =
-        gravar(_ajustes.value.copy(formatoDoCarro = formato))
-
     fun usarFundoDoMenu(fundo: FundoDoCluster) =
         gravar(_ajustes.value.copy(fundoDoMenu = fundo))
 
@@ -1020,15 +951,6 @@ object Cluster {
     /** Troca o jeito de identificar cada dado na bola. Ver [RotuloDoCluster]. */
     fun usarRotuloDoMenu(rotulo: RotuloDoCluster) =
         gravar(_ajustes.value.copy(rotuloDoMenu = rotulo))
-
-    fun alternarHabilitarNumerosNoPainel() =
-        gravar(_ajustes.value.copy(habilitarNumerosNoPainel = !_ajustes.value.habilitarNumerosNoPainel))
-
-    fun alternarHabilitarCarroNoPainel() =
-        gravar(_ajustes.value.copy(habilitarCarroNoPainel = !_ajustes.value.habilitarCarroNoPainel))
-
-    fun alternarHabilitarPaginaComVisoes() =
-        gravar(_ajustes.value.copy(habilitarPaginaComVisoes = !_ajustes.value.habilitarPaginaComVisoes))
 
     /**
      * Em qual página do carrossel do painel a janela do carro aparece.

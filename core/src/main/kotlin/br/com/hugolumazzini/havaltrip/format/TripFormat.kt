@@ -30,8 +30,6 @@ object TripFormat {
 
     fun km(valor: Double?) = valor?.let { "${decimal(it, 1)} km" } ?: AUSENTE
 
-    fun kmInteiro(valor: Double?) = valor?.let { "${decimal(it, 0)} km" } ?: AUSENTE
-
     fun kml(valor: Double?) = valor?.let { "${decimal(it, 1)} km/L" } ?: AUSENTE
 
     fun kmh(valor: Double?) = valor?.let { "${decimal(it, 0)} km/h" } ?: AUSENTE

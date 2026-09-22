@@ -16,8 +16,8 @@ object MedidaDoPainel {
     /** Largura média de um caractere, em frações do tamanho da fonte. */
     private const val LARGURA_DO_CARACTERE = 0.62f
 
-    /** O rótulo e a unidade saem em um terço do tamanho do número (padrão). */
-    const val PROPORCAO_DO_ROTULO_PADRAO = 0.32f
+    /** O rótulo e a unidade saem em um terço do tamanho do número. */
+    const val PROPORCAO_DO_ROTULO = 0.32f
 
     /**
      * Menor letra aceitável para o rótulo e a unidade, em sp.
@@ -31,8 +31,8 @@ object MedidaDoPainel {
     const val ROTULO_MINIMO = 9f
 
     /** O tamanho do rótulo que corresponde a este tamanho de número, em sp. */
-    fun tamanhoDoRotulo(tamanhoDaFonte: Float, proporcao: Float = PROPORCAO_DO_ROTULO_PADRAO): Float =
-        (tamanhoDaFonte * proporcao).coerceAtLeast(ROTULO_MINIMO)
+    fun tamanhoDoRotulo(tamanhoDaFonte: Float): Float =
+        (tamanhoDaFonte * PROPORCAO_DO_ROTULO).coerceAtLeast(ROTULO_MINIMO)
 
     /** Altura de uma linha, com a entrelinha, em frações do tamanho da fonte. */
     private const val ENTRELINHA = 1.25f
@@ -98,8 +98,6 @@ object MedidaDoPainel {
         unidade: String,
         emLinha: Boolean,
         escala: Float,
-        proporcao: Float = PROPORCAO_DO_ROTULO_PADRAO,
-        tamanhoBase: Float = 0.42f,
     ): Float {
         // Lado a lado são três linhas — rótulo, número, unidade. Empilhado são
         // duas, porque a unidade vai ao lado do número: uma terceira linha por
@@ -108,28 +106,28 @@ object MedidaDoPainel {
         // Duas contas porque o rótulo tem piso. Enquanto a proporção rende
         // mais que o piso, vale a proporção; abaixo disso o rótulo é uma
         // altura fixa que o número tem de descontar do que sobra.
-        val comProporcao = alturaDaFatia / ((1f + rotulos * proporcao) * ENTRELINHA)
+        val comProporcao = alturaDaFatia / ((1f + rotulos * PROPORCAO_DO_ROTULO) * ENTRELINHA)
         val cabeNaAltura =
-            if (comProporcao * proporcao >= ROTULO_MINIMO) comProporcao
+            if (comProporcao * PROPORCAO_DO_ROTULO >= ROTULO_MINIMO) comProporcao
             else alturaDaFatia / ENTRELINHA - rotulos * ROTULO_MINIMO
 
         // O mínimo de 4 caracteres impede que um valor curto ("8") peça uma
         // letra gigantesca. Empilhado, a unidade divide a linha com o número e
         // por isso também pesa — em letra menor, daí a proporção.
         val caracteres = maxOf(valor.length, 4) +
-            if (emLinha) 0f else (unidade.length + 1) * proporcao
+            if (emLinha) 0f else (unidade.length + 1) * PROPORCAO_DO_ROTULO
         val cabeNaLargura = larguraDaFatia / (caracteres * LARGURA_DO_CARACTERE)
 
-        val desejado = alturaDaFatia * tamanhoBase * escala
+        val desejado = alturaDaFatia * 0.42f * escala
         return desejado
             .coerceAtMost(minOf(cabeNaAltura, cabeNaLargura))
             .coerceIn(MINIMO, MAXIMO)
     }
 
     /** Altura que um dado ocupa de fato com esta letra, em dp. */
-    fun alturaOcupada(tamanhoDaFonte: Float, emLinha: Boolean, proporcao: Float = PROPORCAO_DO_ROTULO_PADRAO): Float {
+    fun alturaOcupada(tamanhoDaFonte: Float, emLinha: Boolean): Float {
         val rotulos = if (emLinha) 2f else 1f
-        return (tamanhoDaFonte + rotulos * tamanhoDoRotulo(tamanhoDaFonte, proporcao)) * ENTRELINHA
+        return (tamanhoDaFonte + rotulos * tamanhoDoRotulo(tamanhoDaFonte)) * ENTRELINHA
     }
 
     /** Largura que um dado ocupa de fato com esta letra, em dp. */
@@ -138,10 +136,9 @@ object MedidaDoPainel {
         valor: String,
         unidade: String,
         emLinha: Boolean,
-        proporcao: Float = PROPORCAO_DO_ROTULO_PADRAO,
     ): Float {
         val caracteres = valor.length +
-            if (emLinha) 0f else (unidade.length + 1) * proporcao
+            if (emLinha) 0f else (unidade.length + 1) * PROPORCAO_DO_ROTULO
         return tamanhoDaFonte * caracteres * LARGURA_DO_CARACTERE
     }
 }

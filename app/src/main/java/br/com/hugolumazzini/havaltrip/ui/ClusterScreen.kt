@@ -131,7 +131,7 @@ fun ClusterScreen(
                 painelDoCarro,
                 Modifier
                     .fillMaxSize()
-                    .background(Color(ajustes.fundo.argb).copy(alpha = ajustes.fundoTransparencia / 100f))
+                    .background(Color(ajustes.fundo.argb))
                     .medindo(
                         JanelaDoPainel.NUMEROS,
                         constraints.maxWidth,
@@ -184,8 +184,7 @@ fun ClusterScreen(
                 // O fundo é do bloco, e não da janela: a janela é a tela
                 // inteira do painel, e pintá-la inteira apagaria o carro em
                 // vez de tapar só o pedaço que atrapalha.
-                // A transparência é aplicada como fração do alpha da cor (0-100% => 0-1)
-                .background(Color(ajustes.fundo.argb).copy(alpha = ajustes.fundoTransparencia / 100f))
+                .background(Color(ajustes.fundo.argb))
                 // Conta à central onde caiu. Ver `QuadroDeMedidas`.
                 .medindo(
                     JanelaDoPainel.NUMEROS,
@@ -269,8 +268,6 @@ internal fun Painel(
                 unidade = leitura.second,
                 emLinha = emLinha,
                 escala = ajustes.escalaFonte,
-                proporcao = ajustes.proporcaoDoRotulo,
-                tamanhoBase = ajustes.tamanhoBaseDoTexto,
             )
         }
 
@@ -281,7 +278,7 @@ internal fun Painel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 leituras.forEach { (item, leitura) ->
-                    Bloco(item, leitura, tamanho, tinta, emLinha, rotulo, Modifier.weight(1f), ajustes.proporcaoDoRotulo)
+                    Bloco(item, leitura, tamanho, tinta, emLinha, rotulo, Modifier.weight(1f))
                 }
             }
         } else {
@@ -314,7 +311,7 @@ internal fun Painel(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         fila.forEach { (item, leitura) ->
-                            Bloco(item, leitura, tamanho, tinta, emLinha, rotulo, Modifier.weight(1f), ajustes.proporcaoDoRotulo)
+                            Bloco(item, leitura, tamanho, tinta, emLinha, rotulo, Modifier.weight(1f))
                         }
                         // A última fila pode vir incompleta — cinco dados em
                         // duas colunas. O vazio segura o lugar para o dado
@@ -336,10 +333,9 @@ private fun Bloco(
     emLinha: Boolean,
     comoSeIdentifica: RotuloDoCluster,
     modifier: Modifier = Modifier,
-    proporcaoDoRotulo: Float = MedidaDoPainel.PROPORCAO_DO_ROTULO_PADRAO,
 ) {
     val (valor, unidade) = leitura
-    val rotulo = MedidaDoPainel.tamanhoDoRotulo(numero, proporcaoDoRotulo)
+    val rotulo = MedidaDoPainel.tamanhoDoRotulo(numero)
 
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         // A linha do rótulo só existe no modo texto. Nos outros dois ela não

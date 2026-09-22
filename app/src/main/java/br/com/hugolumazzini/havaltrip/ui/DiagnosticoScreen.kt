@@ -13,10 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -70,7 +67,7 @@ fun DiagnosticoScreen(vm: TripViewModel) {
     val fonteReal = fonte != Fonte.SIMULADOR
     val contexto = LocalContext.current
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+    Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("DIAGNÓSTICO DA TELEMETRIA", style = EstiloRotulo)
@@ -171,66 +168,72 @@ fun DiagnosticoScreen(vm: TripViewModel) {
 
         Spacer(Modifier.height(12.dp))
 
-        Text("VALOR ATUAL DE CADA CHAVE", style = EstiloRotulo)
-        Spacer(Modifier.height(6.dp))
-        if (leituras.isEmpty()) {
-            // Silêncio total não é chave faltando na configuração: é
-            // a ponte inteira fora do ar. Mesmo zerado, o Shisuku
-            // publicaria as chaves padrão assim que se conectasse.
-            Text(
-                "Nada recebido — a ponte não está de pé.\n\n" +
-                    "Abra o HavalShisuku e confira, nesta ordem:\n" +
-                    "1. o Shizuku está rodando e autorizou o Shisuku;\n" +
-                    "2. a tela de valores do Shisuku mostra números mexendo.\n\n" +
-                    "Se lá também estiver vazio, o problema é dele, não daqui: " +
-                    "o Haval Trip só escuta o que o Shisuku publica, e não pede " +
-                    "permissão nenhuma por conta própria.",
-                color = Cores.TextoApoio,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        } else {
-            LazyColumn(Modifier.fillMaxWidth().height(200.dp)) {
-                items(leituras.keys.sorted()) { chave ->
-                    val leitura = leituras.getValue(chave)
-                    LinhaCrua(
-                        chave = chave.removePrefix("car.basic."),
-                        valor = leitura.valor,
-                        apoio = "${leitura.vezes}x · ${hora.format(Date(leitura.emMs))}",
-                    )
+        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Cartao(Modifier.weight(1f).fillMaxHeight()) {
+                Column {
+                    Text("VALOR ATUAL DE CADA CHAVE", style = EstiloRotulo)
+                    Spacer(Modifier.height(6.dp))
+                    if (leituras.isEmpty()) {
+                        // Silêncio total não é chave faltando na configuração: é
+                        // a ponte inteira fora do ar. Mesmo zerado, o Shisuku
+                        // publicaria as chaves padrão assim que se conectasse.
+                        Text(
+                            "Nada recebido — a ponte não está de pé.\n\n" +
+                                "Abra o HavalShisuku e confira, nesta ordem:\n" +
+                                "1. o Shizuku está rodando e autorizou o Shisuku;\n" +
+                                "2. a tela de valores do Shisuku mostra números mexendo.\n\n" +
+                                "Se lá também estiver vazio, o problema é dele, não daqui: " +
+                                "o Haval Trip só escuta o que o Shisuku publica, e não pede " +
+                                "permissão nenhuma por conta própria.",
+                            color = Cores.TextoApoio,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    } else {
+                        LazyColumn {
+                            items(leituras.keys.sorted()) { chave ->
+                                val leitura = leituras.getValue(chave)
+                                LinhaCrua(
+                                    chave = chave.removePrefix("car.basic."),
+                                    valor = leitura.valor,
+                                    apoio = "${leitura.vezes}x · ${hora.format(Date(leitura.emMs))}",
+                                )
+                            }
+                            // As que faltam não são defeito nem ausência no
+                            // carro: o Shisuku só monitora a lista de fábrica
+                            // mais o que estiver marcado no "Configurar" dele —
+                            // e tanque, autonomia e consumo médio ficam de fora
+                            // dessa lista de fábrica.
+                            val faltando = HavalTelemetrySource.CHAVES.filterNot { it in leituras }
+                            if (faltando.isNotEmpty()) item { AindaFaltam(faltando) }
+                        }
+                    }
                 }
-                // As que faltam não são defeito nem ausência no
-                // carro: o Shisuku só monitora a lista de fábrica
-                // mais o que estiver marcado no "Configurar" dele —
-                // e tanque, autonomia e consumo médio ficam de fora
-                // dessa lista de fábrica.
-                val faltando = HavalTelemetrySource.CHAVES.filterNot { it in leituras }
-                if (faltando.isNotEmpty()) item { AindaFaltam(faltando) }
+            }
+
+            Cartao(Modifier.weight(1f).fillMaxHeight()) {
+                Column {
+                    Text("FITA DOS ÚLTIMOS EVENTOS", style = EstiloRotulo)
+                    Text(
+                        "É o movimento do número que revela a unidade, não o valor parado.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Cores.TextoApoio,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    LazyColumn(reverseLayout = true) {
+                        items(fita) { evento ->
+                            Text(
+                                "${hora.format(Date(evento.emMs))}  " +
+                                    "${evento.chave.removePrefix("car.basic.")} = ${evento.valor}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = Cores.TextoCorrido,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
             }
         }
-
-        Spacer(Modifier.height(12.dp))
-
-        Text("FITA DOS ÚLTIMOS EVENTOS", style = EstiloRotulo)
-        Text(
-            "É o movimento do número que revela a unidade, não o valor parado.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Cores.TextoApoio,
-        )
-        Spacer(Modifier.height(6.dp))
-        LazyColumn(Modifier.fillMaxWidth().height(200.dp), reverseLayout = true) {
-            items(fita) { evento ->
-                Text(
-                    "${hora.format(Date(evento.emMs))}  " +
-                        "${evento.chave.removePrefix("car.basic.")} = ${evento.valor}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = Cores.TextoCorrido,
-                    maxLines = 1,
-                )
-            }
-        }
-
-        Spacer(Modifier.height(20.dp))
     }
 }
 

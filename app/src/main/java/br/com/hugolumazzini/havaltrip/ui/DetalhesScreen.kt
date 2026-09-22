@@ -115,7 +115,7 @@ fun DetalhesScreen(vm: TripViewModel, estado: TripState, tripId: String) {
                     Column(Modifier.weight(1f)) {
                         // Do veículo, não desta Trip — mas é aqui que a pergunta
                         // "e dá para chegar?" aparece junto com o resto.
-                        LinhaDetalhe("Autonomia agora", TripFormat.kmInteiro(estado.live.autonomyDteKm))
+                        LinhaDetalhe("Autonomia agora", TripFormat.km(estado.live.autonomyDteKm))
                     }
                 }
             }

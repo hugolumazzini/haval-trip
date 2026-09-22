@@ -1426,7 +1426,7 @@ private fun Projecao(janela: JanelaDoPainel, escolhida: Int?) {
             Cluster.usarTela(janela, null)
             ProjetorDoPainel.recolher(janela)
         }
-        telas.filter { it.id != 2 }.forEach { tela ->
+        telas.filter { it.id !in listOf(0, 2) }.forEach { tela ->
             Opcao(tela.descricao, escolhida == tela.id) {
                 Cluster.usarTela(janela, tela.id)
                 escopo.launch(Dispatchers.IO) {

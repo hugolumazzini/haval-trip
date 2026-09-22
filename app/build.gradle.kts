@@ -30,7 +30,7 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("haval-trip-release.jks")
+            storeFile = file("../haval-trip-release.jks")
             storePassword = System.getenv("HAVAL_TRIP_KEYSTORE_PASS") ?: ""
             keyAlias = "haval-trip"
             keyPassword = System.getenv("HAVAL_TRIP_KEYSTORE_PASS") ?: ""

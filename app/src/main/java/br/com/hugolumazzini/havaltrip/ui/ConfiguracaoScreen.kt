@@ -188,7 +188,7 @@ fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
             Cartao(Modifier.fillMaxWidth()) {
                 when (aba) {
-                    AbaDaConfiguracao.GERAL -> GeralNoPainel()
+                    AbaDaConfiguracao.GERAL -> GeralNoPainel(vm, estado)
                     AbaDaConfiguracao.NUMEROS -> NumerosNoPainel(estado)
                     AbaDaConfiguracao.CARRO -> CarroNoPainel()
                     AbaDaConfiguracao.PAGINA -> PaginaComVisoesNaAba()
@@ -468,87 +468,131 @@ private fun espiar(contexto: Context, atividade: Class<*>) {
     contexto.startActivity(Intent(contexto, atividade).putExtra(ESPIANDO, true))
 }
 
-/** Funcionalidades gerais do painel: habilitação de seções. */
+/** Geral: contadores + funcionalidades do painel + versão. */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-private fun GeralNoPainel() {
+private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
     val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
 
     Column {
-        Text("Funcionalidades do painel", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
-        Spacer(Modifier.height(12.dp))
-
-        // Números
+        // Linha 1: Contadores (esquerda) + Funcionalidades (direita)
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // Coluna esquerda: Contadores
             Column(modifier = Modifier.weight(1f)) {
-                Text("Números", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+                Text("Contadores manuais", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Exibe números de um trip no painel do veículo. Permite ajustar posição, tamanho, cor e itens exibidos.",
+                    "Quantos contadores aparecem na lateral, fora a Viagem atual. " +
+                        "Os que saem da lista param de contar, mas guardam o que já mediram.",
                     style = MaterialTheme.typography.bodySmall,
                     color = Cores.TextoApoio,
                 )
+                Spacer(Modifier.height(12.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    (1..TripSnapshot.MAX_CONTADORES_MANUAIS).forEach { quantos ->
+                        Opcao(
+                            texto = quantos.toString(),
+                            marcada = estado.contadoresManuais == quantos,
+                            onClick = { vm.definirContadoresManuais(quantos) },
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(22.dp))
+                ZeragemAutomatica(vm, estado)
             }
-            Spacer(Modifier.width(8.dp))
-            Switch(
-                checked = ajustes.habilitarNumerosNoPainel,
-                onCheckedChange = { Cluster.alternarHabilitarNumerosNoPainel() },
-                modifier = Modifier.scale(0.75f),
-            )
+
+            // Coluna direita: Funcionalidades do painel
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Funcionalidades do painel", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
+                Spacer(Modifier.height(12.dp))
+
+                // Números
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Números", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Exibe números de um trip no painel do veículo.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Cores.TextoApoio,
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Switch(
+                        checked = ajustes.habilitarNumerosNoPainel,
+                        onCheckedChange = { Cluster.alternarHabilitarNumerosNoPainel() },
+                        modifier = Modifier.scale(0.75f),
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // Carrinho
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Carrinho", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Exibe a miniatura do veículo no painel.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Cores.TextoApoio,
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Switch(
+                        checked = ajustes.habilitarCarroNoPainel,
+                        onCheckedChange = { Cluster.alternarHabilitarCarroNoPainel() },
+                        modifier = Modifier.scale(0.75f),
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // Integrar ao painel
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Integrar ao painel", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Exibe carro e trips integrados ao painel.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Cores.TextoApoio,
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Switch(
+                        checked = ajustes.habilitarPaginaComVisoes,
+                        onCheckedChange = { Cluster.alternarHabilitarPaginaComVisoes() },
+                        modifier = Modifier.scale(0.75f),
+                    )
+                }
+            }
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(20.dp))
 
-        // Carrinho
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Carrinho", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Exibe a miniatura do veículo com alguns status no painel do veículo. Permite ajustar posição e tamanho.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Cores.TextoApoio,
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            Switch(
-                checked = ajustes.habilitarCarroNoPainel,
-                onCheckedChange = { Cluster.alternarHabilitarCarroNoPainel() },
-                modifier = Modifier.scale(0.75f),
-            )
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        // Integrar ao painel
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Integrar ao painel", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Ativa a exibição da miniatura do carro e de todos os trips de maneira integrada ao painel do veículo, em posição fixa (na bola da direita) na segunda página. Permite navegação entre os itens.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Cores.TextoApoio,
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            Switch(
-                checked = ajustes.habilitarPaginaComVisoes,
-                onCheckedChange = { Cluster.alternarHabilitarPaginaComVisoes() },
-                modifier = Modifier.scale(0.75f),
-            )
+        // Linha 2: Versão (100% da largura)
+        Column(modifier = Modifier.fillMaxWidth()) {
+            SobreEAtualizacao(vm)
         }
     }
 }

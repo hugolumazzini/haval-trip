@@ -449,7 +449,7 @@ private fun OpcaoColorida(
             .clip(RoundedCornerShape(10.dp))
             .background(if (marcada) Cores.SuperficieSelecionada else Cores.Campo)
             .clickable(enabled = habilitada, onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 18.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Text(
             texto,

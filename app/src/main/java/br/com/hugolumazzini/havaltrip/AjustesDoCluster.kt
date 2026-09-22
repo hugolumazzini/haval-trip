@@ -451,6 +451,11 @@ enum class AlvoNaBola(val rotulo: String) {
     DADOS("os dados"),
 }
 
+enum class FormatoDoCarro(val rotulo: String) {
+    REDONDO("Redondo"),
+    QUADRADO("Quadrado"),
+}
+
 data class AjustesDoCluster(
     val tripId: String? = null,
     val itens: List<ItemDoCluster> = listOf(
@@ -503,6 +508,8 @@ data class AjustesDoCluster(
      */
     val empurraoDoCarroNaBola: Empurrao = Empurrao(),
     val zoomDoCarroNaBola: Zoom = Zoom(),
+    val afastamentoNaBola: Zoom = Zoom(),
+    val formatoDoCarro: FormatoDoCarro = FormatoDoCarro.REDONDO,
     /**
      * Os dados que a **página do painel** mostra.
      *
@@ -627,6 +634,8 @@ object Cluster {
     private const val FUNDO_MENU = "fundoDoMenu"
     private const val ROTULO_MENU = "rotuloDoMenu"
     private const val AFASTAMENTO_MENU = "afastamentoDoMenu"
+    private const val AFASTAMENTO_NA_BOLA = "afastamentoNaBola"
+    private const val FORMATO_DO_CARRO = "formatoDoCarro"
     private const val ITENS_DESPEDIDA = "itensDaDespedida"
 
     /**
@@ -799,6 +808,13 @@ object Cluster {
                 prefs.getInt(AFASTAMENTO_MENU, padrao.afastamentoDoMenu.porcento)
                     .coerceIn(AFASTAMENTO_MINIMO, AFASTAMENTO_MAXIMO),
             ),
+            afastamentoNaBola = Zoom(
+                prefs.getInt(AFASTAMENTO_NA_BOLA, padrao.afastamentoNaBola.porcento)
+                    .coerceIn(AFASTAMENTO_MINIMO, AFASTAMENTO_MAXIMO),
+            ),
+            formatoDoCarro = prefs.getString(FORMATO_DO_CARRO, null)
+                ?.let { nome -> FormatoDoCarro.entries.find { it.name == nome } }
+                ?: padrao.formatoDoCarro,
             rotuloDoMenu = prefs.getString(ROTULO_MENU, null)
                 ?.let { nome -> RotuloDoCluster.entries.find { it.name == nome } }
                 ?: padrao.rotuloDoMenu,
@@ -852,6 +868,8 @@ object Cluster {
             .putString(FUNDO_MENU, novo.fundoDoMenu.name)
             .putString(ROTULO_MENU, novo.rotuloDoMenu.name)
             .putInt(AFASTAMENTO_MENU, novo.afastamentoDoMenu.porcento)
+            .putInt(AFASTAMENTO_NA_BOLA, novo.afastamentoNaBola.porcento)
+            .putString(FORMATO_DO_CARRO, novo.formatoDoCarro.name)
             .putString(ITENS_DESPEDIDA, novo.itensDaDespedida.joinToString(",") { it.name })
             .apply()
     }
@@ -947,6 +965,18 @@ object Cluster {
 
     /** Volta ao espalhamento de fábrica: a coluna ocupando a altura toda. */
     fun afastamentoNatural() = gravar(_ajustes.value.copy(afastamentoDoMenu = Zoom()))
+
+    fun afastarNaBola(delta: Int) = gravar(
+        _ajustes.value.copy(
+            afastamentoNaBola = Zoom(
+                (_ajustes.value.afastamentoNaBola.util + delta)
+                    .coerceIn(AFASTAMENTO_MINIMO, AFASTAMENTO_MAXIMO),
+            ),
+        ),
+    )
+
+    fun usarFormatoDoCarro(formato: FormatoDoCarro) =
+        gravar(_ajustes.value.copy(formatoDoCarro = formato))
 
     /** Troca o jeito de identificar cada dado na bola. Ver [RotuloDoCluster]. */
     fun usarRotuloDoMenu(rotulo: RotuloDoCluster) =

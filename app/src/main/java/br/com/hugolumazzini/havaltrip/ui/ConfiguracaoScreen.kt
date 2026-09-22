@@ -53,6 +53,9 @@ import br.com.hugolumazzini.havaltrip.ClusterCarroActivity
 import br.com.hugolumazzini.havaltrip.ClusterMenuActivity
 import br.com.hugolumazzini.havaltrip.AjustesDoCluster
 import br.com.hugolumazzini.havaltrip.AlvoNaBola
+import br.com.hugolumazzini.havaltrip.FormatoDoCarro
+import br.com.hugolumazzini.havaltrip.AFASTAMENTO_MINIMO
+import br.com.hugolumazzini.havaltrip.AFASTAMENTO_MAXIMO
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -541,15 +544,11 @@ private fun NumerosNoPainel(estado: TripState) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            CorDoCluster.entries.forEach { cor ->
+            CorDoCluster.entries.filter { it != CorDoCluster.DO_IMPULSE }.forEach { cor ->
                 OpcaoColorida(cor.rotulo, ajustes.cor == cor, Color(corDaAmostra(cor, paleta))) {
                     Cluster.usarCor(cor)
                 }
             }
-        }
-        if (ajustes.cor == CorDoCluster.DO_IMPULSE) {
-            Spacer(Modifier.height(6.dp))
-            Text(recadoDaPaleta(paleta), style = MaterialTheme.typography.bodyMedium, color = Cores.TextoApoio)
         }
 
         Spacer(Modifier.height(14.dp))
@@ -712,6 +711,42 @@ private fun CarroNoPainel() {
                 Opcao(fundo.rotulo, ajustes.fundoDoCarro == fundo) { Cluster.usarFundoDoCarro(fundo) }
             }
         }
+
+        Spacer(Modifier.height(14.dp))
+        Text("Formato do fundo", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            FormatoDoCarro.entries.forEach { formato ->
+                Opcao(formato.rotulo, ajustes.formatoDoCarro == formato) {
+                    Cluster.usarFormatoDoCarro(formato)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        Text("Tamanho do conteúdo dentro da bola", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Aproxima ou espalha o conteúdo dentro da bola, sem mexer no tamanho dele.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(8.dp))
+        FlowRowSimples {
+            Seta("−−", "bem mais juntos") { Cluster.afastarNaBola(-Zoom.SALTO) }
+            Seta("−", "um pouco mais juntos") { Cluster.afastarNaBola(-Zoom.PASSO) }
+            Seta("+", "um pouco mais separados") { Cluster.afastarNaBola(Zoom.PASSO) }
+            Seta("++", "bem mais separados") { Cluster.afastarNaBola(Zoom.SALTO) }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "${ajustes.afastamentoNaBola.porcento.coerceAtMost(100)}% da altura.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Cores.TextoApoio,
+        )
 
         Spacer(Modifier.height(14.dp))
         PaginaDoPainel(ajustes.paginaDoCarro)

@@ -103,6 +103,7 @@ fun Diagrama(
     painel: PainelDoVeiculo,
     modifier: Modifier = Modifier,
     legenda: Boolean = true,
+    aproximacao: Float = APROXIMACAO,
 ) {
     val pneus = painel.pneus.associateBy { it.roda }
 
@@ -130,7 +131,7 @@ fun Diagrama(
                 // porque as portas abertas avançam para fora do contorno do carro e
                 // passariam por baixo do número se ele avançasse mais.
                 Column(
-                    Modifier.fillMaxHeight(0.80f).fillMaxWidth(APROXIMACAO),
+                    Modifier.fillMaxHeight(0.80f).fillMaxWidth(aproximacao),
                     verticalArrangement = Arrangement.SpaceBetween,
                 ) {
                     LinhaDePneus(painel, pneus, Roda.DIANTEIRA_ESQ, Roda.DIANTEIRA_DIR, corpo)

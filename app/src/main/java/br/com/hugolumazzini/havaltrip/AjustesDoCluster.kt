@@ -510,6 +510,7 @@ data class AjustesDoCluster(
     val zoomDoCarroNaBola: Zoom = Zoom(),
     val afastamentoNaBola: Zoom = Zoom(),
     val formatoDoCarro: FormatoDoCarro = FormatoDoCarro.REDONDO,
+    val afastamentoDoCarro: Int = 100,
     /**
      * Os dados que a **página do painel** mostra.
      *
@@ -636,6 +637,7 @@ object Cluster {
     private const val AFASTAMENTO_MENU = "afastamentoDoMenu"
     private const val AFASTAMENTO_NA_BOLA = "afastamentoNaBola"
     private const val FORMATO_DO_CARRO = "formatoDoCarro"
+    private const val AFASTAMENTO_CARRO = "afastamentoDoCarro"
     private const val ITENS_DESPEDIDA = "itensDaDespedida"
 
     /**
@@ -815,6 +817,8 @@ object Cluster {
             formatoDoCarro = prefs.getString(FORMATO_DO_CARRO, null)
                 ?.let { nome -> FormatoDoCarro.entries.find { it.name == nome } }
                 ?: padrao.formatoDoCarro,
+            afastamentoDoCarro = prefs.getInt(AFASTAMENTO_CARRO, padrao.afastamentoDoCarro)
+                .coerceIn(50, 100),
             rotuloDoMenu = prefs.getString(ROTULO_MENU, null)
                 ?.let { nome -> RotuloDoCluster.entries.find { it.name == nome } }
                 ?: padrao.rotuloDoMenu,
@@ -870,6 +874,7 @@ object Cluster {
             .putInt(AFASTAMENTO_MENU, novo.afastamentoDoMenu.porcento)
             .putInt(AFASTAMENTO_NA_BOLA, novo.afastamentoNaBola.porcento)
             .putString(FORMATO_DO_CARRO, novo.formatoDoCarro.name)
+            .putInt(AFASTAMENTO_CARRO, novo.afastamentoDoCarro)
             .putString(ITENS_DESPEDIDA, novo.itensDaDespedida.joinToString(",") { it.name })
             .apply()
     }
@@ -977,6 +982,12 @@ object Cluster {
 
     fun usarFormatoDoCarro(formato: FormatoDoCarro) =
         gravar(_ajustes.value.copy(formatoDoCarro = formato))
+
+    fun afastarDoCarro(delta: Int) = gravar(
+        _ajustes.value.copy(
+            afastamentoDoCarro = (_ajustes.value.afastamentoDoCarro + delta).coerceIn(50, 100),
+        ),
+    )
 
     /** Troca o jeito de identificar cada dado na bola. Ver [RotuloDoCluster]. */
     fun usarRotuloDoMenu(rotulo: RotuloDoCluster) =

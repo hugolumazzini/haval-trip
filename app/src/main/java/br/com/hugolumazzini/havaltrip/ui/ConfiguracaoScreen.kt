@@ -749,6 +749,26 @@ private fun CarroNoPainel() {
         )
 
         Spacer(Modifier.height(14.dp))
+        Text("Distância dos pneus e temperatura", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Aproxima ou afasta os números de pressão e temperatura do carro.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(8.dp))
+        FlowRowSimples {
+            Seta("−", "mais perto") { Cluster.afastarDoCarro(-5) }
+            Seta("+", "mais longe") { Cluster.afastarDoCarro(5) }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "${ajustes.afastamentoDoCarro}% da proximidade máxima.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Cores.TextoApoio,
+        )
+
+        Spacer(Modifier.height(14.dp))
         AjusteFino(JanelaDoPainel.CARRO, ajustes.empurraoDoCarro, ajustes.zoomDoCarro)
 
         Spacer(Modifier.height(12.dp))

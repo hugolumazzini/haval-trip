@@ -512,6 +512,9 @@ data class AjustesDoCluster(
     val formatoDoCarro: FormatoDoCarro = FormatoDoCarro.REDONDO,
     val afastamentoDoCarroSolto: Int = 100,
     val afastamentoDoCarroNaBola: Int = 100,
+    val habilitarNumerosNoPainel: Boolean = true,
+    val habilitarCarroNoPainel: Boolean = true,
+    val habilitarPaginaComVisoes: Boolean = true,
     /**
      * Os dados que a **página do painel** mostra.
      *
@@ -640,6 +643,9 @@ object Cluster {
     private const val FORMATO_DO_CARRO = "formatoDoCarro"
     private const val AFASTAMENTO_CARRO_SOLTO = "afastamentoDoCarroSolto"
     private const val AFASTAMENTO_CARRO_NA_BOLA = "afastamentoDoCarroNaBola"
+    private const val HABILITAR_NUMEROS = "habilitarNumerosNoPainel"
+    private const val HABILITAR_CARRO = "habilitarCarroNoPainel"
+    private const val HABILITAR_PAGINA = "habilitarPaginaComVisoes"
     private const val ITENS_DESPEDIDA = "itensDaDespedida"
 
     /**
@@ -823,6 +829,9 @@ object Cluster {
                 .coerceIn(50, 100),
             afastamentoDoCarroNaBola = prefs.getInt(AFASTAMENTO_CARRO_NA_BOLA, padrao.afastamentoDoCarroNaBola)
                 .coerceIn(50, 100),
+            habilitarNumerosNoPainel = prefs.getBoolean(HABILITAR_NUMEROS, padrao.habilitarNumerosNoPainel),
+            habilitarCarroNoPainel = prefs.getBoolean(HABILITAR_CARRO, padrao.habilitarCarroNoPainel),
+            habilitarPaginaComVisoes = prefs.getBoolean(HABILITAR_PAGINA, padrao.habilitarPaginaComVisoes),
             rotuloDoMenu = prefs.getString(ROTULO_MENU, null)
                 ?.let { nome -> RotuloDoCluster.entries.find { it.name == nome } }
                 ?: padrao.rotuloDoMenu,
@@ -880,6 +889,9 @@ object Cluster {
             .putString(FORMATO_DO_CARRO, novo.formatoDoCarro.name)
             .putInt(AFASTAMENTO_CARRO_SOLTO, novo.afastamentoDoCarroSolto)
             .putInt(AFASTAMENTO_CARRO_NA_BOLA, novo.afastamentoDoCarroNaBola)
+            .putBoolean(HABILITAR_NUMEROS, novo.habilitarNumerosNoPainel)
+            .putBoolean(HABILITAR_CARRO, novo.habilitarCarroNoPainel)
+            .putBoolean(HABILITAR_PAGINA, novo.habilitarPaginaComVisoes)
             .putString(ITENS_DESPEDIDA, novo.itensDaDespedida.joinToString(",") { it.name })
             .apply()
     }
@@ -998,6 +1010,18 @@ object Cluster {
         _ajustes.value.copy(
             afastamentoDoCarroNaBola = (_ajustes.value.afastamentoDoCarroNaBola + delta).coerceIn(50, 100),
         ),
+    )
+
+    fun alternarHabilitarNumerosNoPainel() = gravar(
+        _ajustes.value.copy(habilitarNumerosNoPainel = !_ajustes.value.habilitarNumerosNoPainel),
+    )
+
+    fun alternarHabilitarCarroNoPainel() = gravar(
+        _ajustes.value.copy(habilitarCarroNoPainel = !_ajustes.value.habilitarCarroNoPainel),
+    )
+
+    fun alternarHabilitarPaginaComVisoes() = gravar(
+        _ajustes.value.copy(habilitarPaginaComVisoes = !_ajustes.value.habilitarPaginaComVisoes),
     )
 
     /** Troca o jeito de identificar cada dado na bola. Ver [RotuloDoCluster]. */

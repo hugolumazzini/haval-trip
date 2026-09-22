@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -21,6 +23,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -121,6 +124,7 @@ private enum class AbaDaConfiguracao(val rotulo: String) {
     // A ordem é a do uso, não a da implementação: o que o motorista abre todo
     // dia (zerar contador) vem primeiro, depois o que ele abre de vez em quando
     // (versão), e por último o que se acerta uma vez e não se mexe mais.
+    GERAL("Geral"),
     CONTADORES("Contadores"),
     VERSAO("Versão"),
     NUMEROS("Números"),
@@ -141,7 +145,27 @@ fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
     // `rememberSaveable` para a aba sobreviver ao giro de tela e à volta de
     // outra tela: reabrir sempre em "Números" faria perder o lugar a cada
     // espiada em "Ver como fica".
-    var aba by rememberSaveable { mutableStateOf(AbaDaConfiguracao.CONTADORES) }
+    var aba by rememberSaveable { mutableStateOf(AbaDaConfiguracao.GERAL) }
+    val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
+
+    // Determina quais abas são visíveis baseado nos toggles
+    val abasVisiveis = remember(ajustes.habilitarNumerosNoPainel, ajustes.habilitarCarroNoPainel, ajustes.habilitarPaginaComVisoes) {
+        AbaDaConfiguracao.entries.filter { qual ->
+            when (qual) {
+                AbaDaConfiguracao.NUMEROS -> ajustes.habilitarNumerosNoPainel
+                AbaDaConfiguracao.CARRO -> ajustes.habilitarCarroNoPainel
+                AbaDaConfiguracao.PAGINA -> ajustes.habilitarPaginaComVisoes
+                else -> true // GERAL, CONTADORES, VERSAO, DESPEDIDA sempre visíveis
+            }
+        }
+    }
+
+    // Se a aba atual ficar invisível, volta para GERAL
+    LaunchedEffect(abasVisiveis) {
+        if (aba !in abasVisiveis) {
+            aba = AbaDaConfiguracao.GERAL
+        }
+    }
 
     Column(Modifier.fillMaxWidth()) {
         Text("CONFIGURAÇÃO", style = EstiloRotulo)
@@ -151,7 +175,7 @@ fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            AbaDaConfiguracao.entries.forEach { qual ->
+            abasVisiveis.forEach { qual ->
                 Opcao(qual.rotulo, aba == qual) { aba = qual }
             }
         }
@@ -164,6 +188,7 @@ fun ConfiguracaoScreen(vm: TripViewModel, estado: TripState) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
             Cartao(Modifier.fillMaxWidth()) {
                 when (aba) {
+                    AbaDaConfiguracao.GERAL -> GeralNoPainel()
                     AbaDaConfiguracao.NUMEROS -> NumerosNoPainel(estado)
                     AbaDaConfiguracao.CARRO -> CarroNoPainel()
                     AbaDaConfiguracao.PAGINA -> PaginaComVisoesNaAba()
@@ -441,6 +466,91 @@ private fun OpcaoColorida(
  */
 private fun espiar(contexto: Context, atividade: Class<*>) {
     contexto.startActivity(Intent(contexto, atividade).putExtra(ESPIANDO, true))
+}
+
+/** Funcionalidades gerais do painel: habilitação de seções. */
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun GeralNoPainel() {
+    val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
+
+    Column {
+        Text("Funcionalidades do painel", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
+        Spacer(Modifier.height(12.dp))
+
+        // Números
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Números", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Exibe números de um trip no painel do veículo. Permite ajustar posição, tamanho, cor e itens exibidos.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Cores.TextoApoio,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Switch(
+                checked = ajustes.habilitarNumerosNoPainel,
+                onCheckedChange = { Cluster.alternarHabilitarNumerosNoPainel() },
+                modifier = Modifier.scale(0.75f),
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Carrinho
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Carrinho", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Exibe a miniatura do veículo com alguns status no painel do veículo. Permite ajustar posição e tamanho.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Cores.TextoApoio,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Switch(
+                checked = ajustes.habilitarCarroNoPainel,
+                onCheckedChange = { Cluster.alternarHabilitarCarroNoPainel() },
+                modifier = Modifier.scale(0.75f),
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Integrar ao painel
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Integrar ao painel", style = MaterialTheme.typography.bodySmall, color = Cores.TextoCorrido)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Ativa a exibição da miniatura do carro e de todos os trips de maneira integrada ao painel do veículo, em posição fixa (na bola da direita) na segunda página. Permite navegação entre os itens.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Cores.TextoApoio,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Switch(
+                checked = ajustes.habilitarPaginaComVisoes,
+                onCheckedChange = { Cluster.alternarHabilitarPaginaComVisoes() },
+                modifier = Modifier.scale(0.75f),
+            )
+        }
+    }
 }
 
 /**

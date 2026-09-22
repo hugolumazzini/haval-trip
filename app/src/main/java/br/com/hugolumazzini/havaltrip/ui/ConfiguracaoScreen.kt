@@ -376,12 +376,12 @@ private fun ZeragemAutomatica(vm: TripViewModel, estado: TripState) {
         // Numa tela de 1900 px a barra inteira ficaria com dez centímetros por
         // parada: precisa, mas exige atravessar o painel com o dedo.
         Row(
-            modifier = Modifier.widthIn(max = 700.dp).fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Slider(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.widthIn(max = 700.dp),
                 value = parada,
                 onValueChange = { parada = it },
                 onValueChangeFinished = { vm.definirZeragemAutomatica(minutos * 60.0) },

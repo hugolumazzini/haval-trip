@@ -359,19 +359,11 @@ private fun ZeragemAutomatica(vm: TripViewModel, estado: TripState) {
     val minutos = PARADAS[parada.toInt().coerceIn(PARADAS.indices)]
 
     Column {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                "Zerar a Viagem atual",
-                style = MaterialTheme.typography.titleMedium,
-                color = Cores.Texto,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                rotuloDoTempo(minutos),
-                style = MaterialTheme.typography.titleMedium,
-                color = Cores.Destaque,
-            )
-        }
+        Text(
+            "Zerar a Viagem atual",
+            style = MaterialTheme.typography.titleMedium,
+            color = Cores.Texto,
+        )
         Spacer(Modifier.height(4.dp))
         Text(
             "Com a chave fora por mais que este tempo, a Viagem atual é arquivada " +
@@ -380,27 +372,39 @@ private fun ZeragemAutomatica(vm: TripViewModel, estado: TripState) {
             style = MaterialTheme.typography.bodyMedium,
             color = Cores.TextoApoio,
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(8.dp))
         // Numa tela de 1900 px a barra inteira ficaria com dez centímetros por
         // parada: precisa, mas exige atravessar o painel com o dedo.
-        Slider(
-            modifier = Modifier.widthIn(max = 700.dp),
-            value = parada,
-            onValueChange = { parada = it },
-            onValueChangeFinished = { vm.definirZeragemAutomatica(minutos * 60.0) },
-            valueRange = 0f..(PARADAS.size - 1).toFloat(),
-            // Uma parada a menos que os pontos: `steps` conta só os do meio.
-            steps = PARADAS.size - 2,
-            colors = SliderDefaults.colors(
-                thumbColor = Cores.Destaque,
-                activeTrackColor = Cores.Destaque,
-                inactiveTrackColor = Cores.Campo,
-                // Os tiquinhos das paradas somem: com catorze deles a barra
-                // vira um pente e ninguém lê o número por cima disso.
-                activeTickColor = Color.Transparent,
-                inactiveTickColor = Color.Transparent,
-            ),
-        )
+        Row(
+            modifier = Modifier.widthIn(max = 700.dp).fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Slider(
+                modifier = Modifier.weight(1f),
+                value = parada,
+                onValueChange = { parada = it },
+                onValueChangeFinished = { vm.definirZeragemAutomatica(minutos * 60.0) },
+                valueRange = 0f..(PARADAS.size - 1).toFloat(),
+                // Uma parada a menos que os pontos: `steps` conta só os do meio.
+                steps = PARADAS.size - 2,
+                colors = SliderDefaults.colors(
+                    thumbColor = Cores.Destaque,
+                    activeTrackColor = Cores.Destaque,
+                    inactiveTrackColor = Cores.Campo,
+                    // Os tiquinhos das paradas somem: com catorze deles a barra
+                    // vira um pente e ninguém lê o número por cima disso.
+                    activeTickColor = Color.Transparent,
+                    inactiveTickColor = Color.Transparent,
+                ),
+            )
+            Text(
+                rotuloDoTempo(minutos),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Cores.Destaque,
+                modifier = Modifier.widthIn(min = 60.dp),
+            )
+        }
         Row(Modifier.widthIn(max = 700.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("na hora", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoApoio)
             Text("3 h", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoApoio)

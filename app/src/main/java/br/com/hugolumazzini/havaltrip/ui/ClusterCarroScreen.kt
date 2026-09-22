@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,6 +24,7 @@ import br.com.hugolumazzini.havaltrip.Cluster
 import br.com.hugolumazzini.havaltrip.LugarNoPainel
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
 import br.com.hugolumazzini.havaltrip.painel.PaginaDoCluster
+import br.com.hugolumazzini.havaltrip.painel.ProjetorDoPainel
 import br.com.hugolumazzini.havaltrip.TripViewModel
 
 /**
@@ -41,6 +43,13 @@ import br.com.hugolumazzini.havaltrip.TripViewModel
 fun ClusterCarroScreen(vm: TripViewModel, espiando: Boolean = false) {
     val painel by vm.painelDoVeiculo.collectAsStateWithLifecycle()
     val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
+
+    // Recolhe a janela se o toggle for desabilitado
+    LaunchedEffect(ajustes.habilitarCarroNoPainel) {
+        if (!ajustes.habilitarCarroNoPainel && !espiando) {
+            ProjetorDoPainel.recolher(JanelaDoPainel.CARRO)
+        }
+    }
 
     // Na bola do ar o que está por baixo não é só o círculo: o painel desenha
     // ali um quadrado de cantos arredondados, com as marcas de canto azuis, que

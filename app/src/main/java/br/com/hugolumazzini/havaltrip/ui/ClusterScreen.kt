@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
@@ -47,6 +48,7 @@ import br.com.hugolumazzini.havaltrip.LugarNoPainel
 import br.com.hugolumazzini.havaltrip.RotuloDoCluster
 import br.com.hugolumazzini.havaltrip.TripViewModel
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
+import br.com.hugolumazzini.havaltrip.painel.ProjetorDoPainel
 import br.com.hugolumazzini.havaltrip.domain.MedidaDoPainel
 import br.com.hugolumazzini.havaltrip.domain.PaletaSport
 import br.com.hugolumazzini.havaltrip.telemetry.PaletaDoImpulse
@@ -87,6 +89,13 @@ fun ClusterScreen(
     // Só a despedida usa: é o carrinho dela que continua reagindo às portas
     // depois de desligar. Os números não têm desenho de carro.
     val painelDoCarro by vm.painelDoVeiculo.collectAsStateWithLifecycle()
+
+    // Recolhe a janela se o toggle for desabilitado
+    LaunchedEffect(ajustes.habilitarNumerosNoPainel) {
+        if (!ajustes.habilitarNumerosNoPainel && !espiando) {
+            ProjetorDoPainel.recolher(JanelaDoPainel.NUMEROS)
+        }
+    }
 
     // A Trip escolhida na configuração; se ela foi apagada desde então, cai na
     // selecionada da central em vez de deixar o painel em branco.

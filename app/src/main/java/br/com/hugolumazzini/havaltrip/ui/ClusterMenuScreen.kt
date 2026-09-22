@@ -43,6 +43,7 @@ import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo
 import br.com.hugolumazzini.havaltrip.domain.Trip
 import br.com.hugolumazzini.havaltrip.domain.VehicleLive
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
+import br.com.hugolumazzini.havaltrip.painel.ProjetorDoPainel
 import br.com.hugolumazzini.havaltrip.painel.PaginaDoCluster
 import br.com.hugolumazzini.havaltrip.painel.TeclaDoVolante
 import br.com.hugolumazzini.havaltrip.painel.TecladoDoVolante
@@ -100,6 +101,13 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
     val paleta by Cluster.paleta.collectAsStateWithLifecycle()
     val painel by vm.painelDoVeiculo.collectAsStateWithLifecycle()
     val pagina by PaginaDoCluster.pagina.collectAsStateWithLifecycle()
+
+    // Recolhe a janela se o toggle for desabilitado
+    LaunchedEffect(ajustes.habilitarPaginaComVisoes) {
+        if (!ajustes.habilitarPaginaComVisoes && !espiando) {
+            ProjetorDoPainel.recolher(JanelaDoPainel.MENU)
+        }
+    }
 
     val escolhida = ajustes.paginaDoMenu
     // Mesmo critério da janela do carro: sem informação, aparece. Sumir por não

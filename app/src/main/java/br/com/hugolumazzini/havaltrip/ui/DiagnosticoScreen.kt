@@ -3,6 +3,7 @@ package br.com.hugolumazzini.havaltrip.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import br.com.hugolumazzini.havaltrip.BuildConfig
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -153,7 +154,7 @@ fun DiagnosticoScreen(vm: TripViewModel) {
         }
 
         Spacer(Modifier.height(12.dp))
-        MedicaoDeEnergia(vm, coleta, envio, habilitado = fonte == Fonte.SHIZUKU)
+        MedicaoDeEnergia(vm, coleta, envio, habilitado = fonte == Fonte.SHIZUKU || BuildConfig.DEBUG)
 
         Spacer(Modifier.height(12.dp))
         GravadorDeAlertas(vm, gravador, habilitado = fonte == Fonte.SHIZUKU)

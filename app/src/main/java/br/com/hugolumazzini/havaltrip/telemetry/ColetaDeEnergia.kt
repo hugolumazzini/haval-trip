@@ -433,45 +433,40 @@ class ColetaDeEnergia(
      */
     private fun simularColeta() {
         val destino = File(pasta(), "energia-simulado-${carimbo()}.csv")
-        runCatching { destino.writeText(CABECALHO + "\n") }
-            .onFailure {
-                _estado.value = Estado.SemLinha("não deu para criar arquivo: ${it.message}")
-                return
-            }
-        arquivo = destino
 
         laco = escopo.launch(Dispatchers.IO) {
-            // Simula 10 minutos de coleta, com potência variável
-            val duracao = 10 * 60 * 1000L // 10 minutos em ms
-            val intervaloAmostras = INTERVALO_MS
-            val numeroAmostras = (duracao / intervaloAmostras).toInt()
+            runCatching {
+                val sb = StringBuilder(CABECALHO + "\n")
 
-            var amostras = 0
-            var kwh = 0.0
-            var km = 0.0
-            val kmInicial = 1500.5
+                // Gera 1200 amostras = 5 minutos de coleta (250ms * 1200 = 300s)
+                val numeroAmostras = 1200
+                var kwh = 0.0
+                var km = 0.0
 
-            for (i in 0 until numeroAmostras) {
-                if (!isActive) break
-
-                delay(intervaloAmostras)
                 val agora = System.currentTimeMillis()
-                val deltaS = intervaloAmostras / 1000.0
+                for (i in 0 until numeroAmostras) {
+                    if (!isActive) break
 
-                // Simula potência: começa em 50 kW, varia com seno, termina em 30 kW
-                val progresso = i.toDouble() / numeroAmostras
-                val variacaoSeno = kotlin.math.sin(progresso * 2 * kotlin.math.PI) * 20
-                val potenciaKw = 50 + variacaoSeno - (progresso * 20) // Desce gradualmente
+                    val deltaS = INTERVALO_MS / 1000.0
+                    val progresso = i.toDouble() / numeroAmostras
 
-                kwh += potenciaKw * deltaS / 3600.0
-                km = progresso * 40.0 // Simula 40 km de viagem
+                    // Simula potência: começa em 50 kW, varia, termina em 30 kW
+                    val variacaoSeno = kotlin.math.sin(progresso * 2 * kotlin.math.PI) * 20
+                    val potenciaKw = 50 + variacaoSeno - (progresso * 20)
 
-                amostras++
-                runCatching {
-                    destino.appendText("$agora;$deltaS;$potenciaKw\n")
+                    kwh += potenciaKw * deltaS / 3600.0
+                    km = progresso * 40.0
+
+                    sb.append("${agora + (i * INTERVALO_MS)};$deltaS;$potenciaKw\n")
+
+                    _estado.value = Estado.Gravando(i + 1, kwh, km)
                 }
 
-                _estado.value = Estado.Gravando(amostras, kwh, km)
+                destino.writeText(sb.toString())
+                arquivo = destino
+            }.onFailure {
+                _estado.value = Estado.SemLinha("simulação falhou: ${it.message}")
+                arquivo = null
             }
         }
     }

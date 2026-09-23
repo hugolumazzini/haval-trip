@@ -25,7 +25,6 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -611,40 +610,6 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
                         cor = Cores.Atencao,
                         corTexto = Cores.Superficie,
                     )
-                }
-
-                Spacer(Modifier.height(18.dp))
-
-                // Preço do combustível para cálculo de custo
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text("Preço do combustível", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Para calcular o custo estimado das viagens no histórico. Deixe em branco ou zero para desabilitar.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Cores.TextoApoio,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("R$ ", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
-                        var texto by remember { mutableStateOf(if (ajustes.precoDolitroCombustivel > 0) "%.2f".format(ajustes.precoDolitroCombustivel) else "") }
-                        TextField(
-                            value = texto,
-                            onValueChange = {
-                                texto = it
-                                runCatching { it.toDouble() }.onSuccess { preco -> Cluster.definirPrecoDolitro(preco) }
-                            },
-                            modifier = Modifier.weight(1f),
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = Cores.TextoCorrido),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        )
-                        Text("/ L", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
-                    }
                 }
             }
         }

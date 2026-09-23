@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import br.com.hugolumazzini.havaltrip.atualizacao.Atualizacao
 import br.com.hugolumazzini.havaltrip.atualizacao.VersaoPublicada
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo
+import br.com.hugolumazzini.havaltrip.domain.TipoCombustivel
 import br.com.hugolumazzini.havaltrip.domain.TripRecord
 import br.com.hugolumazzini.havaltrip.engine.TripState
 import br.com.hugolumazzini.havaltrip.services.TripComparison
@@ -470,6 +471,10 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
     fun excluirRegistro(recordId: String) {
         motor.excluirRegistro(recordId)
         _modoHistorico.value = ModoHistorico.Vendo()
+    }
+
+    fun atualizarPrecoRegistro(recordId: String, precoDolitro: Double, tipoCombustivel: TipoCombustivel? = null) {
+        motor.atualizarPrecoRegistro(recordId, precoDolitro, tipoCombustivel)
     }
 
     /**

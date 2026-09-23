@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -33,12 +34,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.hugolumazzini.havaltrip.Cluster
 import br.com.hugolumazzini.havaltrip.ModoHistorico
+import br.com.hugolumazzini.havaltrip.domain.TipoCombustivel
 import br.com.hugolumazzini.havaltrip.TripViewModel
 import br.com.hugolumazzini.havaltrip.domain.TripRecord
 import br.com.hugolumazzini.havaltrip.engine.TripState
@@ -78,6 +82,7 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
     /** `null` = nenhum diálogo aberto. Estado da tela, não do módulo. */
     var renomeando by remember { mutableStateOf<TripRecord?>(null) }
     var excluindo by remember { mutableStateOf<TripRecord?>(null) }
+    var editandoPreco by remember { mutableStateOf<TripRecord?>(null) }
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -125,8 +130,8 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
                 modo = modo,
                 emFoco = emFoco,
                 comparando = comparando,
-                precoDolitro = ajustes.precoDolitroCombustivel,
                 onRenomear = { renomeando = it },
+                onEditarPreco = { editandoPreco = it },
                 onExcluir = { excluindo = it },
             )
             AbaHistorico.GRAFICOS -> {
@@ -158,7 +163,6 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
                         posicao = posicaoNaComparacao(modo, registro.recordId),
                         selecionado = registro.recordId == emFoco?.recordId ||
                             (modo as? ModoHistorico.Comparando)?.bId == registro.recordId,
-                        precoDolitro = ajustes.precoDolitroCombustivel,
                         onClick = { vm.tocarNoRegistro(registro.recordId) },
                     )
                 }
@@ -173,6 +177,7 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
                         registro = emFoco,
                         onComparar = { vm.compararComOutra(emFoco.recordId) },
                         onRenomear = { renomeando = emFoco },
+                        onEditarPreco = { editandoPreco = emFoco },
                         onExcluir = { excluindo = emFoco },
                     )
                     else -> Vazio("Escolha uma viagem na lista ao lado.")
@@ -211,6 +216,74 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
             },
         )
     }
+
+    editandoPreco?.let { registro ->
+        var digitos by remember(registro.recordId) { mutableStateOf(registro.precoDolitroCombustivel?.let { "%d".format((it * 1000).toLong()) } ?: "") }
+        var tipoCombustivel by remember(registro.recordId) { mutableStateOf(registro.tipoCombustivel ?: TipoCombustivel.GASOLINA_COMUM) }
+        val digitsOnly = digitos.filter { it.isDigit() }
+        val precoFormatado = when {
+            digitsOnly.isEmpty() -> ""
+            digitsOnly.length <= 3 -> digitsOnly
+            else -> digitsOnly.dropLast(3) + "," + digitsOnly.takeLast(3)
+        }
+        val preco = digitsOnly.toLongOrNull()?.toDouble()?.div(1000) ?: 0.0
+        val custoExato = preco * registro.metrics.fuelLitres
+        val custoArredondado = kotlin.math.ceil(custoExato * 100) / 100
+        AlertDialog(
+            onDismissRequest = { editandoPreco = null },
+            containerColor = Cores.Superficie,
+            title = { Text("Preço do combustível", color = Cores.Texto) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Tipo:", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+                    TipoCombustivel.entries.forEach { tipo ->
+                        Row(
+                            modifier = Modifier.clickable { tipoCombustivel = tipo }.fillMaxWidth().padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier = Modifier.size(20.dp).clip(RoundedCornerShape(4.dp)).background(
+                                    if (tipoCombustivel == tipo) Cores.Destaque else Cores.Campo
+                                ),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(tipo.rotulo, color = Cores.TextoCorrido)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text("Valor:", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("R$ ", style = MaterialTheme.typography.bodyMedium)
+                        OutlinedTextField(
+                            value = precoFormatado,
+                            onValueChange = { novoValor ->
+                                digitos = novoValor.filter { it.isDigit() }.take(7)
+                            },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        )
+                        Text("/ L", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Text("Valor com 3 casas decimais", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+                    if (preco > 0) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("Estimativa: ${TripFormat.reais(custoArredondado)}", style = MaterialTheme.typography.bodySmall, color = Cores.Destaque)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        vm.atualizarPrecoRegistro(registro.recordId, preco, tipoCombustivel); editandoPreco = null
+                    },
+                ) { Text("Salvar", color = Cores.Destaque) }
+            },
+            dismissButton = {
+                TextButton(onClick = { editandoPreco = null }) { Text("Cancelar", color = Cores.Texto) }
+            },
+        )
+    }
 }
 
 /** Em que coluna da comparação este registro caiu, ou -1 se em nenhuma. */
@@ -228,7 +301,6 @@ private fun ItemHistorico(
     registro: TripRecord,
     posicao: Int,
     selecionado: Boolean,
-    precoDolitro: Double = 0.0,
     onClick: () -> Unit,
 ) {
     Cartao(Modifier.fillMaxWidth().clickable(onClick = onClick), selecionado = selecionado) {
@@ -254,9 +326,8 @@ private fun ItemHistorico(
             val linha = "${TripFormat.km(registro.metrics.distanceKm)}  •  " +
                     "${TripFormat.kml(registro.metrics.avgFuelConsumptionKml)}  •  " +
                     TripFormat.litros(registro.metrics.fuelLitres)
-            val custo = registro.custoBR(precoDolitro)
             Text(
-                if (custo != null) "$linha  •  ${TripFormat.reais(custo)}" else linha,
+                if (registro.custoBR != null) "$linha  •  ${TripFormat.reais(registro.custoBR)}" else linha,
                 style = MaterialTheme.typography.bodyMedium,
                 color = Cores.TextoApoio,
             )
@@ -275,6 +346,7 @@ private fun DetalhesDaViagem(
     registro: TripRecord,
     onComparar: () -> Unit,
     onRenomear: () -> Unit,
+    onEditarPreco: () -> Unit,
     onExcluir: () -> Unit,
 ) {
     val m = registro.metrics
@@ -301,6 +373,7 @@ private fun DetalhesDaViagem(
         // mexem, e no rodapé elas caíam abaixo da dobra numa tela de 600 px.
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             BotaoAcao("Renomear", onRenomear)
+            BotaoAcao("Preço combustível", onEditarPreco)
             BotaoAcao("Comparar com outra", onComparar)
             BotaoAcao("Excluir", onExcluir, corTexto = Cores.Erro)
         }
@@ -336,6 +409,15 @@ private fun DetalhesDaViagem(
                     "${TripFormat.decimal(registro.odometerStartKm)} → " +
                         TripFormat.km(registro.odometerEndKm),
                 )
+                if (registro.custoBR != null) {
+                    HorizontalDivider(color = Cores.Contorno)
+                    Column {
+                        Text("CUSTO ESTIMADO", style = EstiloRotulo)
+                        LinhaDetalhe("Tipo", registro.tipoCombustivel?.rotulo ?: "—")
+                        LinhaDetalhe("Valor", TripFormat.reais(registro.precoDolitroCombustivel!!) + " / L", destaque = true)
+                        LinhaDetalhe("Custo da viagem", TripFormat.reais(registro.custoBR), destaque = true)
+                    }
+                }
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -487,8 +569,8 @@ private fun TelaViagensHistorico(
     modo: ModoHistorico,
     emFoco: TripRecord?,
     comparando: Boolean,
-    precoDolitro: Double = 0.0,
     onRenomear: (TripRecord) -> Unit,
+    onEditarPreco: (TripRecord) -> Unit,
     onExcluir: (TripRecord) -> Unit,
 ) {
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -502,7 +584,6 @@ private fun TelaViagensHistorico(
                     posicao = posicaoNaComparacao(modo, registro.recordId),
                     selecionado = registro.recordId == emFoco?.recordId ||
                         (modo as? ModoHistorico.Comparando)?.bId == registro.recordId,
-                    precoDolitro = precoDolitro,
                     onClick = { vm.tocarNoRegistro(registro.recordId) },
                 )
             }
@@ -517,6 +598,7 @@ private fun TelaViagensHistorico(
                     registro = emFoco,
                     onComparar = { vm.compararComOutra(emFoco.recordId) },
                     onRenomear = { onRenomear(emFoco) },
+                    onEditarPreco = { onEditarPreco(emFoco) },
                     onExcluir = { onExcluir(emFoco) },
                 )
                 else -> Vazio("Escolha uma viagem na lista ao lado.")

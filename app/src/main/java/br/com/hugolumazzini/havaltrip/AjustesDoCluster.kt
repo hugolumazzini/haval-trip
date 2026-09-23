@@ -551,6 +551,16 @@ data class AjustesDoCluster(
      */
     val fundoDoMenu: FundoDoCluster = FundoDoCluster.PRETO,
     /**
+     * Distância da pressão dos pneus na página integrada.
+     * Separado do ajuste do carro solto (afastamentoDoCarroSolto).
+     */
+    val afastamentoDaPressaoNoMenu: Int = 100,
+    /**
+     * Distância da temperatura do carrinho na página integrada.
+     * Separado do ajuste do carro solto.
+     */
+    val afastamentoDaTemperaturaNoMenu: Int = 100,
+    /**
      * Como os dados se identificam dentro da bola. Ver [RotuloDoCluster].
      *
      * Só na bola: nas janelinhas soltas o espaço não é redondo nem tão apertado,
@@ -643,6 +653,8 @@ object Cluster {
     private const val FORMATO_DO_CARRO = "formatoDoCarro"
     private const val AFASTAMENTO_CARRO_SOLTO = "afastamentoDoCarroSolto"
     private const val AFASTAMENTO_CARRO_NA_BOLA = "afastamentoDoCarroNaBola"
+    private const val AFASTAMENTO_PRESSAO_MENU = "afastamentoDaPressaoNoMenu"
+    private const val AFASTAMENTO_TEMPERATURA_MENU = "afastamentoDaTemperaturaNoMenu"
     private const val HABILITAR_NUMEROS = "habilitarNumerosNoPainel"
     private const val HABILITAR_CARRO = "habilitarCarroNoPainel"
     private const val HABILITAR_PAGINA = "habilitarPaginaComVisoes"
@@ -829,6 +841,10 @@ object Cluster {
                 .coerceIn(50, 100),
             afastamentoDoCarroNaBola = prefs.getInt(AFASTAMENTO_CARRO_NA_BOLA, padrao.afastamentoDoCarroNaBola)
                 .coerceIn(50, 100),
+            afastamentoDaPressaoNoMenu = prefs.getInt(AFASTAMENTO_PRESSAO_MENU, padrao.afastamentoDaPressaoNoMenu)
+                .coerceIn(50, 100),
+            afastamentoDaTemperaturaNoMenu = prefs.getInt(AFASTAMENTO_TEMPERATURA_MENU, padrao.afastamentoDaTemperaturaNoMenu)
+                .coerceIn(50, 100),
             habilitarNumerosNoPainel = prefs.getBoolean(HABILITAR_NUMEROS, padrao.habilitarNumerosNoPainel),
             habilitarCarroNoPainel = prefs.getBoolean(HABILITAR_CARRO, padrao.habilitarCarroNoPainel),
             habilitarPaginaComVisoes = prefs.getBoolean(HABILITAR_PAGINA, padrao.habilitarPaginaComVisoes),
@@ -893,6 +909,8 @@ object Cluster {
             .putBoolean(HABILITAR_CARRO, novo.habilitarCarroNoPainel)
             .putBoolean(HABILITAR_PAGINA, novo.habilitarPaginaComVisoes)
             .putString(ITENS_DESPEDIDA, novo.itensDaDespedida.joinToString(",") { it.name })
+            .putInt(AFASTAMENTO_PRESSAO_MENU, novo.afastamentoDaPressaoNoMenu)
+            .putInt(AFASTAMENTO_TEMPERATURA_MENU, novo.afastamentoDaTemperaturaNoMenu)
             .apply()
     }
 
@@ -1009,6 +1027,18 @@ object Cluster {
     fun afastarDoCarroNaBola(delta: Int) = gravar(
         _ajustes.value.copy(
             afastamentoDoCarroNaBola = (_ajustes.value.afastamentoDoCarroNaBola + delta).coerceIn(50, 100),
+        ),
+    )
+
+    fun afastarDaPressaoNoMenu(delta: Int) = gravar(
+        _ajustes.value.copy(
+            afastamentoDaPressaoNoMenu = (_ajustes.value.afastamentoDaPressaoNoMenu + delta).coerceIn(50, 100),
+        ),
+    )
+
+    fun afastarDaTemperaturaNoMenu(delta: Int) = gravar(
+        _ajustes.value.copy(
+            afastamentoDaTemperaturaNoMenu = (_ajustes.value.afastamentoDaTemperaturaNoMenu + delta).coerceIn(50, 100),
         ),
     )
 

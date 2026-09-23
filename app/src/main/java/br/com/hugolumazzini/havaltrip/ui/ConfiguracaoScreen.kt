@@ -1080,6 +1080,40 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
         }
     }
 
+    Spacer(Modifier.height(14.dp))
+    Text("Posição da pressão dos pneus", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "Ajusta a distância em que a pressão dos pneus aparece no carro. Independente do ajuste do carro solto.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(8.dp))
+    Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+        BotaoAcao("−", { Cluster.afastarDaPressaoNoMenu(-5) }, modifier = Modifier.width(40.dp))
+        Spacer(Modifier.width(16.dp))
+        Text("${ajustes.afastamentoDaPressaoNoMenu}%", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
+        Spacer(Modifier.width(16.dp))
+        BotaoAcao("+", { Cluster.afastarDaPressaoNoMenu(5) }, modifier = Modifier.width(40.dp))
+    }
+
+    Spacer(Modifier.height(14.dp))
+    Text("Posição da temperatura", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "Ajusta a distância em que a temperatura do carrinho aparece. Independente do ajuste do carro solto.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(8.dp))
+    Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+        BotaoAcao("−", { Cluster.afastarDaTemperaturaNoMenu(-5) }, modifier = Modifier.width(40.dp))
+        Spacer(Modifier.width(16.dp))
+        Text("${ajustes.afastamentoDaTemperaturaNoMenu}%", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
+        Spacer(Modifier.width(16.dp))
+        BotaoAcao("+", { Cluster.afastarDaTemperaturaNoMenu(5) }, modifier = Modifier.width(40.dp))
+    }
+
     // Calibração, não ajuste de motorista. Não há mais escolha de formato: esta
     // página é sempre a bola que o Impulse deixa vazia, e oferecer "painel
     // inteiro" era oferecer um modo que o app não usa. O que fica aqui é só a

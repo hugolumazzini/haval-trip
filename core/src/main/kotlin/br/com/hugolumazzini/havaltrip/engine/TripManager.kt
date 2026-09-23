@@ -201,9 +201,9 @@ class TripManager(
      * motorista espera ao apertar "zerar" na estrada. Uma Trip pausada continua
      * pausada, só que em zero.
      */
-    fun resetTrip(tripId: String) = alterar(tripId) { trip ->
+    fun resetTrip(tripId: String, kwhIntegrado: Double? = null) = alterar(tripId) { trip ->
         trip.copy(
-            metrics = TripMetrics(),
+            metrics = trip.metrics.copy(kwhIntegrado = kwhIntegrado),
             startedAtMs = clock(),
             endedAtMs = null,
             odometerStartKm = odometroConhecido(),

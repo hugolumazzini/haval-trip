@@ -38,6 +38,8 @@ object TripFormat {
 
     fun litros(valor: Double?) = valor?.let { "${decimal(it, 2)} L" } ?: AUSENTE
 
+    fun kwh(valor: Double?) = valor?.let { "${decimal(it, 2)} kWh" } ?: AUSENTE
+
     fun percentual(valor: Double?, casas: Int = 1) =
         valor?.let { "${if (it > 0) "+" else ""}${decimal(it, casas)}%" } ?: AUSENTE
 

@@ -171,7 +171,11 @@ class MotorDeBordo private constructor(private val app: Application) {
     fun selecionar(tripId: String) = manager.selectTrip(tripId)
     fun pausar(tripId: String) = manager.pauseTrip(tripId)
     fun retomar(tripId: String) = manager.resumeTrip(tripId)
-    fun zerar(tripId: String) = manager.resetTrip(tripId)
+    fun zerar(tripId: String) {
+        // Se houver uma coleta de energia Pronta, inclui o kWh na Trip zerada
+        val kwh = (coletaDeEnergia.estado.value as? ColetaDeEnergia.Estado.Pronta)?.resumo?.kwhIntegrado
+        manager.resetTrip(tripId, kwh)
+    }
     fun arquivar(tripId: String) = manager.saveToHistory(tripId)
     fun gravarAgora() = manager.flush()
     fun renomearRegistro(recordId: String, label: String) = manager.renameRecord(recordId, label)

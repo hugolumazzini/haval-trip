@@ -166,6 +166,9 @@ class MotorDeBordo private constructor(private val app: Application) {
         val novo = if (state.value.live.ignition == IgnitionState.ON) IgnitionState.OFF else IgnitionState.ON
         simulador.ignicao = novo
         manager.handleIgnitionChange(novo)
+        // Também inicia/termina a coleta de energia quando a ignição muda
+        if (novo == IgnitionState.ON) coletaDeEnergia.comecar()
+        else coletaDeEnergia.terminar()
     }
 
     fun selecionar(tripId: String) = manager.selectTrip(tripId)

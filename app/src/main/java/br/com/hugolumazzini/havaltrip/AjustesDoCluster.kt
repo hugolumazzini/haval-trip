@@ -556,6 +556,11 @@ data class AjustesDoCluster(
      */
     val afastamentoDoCarroNoMenu: Int = 100,
     /**
+     * Tamanho do carro (pressão dos pneus e temperatura) na página integrada.
+     * Separado do tamanho do carro solto (tamanhoDoCarro).
+     */
+    val tamanhoDoCarroNoMenu: TamanhoDoCarro = TamanhoDoCarro.MEDIO,
+    /**
      * Como os dados se identificam dentro da bola. Ver [RotuloDoCluster].
      *
      * Só na bola: nas janelinhas soltas o espaço não é redondo nem tão apertado,
@@ -649,6 +654,7 @@ object Cluster {
     private const val AFASTAMENTO_CARRO_SOLTO = "afastamentoDoCarroSolto"
     private const val AFASTAMENTO_CARRO_NA_BOLA = "afastamentoDoCarroNaBola"
     private const val AFASTAMENTO_CARRO_MENU = "afastamentoDoCarroNoMenu"
+    private const val TAMANHO_CARRO_MENU = "tamanhoDoCarroNoMenu"
     private const val HABILITAR_NUMEROS = "habilitarNumerosNoPainel"
     private const val HABILITAR_CARRO = "habilitarCarroNoPainel"
     private const val HABILITAR_PAGINA = "habilitarPaginaComVisoes"
@@ -837,6 +843,9 @@ object Cluster {
                 .coerceIn(50, 100),
             afastamentoDoCarroNoMenu = prefs.getInt(AFASTAMENTO_CARRO_MENU, padrao.afastamentoDoCarroNoMenu)
                 .coerceIn(50, 100),
+            tamanhoDoCarroNoMenu = prefs.getString(TAMANHO_CARRO_MENU, null)
+                ?.let { nome -> TamanhoDoCarro.entries.find { it.name == nome } }
+                ?: padrao.tamanhoDoCarroNoMenu,
             habilitarNumerosNoPainel = prefs.getBoolean(HABILITAR_NUMEROS, padrao.habilitarNumerosNoPainel),
             habilitarCarroNoPainel = prefs.getBoolean(HABILITAR_CARRO, padrao.habilitarCarroNoPainel),
             habilitarPaginaComVisoes = prefs.getBoolean(HABILITAR_PAGINA, padrao.habilitarPaginaComVisoes),
@@ -902,6 +911,7 @@ object Cluster {
             .putBoolean(HABILITAR_PAGINA, novo.habilitarPaginaComVisoes)
             .putString(ITENS_DESPEDIDA, novo.itensDaDespedida.joinToString(",") { it.name })
             .putInt(AFASTAMENTO_CARRO_MENU, novo.afastamentoDoCarroNoMenu)
+            .putString(TAMANHO_CARRO_MENU, novo.tamanhoDoCarroNoMenu.name)
             .apply()
     }
 
@@ -1026,6 +1036,9 @@ object Cluster {
             afastamentoDoCarroNoMenu = (_ajustes.value.afastamentoDoCarroNoMenu + delta).coerceIn(50, 100),
         ),
     )
+
+    fun usarTamanhoDoCarroNoMenu(tamanho: TamanhoDoCarro) =
+        gravar(_ajustes.value.copy(tamanhoDoCarroNoMenu = tamanho))
 
     fun alternarHabilitarNumerosNoPainel() = gravar(
         _ajustes.value.copy(habilitarNumerosNoPainel = !_ajustes.value.habilitarNumerosNoPainel),

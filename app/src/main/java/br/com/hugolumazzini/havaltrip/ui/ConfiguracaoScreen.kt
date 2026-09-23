@@ -1097,6 +1097,23 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
         BotaoAcao("+", { Cluster.afastarDoCarroNoMenu(5) }, modifier = Modifier.width(40.dp))
     }
 
+    Spacer(Modifier.height(14.dp))
+    Text("Tamanho do carro (pressão e temperatura)", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "Redimensiona a pressão dos pneus e temperatura juntas. Independente do tamanho do carro solto.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(8.dp))
+    FlowRowSimples {
+        TamanhoDoCarro.Escolhiveis.forEach { tamanho ->
+            Opcao(tamanho.rotulo, ajustes.tamanhoDoCarroNoMenu == tamanho) {
+                Cluster.usarTamanhoDoCarroNoMenu(tamanho)
+            }
+        }
+    }
+
     // Calibração, não ajuste de motorista. Não há mais escolha de formato: esta
     // página é sempre a bola que o Impulse deixa vazia, e oferecer "painel
     // inteiro" era oferecer um modo que o app não usa. O que fica aqui é só a

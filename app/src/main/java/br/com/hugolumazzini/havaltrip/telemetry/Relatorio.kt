@@ -49,6 +49,11 @@ object Relatorio {
          * por que reenviar a lista em todo diagnóstico. Ver [ImagensDaCentral].
          */
         imagens: String = "",
+        /**
+         * As mudanças encontradas pelo gravador de alertas, se houver. Vem do
+         * diagnóstico quando o usuário marca um gesto e compara antes/depois.
+         */
+        mudancasDoGravador: List<GravadorDeMudancas.Mudanca> = emptyList(),
     ): String {
         // Sem isto, os últimos instantes antes do toque no botão ficariam de
         // fora: a fita da tela só alcança a viva de meio em meio segundo.
@@ -126,6 +131,17 @@ object Relatorio {
         sb.appendLine()
 
         if (imagens.isNotEmpty()) sb.append(imagens)
+
+        if (mudancasDoGravador.isNotEmpty()) {
+            sb.appendLine("--- MUDANÇAS ENCONTRADAS PELO GRAVADOR DE ALERTAS ---")
+            sb.appendLine("(tirou-se um retrato de propriedades suspeitas, fez-se um gesto no carro, tirou-se outro — eis o que mudou)")
+            mudancasDoGravador.forEach { mudanca ->
+                sb.appendLine("${mudanca.chave.removePrefix("car.basic.")}")
+                sb.appendLine("  antes: ${mudanca.antes ?: "(sem leitura)"}")
+                sb.appendLine("  depois: ${mudanca.depois ?: "(sem leitura)"}")
+            }
+            sb.appendLine()
+        }
 
         // A fita guarda 10 mil eventos, que em texto passam de meio megabyte —
         // mais do que os sites de paste aceitam. Cortam-se os mais antigos, e

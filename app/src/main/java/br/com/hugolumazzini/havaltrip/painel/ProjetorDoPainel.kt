@@ -271,4 +271,21 @@ object ProjetorDoPainel {
             "falta autorizar o Haval Trip no Shizuku"
         ShizukuShell.Situacao.PRONTO -> ""
     }
+
+    /** Força um reboot do painel para tentar resolver problemas com displays. */
+    fun rebootarPainel(): Boolean {
+        val situacao = ShizukuShell.situacao()
+        if (situacao != ShizukuShell.Situacao.PRONTO) {
+            Log.w(TAG, "não dá para rebootar: $situacao")
+            return false
+        }
+
+        return try {
+            Log.i(TAG, "iniciando reboot do painel...")
+            ShizukuShell.rodar("reboot") != null
+        } catch (e: Exception) {
+            Log.w(TAG, "falha ao rebootar", e)
+            false
+        }
+    }
 }

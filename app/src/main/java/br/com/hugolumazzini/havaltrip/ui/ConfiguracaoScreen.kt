@@ -1122,6 +1122,26 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
     // caiu. Quando o número estiver fechado, isto sai e vira constante, como
     // [BolaDoPainel] já é.
     Spacer(Modifier.height(18.dp))
+    Text("Problema com tela 3?", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "Se a tela 3 não está aparecendo no painel, tente reiniciar. O reboot força o painel a recrear as displays.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(8.dp))
+    BotaoAcao(
+        "Rebootar o painel",
+        onClick = {
+            Thread {
+                ProjetorDoPainel.rebootarPainel()
+            }.start()
+        },
+        cor = Cores.Atencao,
+        corTexto = Cores.Superficie,
+    )
+
+    Spacer(Modifier.height(18.dp))
     Text("Calibração", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
     Spacer(Modifier.height(4.dp))
     Text(

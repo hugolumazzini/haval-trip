@@ -269,6 +269,9 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
         if (_envio.value is Envio.Enviando) return
         _envio.value = Envio.Enviando
         viewModelScope.launch {
+            // Extrai as mudanças do gravador se houver
+            val mudancas = (_gravador.value as? Gravador.Comparado)?.mudancas ?: emptyList()
+
             // Duas versões do mesmo relatório: a gravada leva a fita inteira,
             // porque no aparelho não há limite de tamanho, e a enviada leva só
             // o que os sites de paste aceitam. Se o envio falhar, o arquivo
@@ -279,6 +282,7 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
                 fonte = fonte.value,
                 shisuku = shisukuInstalado,
                 maxEventos = maxEventos,
+                mudancasDoGravador = mudancas,
             )
             val completo = montar(Int.MAX_VALUE)
             val arquivo = runCatching { Relatorio.salvar(getApplication(), completo) }.getOrNull()

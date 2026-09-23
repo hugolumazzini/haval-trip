@@ -2,6 +2,7 @@ package br.com.hugolumazzini.havaltrip.telemetry
 
 import android.content.Context
 import android.util.Log
+import br.com.hugolumazzini.havaltrip.BuildConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -127,10 +128,18 @@ class ColetaDeEnergia(
     /** Chamado quando a ignição liga. Não faz nada se a coleta estiver desligada. */
     fun comecar() {
         if (!ligada || laco != null) return
+
+        // Se estiver no simulador, simula dados em vez de ler do Shizuku
         val servico = ShizukuTelemetrySource.servicoDoCarro()
         if (servico == null) {
-            _estado.value = Estado.SemLinha("o Shizuku não está rodando ou não autorizou o app")
-            return
+            if (BuildConfig.DEBUG) {
+                // No debug simula uma coleta para teste no emulador
+                simularColeta()
+                return
+            } else {
+                _estado.value = Estado.SemLinha("o Shizuku não está rodando ou não autorizou o app")
+                return
+            }
         }
         val destino = File(pasta(), "energia-${carimbo()}.csv")
         runCatching { destino.writeText(CABECALHO + "\n") }
@@ -416,5 +425,54 @@ class ColetaDeEnergia(
 
         val CABECALHO = (listOf("instante_ms", "delta_s", "potencia_kw") + CHAVES)
             .joinToString(";")
+    }
+
+    /**
+     * Simula uma coleta de energia para teste no emulador.
+     * Gera dados fictícios de uma viagem com ~40 km e ~3 kWh consumidos.
+     */
+    private fun simularColeta() {
+        val destino = File(pasta(), "energia-simulado-${carimbo()}.csv")
+        runCatching { destino.writeText(CABECALHO + "\n") }
+            .onFailure {
+                _estado.value = Estado.SemLinha("não deu para criar arquivo: ${it.message}")
+                return
+            }
+        arquivo = destino
+
+        laco = escopo.launch(Dispatchers.IO) {
+            // Simula 10 minutos de coleta, com potência variável
+            val duracao = 10 * 60 * 1000L // 10 minutos em ms
+            val intervaloAmostras = INTERVALO_MS
+            val numeroAmostras = (duracao / intervaloAmostras).toInt()
+
+            var amostras = 0
+            var kwh = 0.0
+            var km = 0.0
+            val kmInicial = 1500.5
+
+            for (i in 0 until numeroAmostras) {
+                if (!isActive) break
+
+                delay(intervaloAmostras)
+                val agora = System.currentTimeMillis()
+                val deltaS = intervaloAmostras / 1000.0
+
+                // Simula potência: começa em 50 kW, varia com seno, termina em 30 kW
+                val progresso = i.toDouble() / numeroAmostras
+                val variacaoSeno = kotlin.math.sin(progresso * 2 * kotlin.math.PI) * 20
+                val potenciaKw = 50 + variacaoSeno - (progresso * 20) // Desce gradualmente
+
+                kwh += potenciaKw * deltaS / 3600.0
+                km = progresso * 40.0 // Simula 40 km de viagem
+
+                amostras++
+                runCatching {
+                    destino.appendText("$agora;$deltaS;$potenciaKw\n")
+                }
+
+                _estado.value = Estado.Gravando(amostras, kwh, km)
+            }
+        }
     }
 }

@@ -127,6 +127,14 @@ data class TripMetrics(
     val idleRatio: Double? get() =
         if (totalTimeS > EPSILON) idleTimeS / totalTimeS else null
 
+    /** Consumo médio de energia, em kWh/km. `null` sem coleta de energia ou distância insuficiente. */
+    val avgEnergyConsumptionKwhPerKm: Double? get() = when {
+        kwhIntegrado == null -> null
+        distanceKm < MIN_KM_PARA_MEDIA -> null
+        kwhIntegrado <= EPSILON -> null
+        else -> kwhIntegrado / distanceKm
+    }
+
     companion object {
         /**
          * Abaixo disso o carro é considerado parado. 1 km/h e não 0 porque o

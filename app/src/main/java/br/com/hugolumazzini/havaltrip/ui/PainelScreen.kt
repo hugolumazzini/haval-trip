@@ -124,6 +124,12 @@ fun PainelScreen(vm: TripViewModel, estado: TripState) {
                             "",
                             Modifier.weight(1f).fillMaxSize(),
                         )
+                        Quadrante(
+                            "MÉDIA ENERGÉTICA",
+                            TripFormat.kwhPerKm(m.avgEnergyConsumptionKwhPerKm),
+                            "",
+                            Modifier.weight(1f).fillMaxSize(),
+                        )
                     }
                 }
             }

@@ -227,7 +227,11 @@ data class TripRecord(
      * "eu arquivei isto" e "isto se arquivou".
      */
     val automatic: Boolean = false,
-)
+) {
+    /** Custo estimado da viagem, em reais. `null` se sem preço configurado. */
+    fun custoBR(precoDolitro: Double): Double? =
+        if (precoDolitro <= 0) null else metrics.fuelLitres * precoDolitro
+}
 
 /**
  * Leitura ao vivo do veículo, comum a todas as Trips: não pertence a nenhum

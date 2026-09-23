@@ -560,6 +560,8 @@ data class AjustesDoCluster(
      * Separado do tamanho do carro solto (tamanhoDoCarro).
      */
     val tamanhoDoCarroNoMenu: TamanhoDoCarro = TamanhoDoCarro.MEDIO,
+    /** Preço do litro de combustível para cálculo de custo das viagens, em reais. */
+    val precoDolitroCombustivel: Double = 0.0,
     /**
      * Como os dados se identificam dentro da bola. Ver [RotuloDoCluster].
      *
@@ -1050,6 +1052,10 @@ object Cluster {
 
     fun alternarHabilitarPaginaComVisoes() = gravar(
         _ajustes.value.copy(habilitarPaginaComVisoes = !_ajustes.value.habilitarPaginaComVisoes),
+    )
+
+    fun definirPrecoDolitro(preco: Double) = gravar(
+        _ajustes.value.copy(precoDolitroCombustivel = preco),
     )
 
     /** Troca o jeito de identificar cada dado na bola. Ver [RotuloDoCluster]. */

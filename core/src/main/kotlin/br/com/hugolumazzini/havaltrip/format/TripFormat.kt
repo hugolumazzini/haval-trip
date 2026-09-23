@@ -42,6 +42,8 @@ object TripFormat {
 
     fun kwhPerKm(valor: Double?) = valor?.let { "${decimal(it, 3)} kWh/km" } ?: AUSENTE
 
+    fun reais(valor: Double?) = valor?.let { "R$ ${decimal(it, 2)}" } ?: AUSENTE
+
     fun percentual(valor: Double?, casas: Int = 1) =
         valor?.let { "${if (it > 0) "+" else ""}${decimal(it, casas)}%" } ?: AUSENTE
 

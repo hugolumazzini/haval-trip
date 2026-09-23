@@ -182,10 +182,15 @@ class ColetaDeEnergia(
     fun terminar() {
         laco?.cancel()
         laco = null
-        val gravado = arquivo ?: return
+        val gravado = arquivo ?: run {
+            Log.w(TAG, "terminar() chamado mas arquivo é null")
+            return
+        }
         arquivo = null
         escopo.launch(Dispatchers.IO) {
+            Log.i(TAG, "terminando coleta, arquivo: ${gravado.absolutePath}, existe: ${gravado.exists()}, tamanho: ${gravado.length()}")
             val resumo = runCatching { contar(gravado) }.getOrNull()
+            Log.i(TAG, "resumo: $resumo")
             _estado.value = when {
                 resumo == null || resumo.amostras == 0 -> if (ligada) Estado.Esperando else Estado.Desligada
                 else -> Estado.Pronta(resumo, gravado.absolutePath)
@@ -433,8 +438,10 @@ class ColetaDeEnergia(
      */
     private fun simularColeta() {
         val destino = File(pasta(), "energia-simulado-${carimbo()}.csv")
+        Log.i(TAG, "iniciando simulação, arquivo: ${destino.absolutePath}")
+        arquivo = destino
 
-        laco = escopo.launch(Dispatchers.IO) {
+        laco = escopo.launch(Dispatchers.Default) {
             runCatching {
                 val sb = StringBuilder(CABECALHO + "\n")
 
@@ -463,8 +470,8 @@ class ColetaDeEnergia(
                 }
 
                 destino.writeText(sb.toString())
-                arquivo = destino
             }.onFailure {
+                Log.w(TAG, "simulação falhou", it)
                 _estado.value = Estado.SemLinha("simulação falhou: ${it.message}")
                 arquivo = null
             }

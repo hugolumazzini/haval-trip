@@ -77,6 +77,8 @@ data class TripMetrics(
     val fuelLitres: Double = 0.0,
     /** Maior velocidade vista na Trip, em km/h. */
     val maxSpeedKmh: Double = 0.0,
+    /** kWh consumidos na Trip (para PHEV/híbridos), integral de tensão × corrente. `null` se não coletado. */
+    val kwhIntegrado: Double? = null,
 ) {
     /** Tempo total da Trip com o carro ligado, em segundos. */
     val totalTimeS: Double get() = movingTimeS + idleTimeS

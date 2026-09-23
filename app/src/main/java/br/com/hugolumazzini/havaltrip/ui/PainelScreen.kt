@@ -115,6 +115,17 @@ fun PainelScreen(vm: TripViewModel, estado: TripState) {
                         Modifier.weight(1f).fillMaxSize(),
                     )
                 }
+                if (m.kwhIntegrado != null) {
+                    Spacer(Modifier.height(14.dp))
+                    Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Quadrante(
+                            "ENERGIA CONSUMIDA",
+                            TripFormat.kwh(m.kwhIntegrado),
+                            "",
+                            Modifier.weight(1f).fillMaxSize(),
+                        )
+                    }
+                }
             }
             // `fillMaxHeight`, nunca `fillMaxSize`: um filho sem peso que pede a
             // largura toda tomaria a linha inteira na medição e deixaria zero

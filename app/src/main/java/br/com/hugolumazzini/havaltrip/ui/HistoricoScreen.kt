@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import br.com.hugolumazzini.havaltrip.Cluster
 import br.com.hugolumazzini.havaltrip.ModoHistorico
 import br.com.hugolumazzini.havaltrip.TripViewModel
 import br.com.hugolumazzini.havaltrip.domain.TripRecord
@@ -72,6 +73,7 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
     val modo by vm.modoHistorico.collectAsStateWithLifecycle()
     val comparando = modo is ModoHistorico.Comparando
     val emFoco = vm.registroEmFoco(modo, estado.history)
+    val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
 
     /** `null` = nenhum diálogo aberto. Estado da tela, não do módulo. */
     var renomeando by remember { mutableStateOf<TripRecord?>(null) }
@@ -123,6 +125,7 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
                 modo = modo,
                 emFoco = emFoco,
                 comparando = comparando,
+                precoDolitro = ajustes.precoDolitroCombustivel,
                 onRenomear = { renomeando = it },
                 onExcluir = { excluindo = it },
             )
@@ -155,6 +158,7 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
                         posicao = posicaoNaComparacao(modo, registro.recordId),
                         selecionado = registro.recordId == emFoco?.recordId ||
                             (modo as? ModoHistorico.Comparando)?.bId == registro.recordId,
+                        precoDolitro = ajustes.precoDolitroCombustivel,
                         onClick = { vm.tocarNoRegistro(registro.recordId) },
                     )
                 }
@@ -224,6 +228,7 @@ private fun ItemHistorico(
     registro: TripRecord,
     posicao: Int,
     selecionado: Boolean,
+    precoDolitro: Double = 0.0,
     onClick: () -> Unit,
 ) {
     Cartao(Modifier.fillMaxWidth().clickable(onClick = onClick), selecionado = selecionado) {
@@ -246,10 +251,12 @@ private fun ItemHistorico(
                 )
             }
             Spacer(Modifier.height(4.dp))
-            Text(
-                "${TripFormat.km(registro.metrics.distanceKm)}  •  " +
+            val linha = "${TripFormat.km(registro.metrics.distanceKm)}  •  " +
                     "${TripFormat.kml(registro.metrics.avgFuelConsumptionKml)}  •  " +
-                    TripFormat.litros(registro.metrics.fuelLitres),
+                    TripFormat.litros(registro.metrics.fuelLitres)
+            val custo = registro.custoBR(precoDolitro)
+            Text(
+                if (custo != null) "$linha  •  ${TripFormat.reais(custo)}" else linha,
                 style = MaterialTheme.typography.bodyMedium,
                 color = Cores.TextoApoio,
             )
@@ -480,6 +487,7 @@ private fun TelaViagensHistorico(
     modo: ModoHistorico,
     emFoco: TripRecord?,
     comparando: Boolean,
+    precoDolitro: Double = 0.0,
     onRenomear: (TripRecord) -> Unit,
     onExcluir: (TripRecord) -> Unit,
 ) {
@@ -494,6 +502,7 @@ private fun TelaViagensHistorico(
                     posicao = posicaoNaComparacao(modo, registro.recordId),
                     selecionado = registro.recordId == emFoco?.recordId ||
                         (modo as? ModoHistorico.Comparando)?.bId == registro.recordId,
+                    precoDolitro = precoDolitro,
                     onClick = { vm.tocarNoRegistro(registro.recordId) },
                 )
             }

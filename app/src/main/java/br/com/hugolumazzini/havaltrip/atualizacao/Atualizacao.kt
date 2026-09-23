@@ -68,23 +68,23 @@ object Atualizacao {
     /** Consulta a release mais recente no GitHub e devolve os metadados. */
     suspend fun consultar(context: Context): VersaoPublicada = withContext(Dispatchers.IO) {
         val texto = baixarTexto(RELEASES)
-        val releases = JSONObject(texto).let { obj ->
-            // Às vezes a API retorna um objeto de erro em vez de um array
+
+        // A API retorna um array de releases
+        val releasesArray = try {
+            org.json.JSONArray(texto)
+        } catch (e: Exception) {
+            // Se falhar ao parsear como array, tenta como objeto
+            val obj = JSONObject(texto)
             if (obj.has("message")) throw IllegalStateException(obj.optString("message"))
-            // Se veio como objeto com array dentro, usa ele; senão assume array direto
-            if (obj.has("releases")) obj.getJSONArray("releases") else {
-                // Quando não é array no topo, constrói um manualmente
-                // (parsing de release individual)
-                return@let obj
-            }
+            throw e
+        }
+
+        if (releasesArray.length() == 0) {
+            throw IllegalStateException("nenhuma release encontrada no repositório")
         }
 
         // Pega a primeira release (mais recente)
-        val release = if (releases.isJSONArray) {
-            (releases as? JSONArray)?.takeIf { it.length() > 0 }?.getJSONObject(0)
-        } else {
-            releases as? JSONObject
-        } ?: throw IllegalStateException("nenhuma release encontrada no repositório")
+        val release = releasesArray.getJSONObject(0)
 
         val tag = release.optString("tag_name")
             .removePrefix("v")

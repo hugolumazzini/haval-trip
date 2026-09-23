@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import br.com.hugolumazzini.havaltrip.domain.IgnitionState
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo
+import br.com.hugolumazzini.havaltrip.domain.TipoCombustivel
 import br.com.hugolumazzini.havaltrip.engine.TripManager
 import br.com.hugolumazzini.havaltrip.engine.TripState
 import br.com.hugolumazzini.havaltrip.storage.FileTripStorage
@@ -183,6 +184,7 @@ class MotorDeBordo private constructor(private val app: Application) {
     fun gravarAgora() = manager.flush()
     fun renomearRegistro(recordId: String, label: String) = manager.renameRecord(recordId, label)
     fun excluirRegistro(recordId: String) = manager.deleteRecord(recordId)
+    fun atualizarPrecoRegistro(recordId: String, precoDolitro: Double, tipoCombustivel: TipoCombustivel? = null) = manager.updateRecordPrice(recordId, precoDolitro, tipoCombustivel)
     fun definirContadoresManuais(quantos: Int) = manager.definirContadoresManuais(quantos)
     fun definirZeragemAutomatica(segundos: Double?) = manager.definirZeragemAutomatica(segundos)
 

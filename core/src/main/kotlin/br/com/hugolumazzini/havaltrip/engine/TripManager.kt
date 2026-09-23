@@ -2,6 +2,7 @@ package br.com.hugolumazzini.havaltrip.engine
 
 import br.com.hugolumazzini.havaltrip.domain.IgnitionState
 import br.com.hugolumazzini.havaltrip.domain.TelemetrySample
+import br.com.hugolumazzini.havaltrip.domain.TipoCombustivel
 import br.com.hugolumazzini.havaltrip.domain.Trip
 import br.com.hugolumazzini.havaltrip.domain.TripMetrics
 import br.com.hugolumazzini.havaltrip.domain.TripRecord
@@ -277,6 +278,18 @@ class TripManager(
      */
     fun deleteRecord(recordId: String): Boolean {
         if (!history.removeIf { it.recordId == recordId }) return false
+        salvarAgora(clock())
+        publicar()
+        return true
+    }
+
+    fun updateRecordPrice(recordId: String, precoDolitro: Double, tipoCombustivel: TipoCombustivel? = null): Boolean {
+        val indice = history.indexOfFirst { it.recordId == recordId }
+        if (indice < 0) return false
+        history[indice] = history[indice].copy(
+            precoDolitroCombustivel = if (precoDolitro > 0) precoDolitro else null,
+            tipoCombustivel = tipoCombustivel,
+        )
         salvarAgora(clock())
         publicar()
         return true

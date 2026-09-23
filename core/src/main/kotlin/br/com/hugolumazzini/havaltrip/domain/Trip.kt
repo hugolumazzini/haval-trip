@@ -35,6 +35,13 @@ enum class TripStatus {
 /** Estado da ignição do veículo. */
 enum class IgnitionState { ON, OFF }
 
+/** Tipo de combustível da viagem. */
+enum class TipoCombustivel(val rotulo: String) {
+    GASOLINA_COMUM("Gasolina comum"),
+    GASOLINA_ADITIVADA("Gasolina aditivada"),
+    GASOLINA_PREMIUM("Gasolina premium"),
+}
+
 /**
  * Amostra crua de telemetria, do jeito que chega do barramento do carro.
  *
@@ -227,10 +234,14 @@ data class TripRecord(
      * "eu arquivei isto" e "isto se arquivou".
      */
     val automatic: Boolean = false,
+    /** Preço do litro de combustível desta viagem específica, em reais. `null` = sem preço. */
+    val precoDolitroCombustivel: Double? = null,
+    /** Tipo de combustível desta viagem. `null` = não informado. */
+    val tipoCombustivel: TipoCombustivel? = null,
 ) {
     /** Custo estimado da viagem, em reais. `null` se sem preço configurado. */
-    fun custoBR(precoDolitro: Double): Double? =
-        if (precoDolitro <= 0) null else metrics.fuelLitres * precoDolitro
+    val custoBR: Double? get() =
+        precoDolitroCombustivel?.takeIf { it > 0 }?.let { metrics.fuelLitres * it }
 }
 
 /**

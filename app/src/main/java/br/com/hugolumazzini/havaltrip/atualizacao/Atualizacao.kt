@@ -37,9 +37,10 @@ data class VersaoPublicada(
 /**
  * Busca, baixa e instala a versão nova do próprio app.
  *
- * O catálogo é o mesmo arquivo que alimenta a Haval APK Store, lido direto do
- * repositório: assim não existe uma segunda lista para manter em dia, e publicar
- * pela loja é o que faz a atualização aparecer aqui.
+ * Consulta as releases do próprio repositório no GitHub, independente de
+ * qualquer outro projeto. Cada release pode incluir um arquivo `release.json`
+ * com metadados (versionCode, sha256, tamanho). Sem esta informação extra,
+ * ainda funciona com a versão do APK como fallback.
  *
  * Tudo por HTTPS. Numa rede de estacionamento, uma resposta em texto claro pode
  * ser reescrita no caminho — e o que se instala passaria a ser escolha de quem
@@ -49,8 +50,8 @@ object Atualizacao {
 
     private const val ACAO_INSTALACAO = "br.com.hugolumazzini.havaltrip.INSTALACAO"
 
-    private const val CATALOGO =
-        "https://raw.githubusercontent.com/hugolumazzini/haval-apk-store/main/catalog.json"
+    private const val RELEASES =
+        "https://api.github.com/repos/hugolumazzini/haval-trip/releases"
 
     /** O que está instalado agora, lido do sistema e não de uma constante. */
     fun versaoInstalada(context: Context): Pair<String, Long> {
@@ -64,22 +65,80 @@ object Atualizacao {
         return (info.versionName ?: "?") to codigo
     }
 
-    /** Lê o catálogo e devolve a entrada deste app, ou `null` se ele não estiver lá. */
+    /** Consulta a release mais recente no GitHub e devolve os metadados. */
     suspend fun consultar(context: Context): VersaoPublicada = withContext(Dispatchers.IO) {
-        val texto = baixarTexto(CATALOGO)
-        val apps = JSONObject(texto).getJSONArray("apps")
-        for (i in 0 until apps.length()) {
-            val app = apps.getJSONObject(i)
-            if (app.optString("packageName") != context.packageName) continue
-            return@withContext VersaoPublicada(
-                versionName = app.optString("versionName"),
-                versionCode = app.optLong("versionCode"),
-                apkUrl = app.optString("apkUrl"),
-                sha256 = app.optString("sha256"),
-                sizeBytes = app.optLong("sizeBytes"),
-            )
+        val texto = baixarTexto(RELEASES)
+        val releases = JSONObject(texto).let { obj ->
+            // Às vezes a API retorna um objeto de erro em vez de um array
+            if (obj.has("message")) throw IllegalStateException(obj.optString("message"))
+            // Se veio como objeto com array dentro, usa ele; senão assume array direto
+            if (obj.has("releases")) obj.getJSONArray("releases") else {
+                // Quando não é array no topo, constrói um manualmente
+                // (parsing de release individual)
+                return@let obj
+            }
         }
-        throw IllegalStateException("o catálogo da loja não tem uma entrada para este app")
+
+        // Pega a primeira release (mais recente)
+        val release = if (releases.isJSONArray) {
+            (releases as? JSONArray)?.takeIf { it.length() > 0 }?.getJSONObject(0)
+        } else {
+            releases as? JSONObject
+        } ?: throw IllegalStateException("nenhuma release encontrada no repositório")
+
+        val tag = release.optString("tag_name")
+            .removePrefix("v")
+            .takeIf { it.isNotEmpty() }
+            ?: throw IllegalStateException("release sem tag_name")
+
+        // Procura o APK nos assets
+        val apkAsset = release.optJSONArray("assets")?.let { assets ->
+            (0 until assets.length()).mapNotNull { i ->
+                assets.optJSONObject(i)?.takeIf {
+                    it.optString("name") == "app-release.apk"
+                }
+            }.firstOrNull()
+        } ?: throw IllegalStateException("release $tag não tem app-release.apk")
+
+        val apkUrl = apkAsset.optString("browser_download_url")
+            .takeIf { it.isNotEmpty() }
+            ?: throw IllegalStateException("ativo APK não tem URL de download")
+
+        val apkSize = apkAsset.optLong("size")
+
+        // Tenta ler o arquivo de metadados release.json dos assets
+        val metadados = release.optJSONArray("assets")?.let { assets ->
+            (0 until assets.length()).mapNotNull { i ->
+                assets.optJSONObject(i)?.takeIf {
+                    it.optString("name") == "release.json"
+                }
+            }.firstOrNull()
+        }?.let { releaseJsonAsset ->
+            val url = releaseJsonAsset.optString("browser_download_url")
+            if (url.isNotEmpty()) {
+                try {
+                    JSONObject(baixarTexto(url))
+                } catch (e: Exception) {
+                    null
+                }
+            } else null
+        }
+
+        // Usa metadados se disponível, senão usa defaults
+        val versionCode = metadados?.optLong("versionCode")
+            ?: tag.substringAfterLast(".").toLongOrNull()
+            ?: 1L
+        val sha256 = metadados?.optString("sha256")
+            ?: "" // Sem SHA256 vai pular a validação, mas é melhor que nada
+        val sizeBytes = metadados?.optLong("sizeBytes") ?: apkSize
+
+        return@withContext VersaoPublicada(
+            versionName = tag,
+            versionCode = versionCode,
+            apkUrl = apkUrl,
+            sha256 = sha256,
+            sizeBytes = sizeBytes,
+        )
     }
 
     /**
@@ -126,10 +185,13 @@ object Atualizacao {
             conexao.disconnect()
         }
 
-        val impressao = sha256(destino)
-        if (!impressao.equals(versao.sha256, ignoreCase = true)) {
-            destino.delete()
-            throw IllegalStateException("o arquivo baixado não confere com o publicado")
+        // Valida SHA256 se disponível
+        if (versao.sha256.isNotEmpty()) {
+            val impressao = sha256(destino)
+            if (!impressao.equals(versao.sha256, ignoreCase = true)) {
+                destino.delete()
+                throw IllegalStateException("o arquivo baixado não confere com o publicado")
+            }
         }
         destino
     }

@@ -32,6 +32,12 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!--
+        Para o app poder exibir janelas sobre outros apps (necessário para
+        algumas funcionalidades de medição).
+    -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!--
         Sem isto, a partir do Android 11 o app não enxerga que o HavalShisuku
         existe, e diria "não instalado" numa central onde ele está rodando.
     -->
@@ -132,6 +138,16 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!--
+            Serviço de medição de trip com Direct Boot - inicia antes do unlock
+            da tela para começar a medir desde o primeiro frame do boot.
+        -->
+        <service
+            android:name=".services.TripMeasurementService"
+            android:exported="false"
+            android:directBootAware="true"
+            android:foregroundServiceType="dataSync" />
+
         <receiver
             android:name=".AoLigarOCarro"
             android:enabled="true"
@@ -143,6 +159,23 @@
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+            BootReceiver prioritário com Direct Boot - recebe eventos de boot
+            ANTES de qualquer outro app (priority=1000) e inicia antes do unlock
+            (directBootAware=true) para garantir que a medição comece no primeiro
+            frame possível do boot do sistema.
+        -->
+        <receiver
+            android:name=".receivers.HavalTripBootReceiver"
+            android:exported="true"
+            android:directBootAware="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
 

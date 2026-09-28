@@ -2,11 +2,14 @@ package br.com.hugolumazzini.havaltrip
 
 import android.app.Application
 import android.content.Context
+import android.util.Log
 import br.com.hugolumazzini.havaltrip.domain.IgnitionState
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo
 import br.com.hugolumazzini.havaltrip.domain.TipoCombustivel
 import br.com.hugolumazzini.havaltrip.engine.TripManager
 import br.com.hugolumazzini.havaltrip.engine.TripState
+import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
+import br.com.hugolumazzini.havaltrip.painel.ProjetorDoPainel
 import br.com.hugolumazzini.havaltrip.storage.FileTripStorage
 import br.com.hugolumazzini.havaltrip.telemetry.BancadaDeTestes
 import br.com.hugolumazzini.havaltrip.telemetry.ColetaDeEnergia
@@ -142,8 +145,15 @@ class MotorDeBordo private constructor(private val app: Application) {
                     // ninguém apertar nada. Ela mesma se cala se estiver
                     // desligada, que é o caso de todo mundo menos quem está
                     // medindo um PHEV.
-                    if (amostra.ignition == IgnitionState.ON) coletaDeEnergia.comecar()
-                    else coletaDeEnergia.terminar()
+                    if (amostra.ignition == IgnitionState.ON) {
+                        coletaDeEnergia.comecar()
+                    } else {
+                        coletaDeEnergia.terminar()
+                        // PRIORIDADE TOTAL DA DESPEDIDA: ao desligar, força a janela
+                        // de despedida para a frente IMEDIATAMENTE, sobrepondo qualquer
+                        // outra janela (incluindo do Impulse)
+                        forcarDespedidaNaFrente()
+                    }
                 }
                 manager.processTelemetry(amostra)
             }
@@ -168,8 +178,13 @@ class MotorDeBordo private constructor(private val app: Application) {
         simulador.ignicao = novo
         manager.handleIgnitionChange(novo)
         // Também inicia/termina a coleta de energia quando a ignição muda
-        if (novo == IgnitionState.ON) coletaDeEnergia.comecar()
-        else coletaDeEnergia.terminar()
+        if (novo == IgnitionState.ON) {
+            coletaDeEnergia.comecar()
+        } else {
+            coletaDeEnergia.terminar()
+            // PRIORIDADE TOTAL DA DESPEDIDA ao desligar
+            forcarDespedidaNaFrente()
+        }
     }
 
     fun selecionar(tripId: String) = manager.selectTrip(tripId)
@@ -192,6 +207,51 @@ class MotorDeBordo private constructor(private val app: Application) {
     fun pedirTudoAoCarro() {
         HavalTelemetrySource.pedirTudo(app)
         if (_fonte.value == Fonte.SHIZUKU) escutar()
+    }
+
+    /**
+     * Força a janela de despedida para a frente IMEDIATAMENTE ao desligar a ignição.
+     *
+     * Isso garante que a despedida tenha PRIORIDADE TOTAL e apareça na frente de
+     * qualquer outra janela, incluindo as do Impulse ou outros apps.
+     */
+    private fun forcarDespedidaNaFrente() {
+        Thread {
+            try {
+                // Pequena pausa para garantir que as composables processem a mudança de ignição
+                Thread.sleep(100)
+
+                val ajustes = Cluster.ajustes.value
+
+                // Determina qual janela vai mostrar a despedida
+                val janelaComDespedida = when {
+                    ajustes.telaDosNumeros != null -> JanelaDoPainel.NUMEROS to ajustes.telaDosNumeros
+                    ajustes.telaDoMenu != null -> JanelaDoPainel.MENU to ajustes.telaDoMenu
+                    ajustes.telaDoCarro != null -> JanelaDoPainel.CARRO to ajustes.telaDoCarro
+                    else -> null
+                }
+
+                janelaComDespedida?.let { (janela, telaId) ->
+                    // Reprojetar COM INSISTÊNCIA para que fique NA FRENTE de tudo
+                    ProjetorDoPainel.projetar(
+                        context = app,
+                        janela = janela,
+                        telaId = telaId,
+                        insistir = true  // FORÇA a janela para frente
+                    )
+                    Log.i("MotorDeBordo", "Despedida forçada na frente: $janela na tela $telaId")
+
+                    // Recolhe as outras janelas do Haval Trip que não mostram despedida
+                    JanelaDoPainel.entries.forEach { outraJanela ->
+                        if (outraJanela != janela) {
+                            ProjetorDoPainel.recolher(outraJanela)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("MotorDeBordo", "Erro ao forçar despedida na frente", e)
+            }
+        }.start()
     }
 
     companion object {

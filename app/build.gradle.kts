@@ -22,10 +22,11 @@ android {
         // aconteceu de o release ser `v0.3.0` com o APK dizendo `1.0.0` por
         // dentro, e aí o catálogo da loja não tinha como comparar nada.
         //
-        // A numeração é 0.x: a `v1.0.0` de 31/08/2026 foi a primeira tentativa,
-        // e a contagem recomeçou em 0.2.0 no dia seguinte.
-        versionCode = 41
-        versionName = "0.9.28"
+        // A numeração começou em 0.x durante desenvolvimento. A v1.0.0 marca
+        // o primeiro release production-ready, após otimizações de segurança,
+        // performance e consolidação de componentes.
+        versionCode = 42
+        versionName = "1.0.0"
     }
 
     signingConfigs {

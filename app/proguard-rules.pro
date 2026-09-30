@@ -55,9 +55,9 @@
 -keepattributes InnerClasses
 -keepattributes EnclosingMethod
 
-# Remove logs em produção (opcional - comentar se quiser manter)
-# -assumenosideeffects class android.util.Log {
-#     public static *** d(...);
-#     public static *** v(...);
-#     public static *** i(...);
-# }
+# Remove logs em produção (exceto warnings e errors)
+-assumenosideeffects class android.util.Log {
+    public static *** d(...);
+    public static *** v(...);
+    public static *** i(...);
+}

@@ -9,6 +9,7 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import android.util.Log
 import android.view.KeyEvent
+import androidx.core.content.ContextCompat
 import com.beantechs.inputservice.IInputListener
 import com.beantechs.inputservice.IInputService
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -229,7 +230,12 @@ object TecladoDoVolante {
             }
         }
         runCatching {
-            context.applicationContext.registerReceiver(receptor, IntentFilter(ACAO_SIMULAR))
+            ContextCompat.registerReceiver(
+                context.applicationContext,
+                receptor,
+                IntentFilter(ACAO_SIMULAR),
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
         }.onFailure { Log.w(TAG, "não deu para ouvir a simulação", it) }
     }
 

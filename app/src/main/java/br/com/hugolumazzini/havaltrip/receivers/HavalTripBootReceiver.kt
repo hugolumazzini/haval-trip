@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
@@ -109,13 +110,22 @@ class HavalTripBootReceiver : BroadcastReceiver() {
             return
         }
 
-        val triggerAtMs = System.currentTimeMillis() + delayMs
-        alarmManager.setExactAndAllowWhileIdle(
-            AlarmManager.RTC_WAKEUP,
-            triggerAtMs,
-            pendingIntent
-        )
+        // A partir do Android 12, precisa verificar se pode agendar alarmes exatos
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+            Log.e(TAG, "Cannot schedule exact alarms, permission not granted")
+            return
+        }
 
-        Log.d(TAG, "Retry #$nextAttempt scheduled in ${delayMs/1000}s")
+        val triggerAtMs = System.currentTimeMillis() + delayMs
+        try {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                triggerAtMs,
+                pendingIntent
+            )
+            Log.d(TAG, "Retry #$nextAttempt scheduled in ${delayMs/1000}s")
+        } catch (e: SecurityException) {
+            Log.e(TAG, "SecurityException when scheduling exact alarm", e)
+        }
     }
 }

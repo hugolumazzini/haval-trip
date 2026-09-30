@@ -3,12 +3,18 @@ package br.com.hugolumazzini.havaltrip.painel
 import android.content.Context
 import android.hardware.display.DisplayManager
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import rikka.shizuku.Shizuku
 
 private const val TAG = "ProjetorDoPainel"
@@ -81,6 +87,12 @@ object ProjetorDoPainel {
      * antes de ele passar na frente, que é o mesmo que não insistir.
      */
     private const val REFORCO_MS = 30_000L
+
+    /**
+     * Escopo de coroutines para operações assíncronas do projetor.
+     * SupervisorJob para que falhas não derrubem outras projeções.
+     */
+    private val escopo = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /** Como foi a última tentativa de projetar, por janela. */
     sealed interface Resultado {
@@ -178,7 +190,7 @@ object ProjetorDoPainel {
             ) ?: return marcar(janela, Resultado.Falhou("o Shizuku recusou o comando"))
             // O `am start` volta antes de a janela existir na pilha; sem esta
             // pausa o redimensionamento logo abaixo não acha o que redimensionar.
-            Thread.sleep(400)
+            runBlocking { delay(400) }
         }
 
         val pilha = pilhaDaJanela(janela, telaId)
@@ -210,7 +222,7 @@ object ProjetorDoPainel {
     fun projetarNaPartida(context: Context, escolhas: () -> Map<JanelaDoPainel, Int?>) {
         val aplicacao = context.applicationContext
         val aoChegarBinder = Shizuku.OnBinderReceivedListener {
-            Thread {
+            escopo.launch {
                 escolhas().forEach { (janela, tela) ->
                     if (tela != null) runCatching { projetar(aplicacao, janela, tela) }
                 }
@@ -220,11 +232,11 @@ object ProjetorDoPainel {
                 // termina primeiro, insistimos uma vez depois que a poeira
                 // baixou. Uma só — reprojetar em laço seria uma queda de braço
                 // com o outro app, piscando o painel inteiro.
-                Thread.sleep(REFORCO_MS)
+                delay(REFORCO_MS)
                 escolhas().forEach { (janela, tela) ->
                     if (tela != null) runCatching { projetar(aplicacao, janela, tela, insistir = true) }
                 }
-            }.start()
+            }
         }
         runCatching { Shizuku.addBinderReceivedListenerSticky(aoChegarBinder) }
             .onFailure { Log.w(TAG, "não deu para esperar pelo Shizuku", it) }

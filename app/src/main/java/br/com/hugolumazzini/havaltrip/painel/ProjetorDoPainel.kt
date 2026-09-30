@@ -300,4 +300,62 @@ object ProjetorDoPainel {
             false
         }
     }
+
+    /**
+     * Remove TODAS as atividades de TODOS os apps no display especificado.
+     *
+     * Isso garante que a despedida apareça sozinha, sem AutoPanel, Impulse ou
+     * qualquer outro app por cima. É agressivo de propósito - a despedida DEVE
+     * ser a única coisa visível ao desligar.
+     */
+    fun limparTudoNoCluster(displayId: Int) {
+        val situacao = ShizukuShell.situacao()
+        if (situacao != ShizukuShell.Situacao.PRONTO) {
+            Log.w(TAG, "sem Shizuku, não dá para limpar o cluster")
+            return
+        }
+
+        try {
+            // Lista todas as pilhas (stacks) no display do cluster
+            val saida = ShizukuShell.rodar("am stack list") ?: return
+            val pilhas = mutableListOf<Int>()
+            var displayAtual: Int? = null
+
+            for (linha in saida.lines()) {
+                // Detecta o display: "Stack id=123 ... displayId=3"
+                Regex("""Stack id=(\d+).*displayId=(\d+)""").find(linha)?.let { m ->
+                    val pilha = m.groupValues[1].toIntOrNull()
+                    val display = m.groupValues[2].toIntOrNull()
+
+                    if (display == displayId && pilha != null) {
+                        displayAtual = display
+                        // Verifica se NÃO é uma pilha do Haval Trip
+                        // (vamos deixar as nossas, só queremos tirar os outros apps)
+                        val ehNossa = linha.contains(PACOTE)
+
+                        if (!ehNossa) {
+                            pilhas.add(pilha)
+                            Log.i(TAG, "Pilha $pilha no display $displayId será removida")
+                        }
+                    }
+                }
+            }
+
+            // Remove todas as pilhas de outros apps
+            pilhas.forEach { pilha ->
+                try {
+                    ShizukuShell.rodar("am stack remove $pilha")
+                    Log.i(TAG, "✅ Pilha $pilha removida do cluster")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Não conseguiu remover pilha $pilha", e)
+                }
+            }
+
+            if (pilhas.isNotEmpty()) {
+                Log.i(TAG, "Cluster limpo: ${pilhas.size} pilha(s) removida(s)")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Erro ao limpar cluster", e)
+        }
+    }
 }

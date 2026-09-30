@@ -20,6 +20,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,9 +38,13 @@ import br.com.hugolumazzini.havaltrip.TripViewModel
 import br.com.hugolumazzini.havaltrip.domain.IgnitionState
 import br.com.hugolumazzini.havaltrip.telemetry.ColetaDeEnergia
 import br.com.hugolumazzini.havaltrip.telemetry.DiarioDeCampo
+import br.com.hugolumazzini.havaltrip.telemetry.Diagnostico
 import br.com.hugolumazzini.havaltrip.telemetry.GravadorDeMudancas
 import br.com.hugolumazzini.havaltrip.telemetry.HavalTelemetrySource
 import br.com.hugolumazzini.havaltrip.telemetry.ShizukuTelemetrySource
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import br.com.hugolumazzini.havaltrip.ui.theme.Cores
 import br.com.hugolumazzini.havaltrip.ui.theme.EstiloRotulo
 import java.text.SimpleDateFormat
@@ -67,6 +72,15 @@ fun DiagnosticoScreen(vm: TripViewModel) {
     val situacao by vm.situacaoShizuku.collectAsStateWithLifecycle()
     val fonteReal = fonte != Fonte.SIMULADOR
     val contexto = LocalContext.current
+    val escopo = rememberCoroutineScope()
+
+    var estadoSistema by remember { mutableStateOf<Diagnostico.EstadoDoSistema?>(null) }
+    var tentandoIniciar by remember { mutableStateOf(false) }
+
+    // Carrega informações do sistema ao abrir a tela
+    LaunchedEffect(Unit) {
+        estadoSistema = Diagnostico.verificarSistema(contexto)
+    }
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -100,6 +114,32 @@ fun DiagnosticoScreen(vm: TripViewModel) {
             }
             BotaoAcao("Voltar ao painel", vm::voltarAoPainel)
         }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Estado do Sistema
+        EstadoDoSistemaCard(
+            estado = estadoSistema,
+            tentandoIniciar = tentandoIniciar,
+            onTentarIniciar = {
+                tentandoIniciar = true
+                escopo.launch {
+                    try {
+                        val sucesso = Diagnostico.tentarIniciarShizuku(contexto)
+                        // Atualiza o estado após tentativa
+                        delay(1000)
+                        estadoSistema = Diagnostico.verificarSistema(contexto)
+                    } finally {
+                        tentandoIniciar = false
+                    }
+                }
+            },
+            onAtualizar = {
+                escopo.launch {
+                    estadoSistema = Diagnostico.verificarSistema(contexto)
+                }
+            }
+        )
 
         Spacer(Modifier.height(12.dp))
 
@@ -561,5 +601,159 @@ private fun LinhaCrua(chave: String, valor: String, apoio: String) {
         }
         Text(apoio, style = MaterialTheme.typography.bodySmall, color = Cores.Contorno)
         HorizontalDivider(color = Cores.Contorno)
+    }
+}
+
+/**
+ * Mostra o estado do sistema: root, Shizuku, dependências.
+ *
+ * Responde "por que o Shizuku não sobe automaticamente?" com dados concretos.
+ */
+@Composable
+private fun EstadoDoSistemaCard(
+    estado: Diagnostico.EstadoDoSistema?,
+    tentandoIniciar: Boolean,
+    onTentarIniciar: () -> Unit,
+    onAtualizar: () -> Unit,
+) {
+    Cartao(Modifier.fillMaxWidth()) {
+        Column {
+            Text("ESTADO DO SISTEMA", style = EstiloRotulo)
+            Spacer(Modifier.height(6.dp))
+
+            if (estado == null) {
+                Text(
+                    "Verificando...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Cores.TextoApoio,
+                )
+            } else {
+                // Linha 1: Root e Shizuku instalado
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp)
+                ) {
+                    ItemEstado(
+                        rotulo = "Root",
+                        presente = estado.temRoot,
+                        detalhes = if (estado.temRoot) "Disponível" else "Não disponível",
+                    )
+                    ItemEstado(
+                        rotulo = "Shizuku",
+                        presente = estado.shizukuInstalado,
+                        detalhes = if (estado.shizukuInstalado) "Instalado" else "Não instalado",
+                    )
+                    ItemEstado(
+                        rotulo = "Impulse",
+                        presente = estado.impulseInstalado,
+                        detalhes = if (estado.impulseInstalado) "Instalado" else "Não instalado",
+                    )
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // Linha 2: Shizuku rodando e autorização
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp)
+                ) {
+                    ItemEstado(
+                        rotulo = "Shizuku rodando",
+                        presente = estado.shizukuRodando,
+                        detalhes = if (estado.shizukuRodando) "Em execução" else "Parado",
+                    )
+                    ItemEstado(
+                        rotulo = "Haval Trip autorizado",
+                        presente = estado.havalTripAutorizado,
+                        detalhes = if (estado.havalTripAutorizado) "Sim" else "Não",
+                        habilitado = estado.shizukuRodando,
+                    )
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // Explicação do estado
+                Text(
+                    when {
+                        !estado.shizukuInstalado ->
+                            "⚠️ Shizuku não instalado. Instale para leitura direta do carro."
+
+                        !estado.shizukuRodando && estado.temRoot ->
+                            "⚠️ Shizuku parado. Como tem root, deveria iniciar automaticamente. " +
+                                "Tente forçar início abaixo."
+
+                        !estado.shizukuRodando && !estado.temRoot ->
+                            "⚠️ Shizuku parado e sem root. Precisa de wireless debugging ativo. " +
+                                "Tente forçar início ou ative wireless debugging."
+
+                        estado.shizukuRodando && !estado.havalTripAutorizado ->
+                            "⚠️ Shizuku rodando mas Haval Trip não autorizado. " +
+                                "Toque em 'Pedir tudo ao carro' acima para autorizar."
+
+                        estado.shizukuRodando && estado.havalTripAutorizado ->
+                            "✅ Tudo OK! Shizuku rodando e Haval Trip autorizado."
+
+                        else ->
+                            "Estado indefinido. Toque em Atualizar."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = when {
+                        estado.shizukuRodando && estado.havalTripAutorizado -> Cores.Confirmacao
+                        !estado.shizukuInstalado -> Cores.Atencao
+                        else -> Cores.TextoApoio
+                    },
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                // Botões de ação
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    BotaoAcao(
+                        texto = if (tentandoIniciar) "Tentando..." else "Tentar Iniciar Shizuku",
+                        onClick = onTentarIniciar,
+                        habilitado = estado.shizukuInstalado && !estado.shizukuRodando && !tentandoIniciar,
+                        cor = Cores.SuperficieSelecionada,
+                        corTexto = Cores.Destaque,
+                    )
+                    BotaoAcao(
+                        texto = "Atualizar",
+                        onClick = onAtualizar,
+                        cor = Cores.Campo,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ItemEstado(
+    rotulo: String,
+    presente: Boolean,
+    detalhes: String,
+    habilitado: Boolean = true,
+) {
+    Column {
+        Text(
+            rotulo,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (habilitado) Cores.TextoApoio else Cores.Contorno,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (presente) "✅" else "❌",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                detalhes,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (habilitado) {
+                    if (presente) Cores.Confirmacao else Cores.Atencao
+                } else {
+                    Cores.Contorno
+                },
+            )
+        }
     }
 }

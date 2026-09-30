@@ -8,7 +8,7 @@ import android.content.Intent
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
-import br.com.hugolumazzini.havaltrip.services.TripMeasurementService
+import br.com.hugolumazzini.havaltrip.ServicoDeBordo
 
 class HavalTripBootReceiver : BroadcastReceiver() {
 
@@ -31,7 +31,9 @@ class HavalTripBootReceiver : BroadcastReceiver() {
         val isBootEvent = bootAction in setOf(
             Intent.ACTION_BOOT_COMPLETED,
             "android.intent.action.QUICKBOOT_POWERON",
-            Intent.ACTION_LOCKED_BOOT_COMPLETED
+            "com.htc.intent.action.QUICKBOOT_POWERON",
+            Intent.ACTION_LOCKED_BOOT_COMPLETED,
+            Intent.ACTION_MY_PACKAGE_REPLACED
         )
 
         val isRetry = bootAction == ACTION_RETRY_START
@@ -68,9 +70,8 @@ class HavalTripBootReceiver : BroadcastReceiver() {
         }
 
         try {
-            // Inicia o ForegroundService
-            val serviceIntent = Intent(context, TripMeasurementService::class.java)
-            context.startForegroundService(serviceIntent)
+            // Inicia o ServicoDeBordo (ForegroundService)
+            ServicoDeBordo.garantir(context)
 
             val duration = SystemClock.elapsedRealtime() - startTime
             Log.i(TAG, "Service started successfully (attempt=$attempt, duration=${duration}ms)")

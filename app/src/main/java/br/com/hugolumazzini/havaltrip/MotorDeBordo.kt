@@ -23,6 +23,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -216,10 +217,10 @@ class MotorDeBordo private constructor(private val app: Application) {
      * qualquer outra janela, incluindo as do Impulse ou outros apps.
      */
     private fun forcarDespedidaNaFrente() {
-        Thread {
+        escopo.launch(Dispatchers.Default) {
             try {
                 // Pequena pausa para garantir que as composables processem a mudança de ignição
-                Thread.sleep(100)
+                delay(100)
 
                 val ajustes = Cluster.ajustes.value
 
@@ -251,7 +252,7 @@ class MotorDeBordo private constructor(private val app: Application) {
             } catch (e: Exception) {
                 Log.w("MotorDeBordo", "Erro ao forçar despedida na frente", e)
             }
-        }.start()
+        }
     }
 
     companion object {

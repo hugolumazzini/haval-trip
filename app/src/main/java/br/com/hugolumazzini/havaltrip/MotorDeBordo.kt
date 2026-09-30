@@ -233,7 +233,13 @@ class MotorDeBordo private constructor(private val app: Application) {
                 }
 
                 janelaComDespedida?.let { (janela, telaId) ->
-                    // Reprojetar COM INSISTÊNCIA para que fique NA FRENTE de tudo
+                    // PRIMEIRO: Limpa TUDO que está no cluster (incluindo AutoPanel e outros apps)
+                    ProjetorDoPainel.limparTudoNoCluster(telaId)
+
+                    // Pequena pausa para garantir limpeza
+                    delay(200)
+
+                    // DEPOIS: Reprojetar COM INSISTÊNCIA para que fique NA FRENTE de tudo
                     ProjetorDoPainel.projetar(
                         context = app,
                         janela = janela,

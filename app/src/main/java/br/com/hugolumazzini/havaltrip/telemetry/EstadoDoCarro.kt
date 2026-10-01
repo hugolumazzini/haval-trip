@@ -127,6 +127,7 @@ class EstadoDoCarro(private val diario: DiarioDeCampo) {
         lampadaDireita = cache[HavalTelemetrySource.CHAVE_SETA_DIR_LAMPADA]
             ?: cache[HavalTelemetrySource.CHAVE_SETA_DIR_INDICADOR],
         pisca = cache[HavalTelemetrySource.CHAVE_PISCA_ALERTA],
+        combustivelBaixo = cache[HavalTelemetrySource.CHAVE_COMBUSTIVEL_BAIXO],
     )
 
     fun montarAmostra(): TelemetrySample {

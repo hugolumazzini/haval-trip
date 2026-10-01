@@ -143,6 +143,15 @@ class HavalTelemetrySource(
         const val CHAVE_LUZ_DE_POSICAO = "car.basic.low_light_status"
 
         /**
+         * O aviso de reserva de combustível.
+         *
+         * É a mesma luz amarela que acende no painel do H6 quando o tanque está
+         * baixo. Mostrar isto no desenho do carro evita que o motorista precise
+         * olhar para o hodômetro físico enquanto dirige.
+         */
+        const val CHAVE_COMBUSTIVEL_BAIXO = "car.ipk_light.fuel_low"
+
+        /**
          * A **alavanca** da seta, e não a lâmpada.
          *
          * O carro publica as duas coisas: `left_turn_light_status` é a lâmpada,
@@ -234,6 +243,7 @@ class HavalTelemetrySource(
             CHAVE_NEBLINA_DIANTEIRA,
             CHAVE_NEBLINA_TRASEIRA,
             CHAVE_LUZ_DE_POSICAO,
+            CHAVE_COMBUSTIVEL_BAIXO,
             CHAVE_SETA_ESQ,
             CHAVE_SETA_DIR,
             CHAVE_SETA_ESQ_LAMPADA,

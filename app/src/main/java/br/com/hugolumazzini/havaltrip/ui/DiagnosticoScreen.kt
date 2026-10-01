@@ -84,142 +84,129 @@ fun DiagnosticoScreen(vm: TripViewModel) {
         estadoSistema = Diagnostico.verificarSistema(contexto)
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("DIAGNÓSTICO DA TELEMETRIA", style = EstiloRotulo)
-                Text(
-                    when {
-                        fonte == Fonte.SIMULADOR ->
-                            "Simulador ligado: os números da tela são inventados"
-                        fonte == Fonte.SHIZUKU -> when (val s = situacao) {
-                            is ShizukuTelemetrySource.Situacao.SemShizuku ->
-                                "Shizuku não está rodando nesta central — inicie-o e volte aqui"
-                            is ShizukuTelemetrySource.Situacao.PrecisaAutorizar ->
-                                "Falta autorizar o Haval Trip no Shizuku. Toque em \"Pedir tudo ao carro\"."
-                            is ShizukuTelemetrySource.Situacao.Falhou -> "Linha direta falhou: ${s.motivo}"
-                            is ShizukuTelemetrySource.Situacao.Verificando -> "Procurando o Shizuku…"
-                            is ShizukuTelemetrySource.Situacao.Conectado ->
-                                if (leituras.isEmpty()) "Conectado ao carro, esperando o primeiro valor."
-                                else "${leituras.size} chaves lidas direto do carro"
-                        }
-                        !vm.shisukuInstalado ->
-                            "HavalShisuku não encontrado nesta central — sem ele não chega nada do carro"
-                        leituras.isEmpty() ->
-                            "Ponte encontrada, mas nada chegou ainda. Ligue o carro e ande um pouco."
-                        else ->
-                            "${leituras.size} chaves recebidas do carro"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (fonteReal && leituras.isNotEmpty()) Cores.Confirmacao else Cores.Atencao,
-                )
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("DIAGNÓSTICO DA TELEMETRIA", style = EstiloRotulo)
+                    Text(
+                        when {
+                            fonte == Fonte.SIMULADOR ->
+                                "Simulador ligado: os números da tela são inventados"
+                            fonte == Fonte.SHIZUKU -> when (val s = situacao) {
+                                is ShizukuTelemetrySource.Situacao.SemShizuku ->
+                                    "Shizuku não está rodando nesta central — inicie-o e volte aqui"
+                                is ShizukuTelemetrySource.Situacao.PrecisaAutorizar ->
+                                    "Falta autorizar o Haval Trip no Shizuku. Toque em \"Pedir tudo ao carro\"."
+                                is ShizukuTelemetrySource.Situacao.Falhou -> "Linha direta falhou: ${s.motivo}"
+                                is ShizukuTelemetrySource.Situacao.Verificando -> "Procurando o Shizuku…"
+                                is ShizukuTelemetrySource.Situacao.Conectado ->
+                                    if (leituras.isEmpty()) "Conectado ao carro, esperando o primeiro valor."
+                                    else "${leituras.size} chaves lidas direto do carro"
+                            }
+                            !vm.shisukuInstalado ->
+                                "HavalShisuku não encontrado nesta central — sem ele não chega nada do carro"
+                            leituras.isEmpty() ->
+                                "Ponte encontrada, mas nada chegou ainda. Ligue o carro e ande um pouco."
+                            else ->
+                                "${leituras.size} chaves recebidas do carro"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (fonteReal && leituras.isNotEmpty()) Cores.Confirmacao else Cores.Atencao,
+                    )
+                }
+                BotaoAcao("Voltar ao painel", vm::voltarAoPainel)
             }
-            BotaoAcao("Voltar ao painel", vm::voltarAoPainel)
         }
 
-        Spacer(Modifier.height(12.dp))
-
-        // Estado do Sistema
-        EstadoDoSistemaCard(
-            estado = estadoSistema,
-            tentandoIniciar = tentandoIniciar,
-            onTentarIniciar = {
-                tentandoIniciar = true
-                escopo.launch {
-                    try {
-                        val sucesso = Diagnostico.tentarIniciarShizuku(contexto)
-                        // Atualiza o estado após tentativa
-                        delay(1000)
+        item {
+            EstadoDoSistemaCard(
+                estado = estadoSistema,
+                tentandoIniciar = tentandoIniciar,
+                onTentarIniciar = {
+                    tentandoIniciar = true
+                    escopo.launch {
+                        try {
+                            val sucesso = Diagnostico.tentarIniciarShizuku(contexto)
+                            delay(1000)
+                            estadoSistema = Diagnostico.verificarSistema(contexto)
+                        } finally {
+                            tentandoIniciar = false
+                        }
+                    }
+                },
+                onAtualizar = {
+                    escopo.launch {
                         estadoSistema = Diagnostico.verificarSistema(contexto)
-                    } finally {
-                        tentandoIniciar = false
                     }
                 }
-            },
-            onAtualizar = {
-                escopo.launch {
-                    estadoSistema = Diagnostico.verificarSistema(contexto)
-                }
-            }
-        )
-
-        Spacer(Modifier.height(12.dp))
-
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            BotaoAcao("Pedir tudo ao carro", vm::pedirTudoAoCarro)
-            // Nada aqui se resolve dentro do Haval Trip: quem precisa de Shizuku
-            // e de serviço conectado é o Shisuku. O botão encurta o caminho até
-            // lá, que dentro do carro é procurar ícone na gaveta de apps.
-            if (vm.shisukuInstalado) BotaoAcao("Abrir HavalShisuku", vm::abrirShisuku)
-            BotaoAcao(
-                texto = "Fonte: ${fonte.rotulo}",
-                onClick = vm::proximaFonte,
-                cor = if (fonteReal) Cores.Campo else Cores.SuperficieSelecionada,
-                corTexto = if (fonteReal) Cores.Texto else Cores.Atencao,
-            )
-            BotaoAcao(
-                texto = when (envio) {
-                    is Envio.Enviando -> "Enviando…"
-                    else -> "Gerar e enviar relatório"
-                },
-                onClick = vm::enviarRelatorio,
-                habilitado = envio !is Envio.Enviando,
-                cor = Cores.SuperficieSelecionada,
-                corTexto = Cores.Destaque,
-            )
-            // Coleta de uma vez só: lista que imagens do veículo a própria
-            // central guarda, para saber se dá para desenhar o H6 em outros
-            // ângulos sem inventar arte nova. Não tem a ver com telemetria,
-            // por isso não entra no relatório de sempre.
-            BotaoAcao(
-                texto = "Listar imagens do carro",
-                onClick = vm::enviarInventarioDeImagens,
-                habilitado = envio !is Envio.Enviando,
-                cor = Cores.SuperficieSelecionada,
-                corTexto = Cores.Destaque,
-            )
-            // Também de uma vez só: pergunta ao carro se ele sabe dizer que
-            // modelo é, para o desenho poder mudar conforme a versão. Nada de
-            // chassi ou placa entra nessa lista. Ver `IdentidadeDoCarro`.
-            //
-            // O aviso no rótulo não é exagero: esta sonda lê o `dex` de todos os
-            // aplicativos da GWM instalados, na hora, e no teste no carro isso
-            // travou a central. Fica porque a resposta ainda interessa, mas com
-            // o preço escrito no botão.
-            BotaoAcao(
-                texto = "Sondar modelo do carro (trava a central)",
-                onClick = vm::enviarSondaDeIdentidade,
-                habilitado = envio !is Envio.Enviando,
-                cor = Cores.SuperficieSelecionada,
-                corTexto = Cores.Destaque,
             )
         }
 
-        Spacer(Modifier.height(12.dp))
-        MedicaoDeEnergia(vm, coleta, envio, habilitado = fonte == Fonte.SHIZUKU || BuildConfig.DEBUG)
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                BotaoAcao("Pedir tudo ao carro", vm::pedirTudoAoCarro)
+                if (vm.shisukuInstalado) BotaoAcao("Abrir HavalShisuku", vm::abrirShisuku)
+                BotaoAcao(
+                    texto = "Fonte: ${fonte.rotulo}",
+                    onClick = vm::proximaFonte,
+                    cor = if (fonteReal) Cores.Campo else Cores.SuperficieSelecionada,
+                    corTexto = if (fonteReal) Cores.Texto else Cores.Atencao,
+                )
+                BotaoAcao(
+                    texto = when (envio) {
+                        is Envio.Enviando -> "Enviando…"
+                        else -> "Gerar e enviar relatório"
+                    },
+                    onClick = vm::enviarRelatorio,
+                    habilitado = envio !is Envio.Enviando,
+                    cor = Cores.SuperficieSelecionada,
+                    corTexto = Cores.Destaque,
+                )
+                BotaoAcao(
+                    texto = "Listar imagens do carro",
+                    onClick = vm::enviarInventarioDeImagens,
+                    habilitado = envio !is Envio.Enviando,
+                    cor = Cores.SuperficieSelecionada,
+                    corTexto = Cores.Destaque,
+                )
+                BotaoAcao(
+                    texto = "Sondar modelo do carro (trava a central)",
+                    onClick = vm::enviarSondaDeIdentidade,
+                    habilitado = envio !is Envio.Enviando,
+                    cor = Cores.SuperficieSelecionada,
+                    corTexto = Cores.Destaque,
+                )
+            }
+        }
 
-        Spacer(Modifier.height(12.dp))
-        GravadorDeAlertas(vm, gravador, habilitado = fonte == Fonte.SHIZUKU)
+        item {
+            MedicaoDeEnergia(vm, coleta, envio, habilitado = fonte == Fonte.SHIZUKU || BuildConfig.DEBUG)
+        }
 
-        Spacer(Modifier.height(12.dp))
-        PorQueAIgnicaoEstaAssim(vm, leituras, simulando = !fonteReal)
+        item {
+            GravadorDeAlertas(vm, gravador, habilitado = fonte == Fonte.SHIZUKU)
+        }
+
+        item {
+            PorQueAIgnicaoEstaAssim(vm, leituras, simulando = !fonteReal)
+        }
 
         if (envio !is Envio.Parado) {
-            Spacer(Modifier.height(10.dp))
-            ResultadoDoEnvio(envio, contexto, onTentarDeNovo = vm::enviarRelatorio)
+            item {
+                ResultadoDoEnvio(envio, contexto, onTentarDeNovo = vm::enviarRelatorio)
+            }
         }
 
-        Spacer(Modifier.height(12.dp))
-
-        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Cartao(Modifier.weight(1f).fillMaxHeight()) {
+        item {
+            Cartao(Modifier.fillMaxWidth()) {
                 Column {
                     Text("VALOR ATUAL DE CADA CHAVE", style = EstiloRotulo)
                     Spacer(Modifier.height(6.dp))
                     if (leituras.isEmpty()) {
-                        // Silêncio total não é chave faltando na configuração: é
-                        // a ponte inteira fora do ar. Mesmo zerado, o Shisuku
-                        // publicaria as chaves padrão assim que se conectasse.
                         Text(
                             "Nada recebido — a ponte não está de pé.\n\n" +
                                 "Abra o HavalShisuku e confira, nesta ordem:\n" +
@@ -232,8 +219,8 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     } else {
-                        LazyColumn {
-                            items(leituras.keys.sorted()) { chave ->
+                        Column {
+                            leituras.keys.sorted().forEach { chave ->
                                 val leitura = leituras.getValue(chave)
                                 LinhaCrua(
                                     chave = chave.removePrefix("car.basic."),
@@ -241,19 +228,16 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                                     apoio = "${leitura.vezes}x · ${hora.format(Date(leitura.emMs))}",
                                 )
                             }
-                            // As que faltam não são defeito nem ausência no
-                            // carro: o Shisuku só monitora a lista de fábrica
-                            // mais o que estiver marcado no "Configurar" dele —
-                            // e tanque, autonomia e consumo médio ficam de fora
-                            // dessa lista de fábrica.
                             val faltando = HavalTelemetrySource.CHAVES.filterNot { it in leituras }
-                            if (faltando.isNotEmpty()) item { AindaFaltam(faltando) }
+                            if (faltando.isNotEmpty()) AindaFaltam(faltando)
                         }
                     }
                 }
             }
+        }
 
-            Cartao(Modifier.weight(1f).fillMaxHeight()) {
+        item {
+            Cartao(Modifier.fillMaxWidth()) {
                 Column {
                     Text("FITA DOS ÚLTIMOS EVENTOS", style = EstiloRotulo)
                     Text(
@@ -262,8 +246,8 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                         color = Cores.TextoApoio,
                     )
                     Spacer(Modifier.height(6.dp))
-                    LazyColumn(reverseLayout = true) {
-                        items(fita) { evento ->
+                    Column {
+                        fita.reversed().forEach { evento ->
                             Text(
                                 "${hora.format(Date(evento.emMs))}  " +
                                     "${evento.chave.removePrefix("car.basic.")} = ${evento.valor}",

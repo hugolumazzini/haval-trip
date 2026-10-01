@@ -153,8 +153,9 @@ fun ClusterCarroScreen(vm: TripViewModel, espiando: Boolean = false) {
         ) {
             // O anel azul que o painel desenhava e que a nossa tapa cobriu,
             // refeito por dentro dela e do tamanho do original: sem ele a bola
-            // vira um quadrado preto no meio do painel.
-            if (naBola) {
+            // vira um quadrado preto no meio do painel. Só aparece se o motorista
+            // não o desabilitou.
+            if (naBola && ajustes.mostrarAnelAzul) {
                 Canvas(
                     Modifier
                         .fillMaxHeight(1f / FOLGA_DA_TAPA)
@@ -193,7 +194,7 @@ fun ClusterCarroScreen(vm: TripViewModel, espiando: Boolean = false) {
 internal const val LARGURA_POR_ALTURA = 1.15f
 
 /** Altura do desenho como fração da tapa. Ver o comentário no lugar em que é usada. */
-internal const val DENTRO_DA_BOLA = 0.58f
+internal const val DENTRO_DA_BOLA = 0.80f
 
 /**
  * Quanto a tapa preta é maior que o anel azul.

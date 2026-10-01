@@ -51,6 +51,21 @@ import br.com.hugolumazzini.havaltrip.services.ComparisonLine
 import br.com.hugolumazzini.havaltrip.ui.theme.Cores
 import br.com.hugolumazzini.havaltrip.ui.theme.EstiloRotulo
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.toArgb
+import com.patrykandpatrick.vico.compose.axis.horizontal.rememberBottomAxis
+import com.patrykandpatrick.vico.compose.axis.vertical.rememberStartAxis
+import com.patrykandpatrick.vico.compose.chart.Chart
+import com.patrykandpatrick.vico.compose.chart.column.columnChart
+import com.patrykandpatrick.vico.compose.component.shape.shader.fromBrush
+import com.patrykandpatrick.vico.compose.component.shapeComponent
+import com.patrykandpatrick.vico.compose.style.ProvideChartStyle
+import com.patrykandpatrick.vico.core.chart.column.ColumnChart
+import com.patrykandpatrick.vico.core.component.shape.LineComponent
+import com.patrykandpatrick.vico.core.component.shape.Shapes
+import com.patrykandpatrick.vico.core.entry.entryModelOf
+import com.patrykandpatrick.vico.core.entry.FloatEntry
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -99,18 +114,17 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
             else BotaoAcao("Voltar ao painel", vm::voltarAoPainel)
         }
 
-        Spacer(Modifier.height(12.dp))
-
         // Abas de navegação
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             AbaHistorico.entries.forEach { abaPossivel ->
                 OpcaoAbas(
                     texto = abaPossivel.rotulo,
                     marcada = aba == abaPossivel,
-                    habilitada = abaPossivel != AbaHistorico.GRAFICOS,
+                    habilitada = true,
                     onClick = { aba = abaPossivel },
                 )
             }
@@ -134,56 +148,9 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
                 onEditarPreco = { editandoPreco = it },
                 onExcluir = { excluindo = it },
             )
-            AbaHistorico.GRAFICOS -> {
-                Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Gráficos", style = MaterialTheme.typography.headlineSmall, color = Cores.Texto)
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        "Em breve! 📊",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Cores.Destaque,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Estamos preparando gráficos mais bonitos para você visualizar seus dados.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Cores.TextoApoio,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
+            AbaHistorico.GRAFICOS -> TelaGraficos(estado)
         }
-            LazyColumn(
-                Modifier.width(320.dp).fillMaxHeight(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(estado.history.reversed(), key = { it.recordId }) { registro ->
-                    ItemHistorico(
-                        registro = registro,
-                        posicao = posicaoNaComparacao(modo, registro.recordId),
-                        selecionado = registro.recordId == emFoco?.recordId ||
-                            (modo as? ModoHistorico.Comparando)?.bId == registro.recordId,
-                        onClick = { vm.tocarNoRegistro(registro.recordId) },
-                    )
-                }
-            }
-
-            Column(Modifier.weight(1f).fillMaxHeight()) {
-                val comparacao = vm.comparar(modo, estado.history)
-                when {
-                    comparacao != null -> TabelaComparacao(comparacao.a, comparacao.b, comparacao.lines)
-                    comparando -> Vazio("Toque na segunda viagem, na lista ao lado.")
-                    emFoco != null -> DetalhesDaViagem(
-                        registro = emFoco,
-                        onComparar = { vm.compararComOutra(emFoco.recordId) },
-                        onRenomear = { renomeando = emFoco },
-                        onEditarPreco = { editandoPreco = emFoco },
-                        onExcluir = { excluindo = emFoco },
-                    )
-                    else -> Vazio("Escolha uma viagem na lista ao lado.")
-                }
-            }
-        }
+    }
     renomeando?.let { registro ->
         DialogoRenomear(
             registro = registro,
@@ -310,7 +277,7 @@ private fun ItemHistorico(
                     // Na comparação o número diz qual coluna a viagem ocupa;
                     // sem ele o percentual inverte de sinal sem explicação.
                     if (posicao >= 0) "${posicao + 1} · ${registro.label}" else registro.label,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
                     color = if (selecionado) Cores.Destaque else Cores.Texto,
                 )
                 Text(
@@ -322,13 +289,13 @@ private fun ItemHistorico(
                     color = Cores.TextoApoio,
                 )
             }
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(12.dp))
             val linha = "${TripFormat.km(registro.metrics.distanceKm)}  •  " +
                     "${TripFormat.kml(registro.metrics.avgFuelConsumptionKml)}  •  " +
                     TripFormat.litros(registro.metrics.fuelLitres)
             Text(
                 if (registro.custoBR != null) "$linha  •  ${TripFormat.reais(registro.custoBR)}" else linha,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
                 color = Cores.TextoApoio,
             )
         }
@@ -350,12 +317,12 @@ private fun DetalhesDaViagem(
     onExcluir: () -> Unit,
 ) {
     val m = registro.metrics
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+    Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
                     registro.label,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.headlineSmall.copy(fontSize = 26.sp),
                     color = Cores.Texto,
                 )
                 Text(
@@ -380,47 +347,92 @@ private fun DetalhesDaViagem(
 
         Spacer(Modifier.height(12.dp))
 
-        Cartao(Modifier.fillMaxWidth()) {
-            Column {
-                Row {
-                    Column(Modifier.weight(1f)) {
-                        Text("PERCURSO", style = EstiloRotulo)
-                        LinhaDetalhe("Distância", TripFormat.km(m.distanceKm), destaque = true)
-                        LinhaDetalhe("Velocidade média", TripFormat.kmh(m.avgSpeedKmh))
-                        LinhaDetalhe("Média andando", TripFormat.kmh(m.avgMovingSpeedKmh))
-                        LinhaDetalhe("Máxima", TripFormat.kmh(m.maxSpeedKmh))
-                    }
-                    Spacer(Modifier.width(24.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("TEMPO E CONSUMO", style = EstiloRotulo)
-                        LinhaDetalhe("Tempo total", TripFormat.duracao(m.totalTimeS), destaque = true)
-                        LinhaDetalhe("Em movimento", TripFormat.duracao(m.movingTimeS))
-                        LinhaDetalhe("Parado, motor ligado", TripFormat.duracao(m.idleTimeS))
-                        HorizontalDivider(color = Cores.Contorno)
-                        LinhaDetalhe("Consumo médio", TripFormat.kml(m.avgFuelConsumptionKml))
-                        LinhaDetalhe("Combustível", TripFormat.litros(m.fuelLitres))
+        Cartao(Modifier.fillMaxWidth().weight(1f)) {
+            Row {
+                // Coluna 1: Percurso + Hodômetro
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "PERCURSO",
+                        style = EstiloRotulo.copy(fontSize = 14.sp),
+                    )
+                    LinhaDetalheViagem("Distância", TripFormat.km(m.distanceKm), destaque = true)
+                    LinhaDetalheViagem("Velocidade média", TripFormat.kmh(m.avgSpeedKmh))
+                    LinhaDetalheViagem("Média andando", TripFormat.kmh(m.avgMovingSpeedKmh))
+                    LinhaDetalheViagem("Máxima", TripFormat.kmh(m.maxSpeedKmh))
+                    HorizontalDivider(color = Cores.Contorno, modifier = Modifier.padding(vertical = 8.dp))
+                    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                        Text(
+                            "Hodômetro",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 18.sp),
+                            color = Cores.TextoApoio,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "${TripFormat.decimal(registro.odometerStartKm)} → ${TripFormat.km(registro.odometerEndKm)}",
+                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 24.sp),
+                            color = Cores.Texto,
+                        )
                     }
                 }
-                HorizontalDivider(color = Cores.Contorno)
-                // Largura inteira: os dois hodômetros só valem lidos como um
-                // intervalo, e o par não cabe em meia tela sem quebrar no meio.
-                LinhaDetalhe(
-                    "Hodômetro do carro",
-                    "${TripFormat.decimal(registro.odometerStartKm)} → " +
-                        TripFormat.km(registro.odometerEndKm),
-                )
-                if (registro.custoBR != null) {
-                    HorizontalDivider(color = Cores.Contorno)
-                    Column {
-                        Text("CUSTO ESTIMADO", style = EstiloRotulo)
-                        LinhaDetalhe("Tipo", registro.tipoCombustivel?.rotulo ?: "—")
-                        LinhaDetalhe("Valor", TripFormat.reais(registro.precoDolitroCombustivel!!) + " / L", destaque = true)
-                        LinhaDetalhe("Custo da viagem", TripFormat.reais(registro.custoBR), destaque = true)
+
+                Spacer(Modifier.width(48.dp))
+
+                // Coluna 2: Tempo e Consumo
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "TEMPO E CONSUMO",
+                        style = EstiloRotulo.copy(fontSize = 14.sp),
+                    )
+                    LinhaDetalheViagem("Tempo total", TripFormat.duracao(m.totalTimeS), destaque = true)
+                    LinhaDetalheViagem("Em movimento", TripFormat.duracao(m.movingTimeS))
+                    LinhaDetalheViagem("Parado, motor ligado", TripFormat.duracao(m.idleTimeS))
+                    HorizontalDivider(color = Cores.Contorno, modifier = Modifier.padding(vertical = 8.dp))
+                    LinhaDetalheViagem("Consumo médio", TripFormat.kml(m.avgFuelConsumptionKml))
+                    LinhaDetalheViagem("Combustível", TripFormat.litros(m.fuelLitres))
+                }
+
+                Spacer(Modifier.width(48.dp))
+
+                // Coluna 3: Custo
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "CUSTO",
+                        style = EstiloRotulo.copy(fontSize = 14.sp),
+                    )
+                    if (registro.custoBR != null) {
+                        LinhaDetalheViagem("Tipo", registro.tipoCombustivel?.rotulo ?: "—")
+                        LinhaDetalheViagem("Valor", TripFormat.reais(registro.precoDolitroCombustivel!!) + " / L", destaque = true)
+                        LinhaDetalheViagem("Custo da viagem", TripFormat.reais(registro.custoBR), destaque = true)
+                    } else {
+                        Text(
+                            "Sem informações de custo",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 18.sp),
+                            color = Cores.TextoApoio,
+                        )
                     }
                 }
             }
         }
-        Spacer(Modifier.height(12.dp))
+    }
+}
+
+/** Linha de detalhe customizada para a tela de viagem com fontes maiores */
+@Composable
+private fun LinhaDetalheViagem(rotulo: String, valor: String, destaque: Boolean = false) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Text(
+            rotulo,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 18.sp),
+            color = Cores.TextoApoio,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            valor,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontSize = if (destaque) 28.sp else 24.sp
+            ),
+            color = if (destaque) Cores.Destaque else Cores.Texto,
+        )
     }
 }
 
@@ -574,21 +586,26 @@ private fun TelaViagensHistorico(
     onExcluir: (TripRecord) -> Unit,
 ) {
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        LazyColumn(
-            Modifier.width(320.dp).fillMaxHeight(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(estado.history.reversed(), key = { it.recordId }) { registro ->
-                ItemHistorico(
-                    registro = registro,
-                    posicao = posicaoNaComparacao(modo, registro.recordId),
-                    selecionado = registro.recordId == emFoco?.recordId ||
-                        (modo as? ModoHistorico.Comparando)?.bId == registro.recordId,
-                    onClick = { vm.tocarNoRegistro(registro.recordId) },
-                )
+        // Lado esquerdo: Lista
+        Column(Modifier.width(320.dp).fillMaxHeight()) {
+            // Lista de viagens
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(estado.history.reversed(), key = { it.recordId }) { registro ->
+                    ItemHistorico(
+                        registro = registro,
+                        posicao = posicaoNaComparacao(modo, registro.recordId),
+                        selecionado = registro.recordId == emFoco?.recordId ||
+                            (modo as? ModoHistorico.Comparando)?.bId == registro.recordId,
+                        onClick = { vm.tocarNoRegistro(registro.recordId) },
+                    )
+                }
             }
         }
 
+        // Lado direito: Detalhes (alinhado com o topo das abas)
         Column(Modifier.weight(1f).fillMaxHeight()) {
             val comparacao = vm.comparar(modo, estado.history)
             when {
@@ -666,14 +683,28 @@ private fun agruparPorDia(history: List<TripRecord>): List<DadosPeriodo> {
 private fun agruparPorSemana(history: List<TripRecord>): List<DadosPeriodo> {
     return history
         .groupBy { registro ->
-            val cal = Calendar.getInstance().apply { timeInMillis = registro.savedAtMs }
-            val semana = cal.get(Calendar.WEEK_OF_YEAR)
-            val ano = cal.get(Calendar.YEAR)
-            "S$semana/$ano"
+            val cal = Calendar.getInstance().apply {
+                timeInMillis = registro.savedAtMs
+                // Voltar para o domingo da semana
+                set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY)
+            }
+            // Usar o timestamp do domingo como chave de agrupamento
+            cal.timeInMillis
         }
-        .map { (semana, viagens) ->
+        .map { (domingoMs, viagens) ->
+            val inicio = Calendar.getInstance().apply { timeInMillis = domingoMs }
+            val fim = Calendar.getInstance().apply {
+                timeInMillis = domingoMs
+                add(Calendar.DAY_OF_YEAR, 6)
+            }
+            val label = "%02d/%02d a %02d/%02d".format(
+                inicio.get(Calendar.DAY_OF_MONTH),
+                inicio.get(Calendar.MONTH) + 1,
+                fim.get(Calendar.DAY_OF_MONTH),
+                fim.get(Calendar.MONTH) + 1,
+            )
             DadosPeriodo(
-                label = semana,
+                label = label,
                 distancia = viagens.sumOf { it.metrics.distanceKm },
                 consumo = if (viagens.isNotEmpty()) viagens.mapNotNull { it.metrics.avgFuelConsumptionKml }.average() else 0.0,
                 combustivel = viagens.sumOf { it.metrics.fuelLitres },
@@ -703,23 +734,33 @@ private fun agruparPorMes(history: List<TripRecord>): List<DadosPeriodo> {
 private fun TelaGraficos(estado: TripState) {
     var periodo by remember { mutableStateOf(PeriodoGrafico.DIA) }
 
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+    if (estado.history.isEmpty()) {
+        Vazio("Nenhuma viagem arquivada ainda.\nFeche uma viagem no painel para ela aparecer aqui.")
+        return
+    }
+
+    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Lado esquerdo: Seletores de período (320dp - igual à lista de viagens)
+        Column(
+            Modifier.width(320.dp).fillMaxHeight(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             PeriodoGrafico.entries.forEach { p ->
-                OpcaoAbas(
-                    texto = p.rotulo,
-                    marcada = periodo == p,
-                    onClick = { periodo = p },
-                )
+                Cartao(
+                    Modifier.fillMaxWidth().clickable { periodo = p },
+                    selecionado = periodo == p,
+                ) {
+                    Text(
+                        p.rotulo,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (periodo == p) Cores.Destaque else Cores.Texto,
+                    )
+                }
             }
         }
 
-        Spacer(Modifier.height(16.dp))
-
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        // Lado direito: Gráficos (50/50 da altura)
+        Column(Modifier.weight(1f).fillMaxHeight()) {
             val dados = when (periodo) {
                 PeriodoGrafico.DIA -> agruparPorDia(estado.history)
                 PeriodoGrafico.SEMANA -> agruparPorSemana(estado.history)
@@ -727,79 +768,117 @@ private fun TelaGraficos(estado: TripState) {
             }
 
             if (dados.isEmpty()) {
-                Text("Nenhuma viagem neste período", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoApoio)
+                Vazio("Nenhuma viagem neste período")
             } else {
-                // Gráfico de Distância
-                Text("Distância (km)", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
-                Spacer(Modifier.height(8.dp))
-                GraficoDistancia(dados)
-                Spacer(Modifier.height(24.dp))
+                // Gráfico de Distância - 50% da altura
+                Cartao(Modifier.fillMaxWidth().weight(1f)) {
+                    Column(Modifier.fillMaxSize()) {
+                        Text(
+                            "Distância (km)",
+                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 20.sp),
+                            color = Cores.Texto,
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        GraficoDistancia(dados)
+                    }
+                }
 
-                // Gráfico de Consumo
-                Text("Consumo Médio (km/L)", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
-                Spacer(Modifier.height(8.dp))
-                GraficoConsumo(dados)
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(16.dp))
 
-                // Gráfico de Combustível
-                Text("Combustível (L)", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
-                Spacer(Modifier.height(8.dp))
-                GraficoCombustivel(dados)
+                // Gráfico de Consumo - 50% da altura
+                Cartao(Modifier.fillMaxWidth().weight(1f)) {
+                    Column(Modifier.fillMaxSize()) {
+                        Text(
+                            "Consumo Médio (km/L)",
+                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 20.sp),
+                            color = Cores.Texto,
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        GraficoConsumo(dados)
+                    }
+                }
             }
-
-            Spacer(Modifier.height(16.dp))
-            Text(
-                "Total de viagens: ${estado.history.size}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Cores.TextoApoio,
-            )
         }
     }
 }
 
 @Composable
 private fun GraficoDistancia(dados: List<DadosPeriodo>) {
-    val maxDistancia = (dados.maxOfOrNull { it.distancia } ?: 1.0).toFloat()
-    Canvas(Modifier.fillMaxWidth().height(250.dp)) {
-        val barWidth = size.width / (dados.size * 1.5f)
-        val spacing = barWidth * 0.5f
-        val totalBarWidth = barWidth + spacing
-        val maxHeight = size.height * 0.8f
+    if (dados.isEmpty()) return
 
-        dados.forEachIndexed { index, d ->
-            val x = (index * totalBarWidth + spacing).toFloat()
-            val barHeight = ((d.distancia / maxDistancia) * maxHeight).toFloat()
-            val y = (size.height - barHeight - 20f).toFloat()
+    val entries = dados.mapIndexed { index, d ->
+        FloatEntry(index.toFloat(), d.distancia.toFloat())
+    }
+    val chartEntryModel = entryModelOf(entries)
+    val labels = dados.map { it.label }
 
-            drawRect(
-                color = Cores.Destaque,
-                topLeft = androidx.compose.ui.geometry.Offset(x, y),
-                size = androidx.compose.ui.geometry.Size(barWidth, barHeight),
-            )
-        }
+    ProvideChartStyle {
+        Chart(
+            chart = columnChart(
+                columns = listOf(
+                    LineComponent(
+                        color = Cores.Destaque.toArgb(),
+                        thicknessDp = 16f,
+                        shape = Shapes.roundedCornerShape(
+                            topLeftPercent = 8,
+                            topRightPercent = 8,
+                        ),
+                    ),
+                ),
+            ),
+            model = chartEntryModel,
+            startAxis = rememberStartAxis(
+                guideline = null,
+                titleComponent = null,
+            ),
+            bottomAxis = rememberBottomAxis(
+                guideline = null,
+                valueFormatter = { value, _ ->
+                    labels.getOrNull(value.toInt()) ?: ""
+                },
+            ),
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 }
 
 @Composable
 private fun GraficoConsumo(dados: List<DadosPeriodo>) {
-    val maxConsumo = (dados.maxOfOrNull { it.consumo } ?: 1.0).toFloat()
-    Canvas(Modifier.fillMaxWidth().height(250.dp)) {
-        val barWidth = size.width / (dados.size * 1.5f)
-        val spacing = barWidth * 0.5f
-        val totalBarWidth = barWidth + spacing
-        val maxHeight = size.height * 0.8f
+    if (dados.isEmpty()) return
 
-        dados.forEachIndexed { index, d ->
-            val x = (index * totalBarWidth + spacing).toFloat()
-            val barHeight = ((d.consumo / maxConsumo) * maxHeight).toFloat()
-            val y = (size.height - barHeight - 20f).toFloat()
+    val entries = dados.mapIndexed { index, d ->
+        FloatEntry(index.toFloat(), d.consumo.toFloat())
+    }
+    val chartEntryModel = entryModelOf(entries)
+    val labels = dados.map { it.label }
 
-            drawRect(
-                color = Cores.Destaque,
-                topLeft = androidx.compose.ui.geometry.Offset(x, y),
-                size = androidx.compose.ui.geometry.Size(barWidth, barHeight),
-            )
-        }
+    ProvideChartStyle {
+        Chart(
+            chart = columnChart(
+                columns = listOf(
+                    LineComponent(
+                        color = Cores.Destaque.toArgb(),
+                        thicknessDp = 16f,
+                        shape = Shapes.roundedCornerShape(
+                            topLeftPercent = 8,
+                            topRightPercent = 8,
+                        ),
+                    ),
+                ),
+            ),
+            model = chartEntryModel,
+            startAxis = rememberStartAxis(
+                guideline = null,
+                titleComponent = null,
+            ),
+            bottomAxis = rememberBottomAxis(
+                guideline = null,
+                valueFormatter = { value, _ ->
+                    labels.getOrNull(value.toInt()) ?: ""
+                },
+            ),
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 }
 

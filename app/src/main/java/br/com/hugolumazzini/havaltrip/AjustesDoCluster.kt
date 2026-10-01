@@ -506,8 +506,15 @@ data class AjustesDoCluster(
      * cortado. Com um ajuste só, acertar o carro desacertava os números —
      * era o que acontecia no painel.
      */
-    val empurraoDoCarroNaBola: Empurrao = Empurrao(),
+    val empurraoDoCarroNaBola: Empurrao = Empurrao(0, 27),
     val zoomDoCarroNaBola: Zoom = Zoom(),
+    /**
+     * Offset das pressões dos pneus dentro da bola do carro.
+     *
+     * Ajuste fino para posicionar exatamente onde os números de pressão e
+     * temperatura aparecem em relação ao desenho do carro na bola.
+     */
+    val offsetPressoesNaBola: Empurrao = Empurrao(-47, 23),
     val afastamentoNaBola: Zoom = Zoom(),
     val formatoDoCarro: FormatoDoCarro = FormatoDoCarro.REDONDO,
     val afastamentoDoCarroSolto: Int = 100,
@@ -567,6 +574,14 @@ data class AjustesDoCluster(
      * e lá o rótulo escrito não custa o tamanho do número.
      */
     val rotuloDoMenu: RotuloDoCluster = RotuloDoCluster.TEXTO,
+    /**
+     * Se mostra o contorno azul da bola (aspecto original do painel).
+     *
+     * Verdadeiro por padrão: é o que o painel desenha. Mas em alguns ajustes o
+     * contorno atrapalha — fundo transparente deixando o ar aparecer por baixo,
+     * ou a bola sobre outra coisa do painel que já tem moldura própria.
+     */
+    val mostrarAnelAzul: Boolean = true,
     /**
      * O que o resumo de despedida mostra, e nesta ordem.
      *
@@ -645,6 +660,8 @@ object Cluster {
     private const val EMPURRAO_CARRO_BOLA_X = "empurraoDoCarroNaBolaX"
     private const val EMPURRAO_CARRO_BOLA_Y = "empurraoDoCarroNaBolaY"
     private const val ZOOM_CARRO_BOLA = "zoomDoCarroNaBola"
+    private const val OFFSET_PRESSOES_BOLA_X = "offsetPressoesNaBolaX"
+    private const val OFFSET_PRESSOES_BOLA_Y = "offsetPressoesNaBolaY"
     private const val ITENS_MENU = "itensDoMenu"
     private const val FUNDO_MENU = "fundoDoMenu"
     private const val ROTULO_MENU = "rotuloDoMenu"
@@ -659,6 +676,7 @@ object Cluster {
     private const val HABILITAR_CARRO = "habilitarCarroNoPainel"
     private const val HABILITAR_PAGINA = "habilitarPaginaComVisoes"
     private const val ITENS_DESPEDIDA = "itensDaDespedida"
+    private const val MOSTRAR_ANEL_AZUL = "mostrarAnelAzul"
 
     /**
      * O que se grava no lugar de "nenhuma tela".
@@ -823,6 +841,10 @@ object Cluster {
             // de uma separação que ele não pediu.
             zoomDoCarroNaBola = Zoom(0)
                 .mais(prefs.getInt(ZOOM_CARRO_BOLA, prefs.getInt(ZOOM_MENU, Zoom.PADRAO))),
+            offsetPressoesNaBola = Empurrao().mais(
+                prefs.getInt(OFFSET_PRESSOES_BOLA_X, -47),
+                prefs.getInt(OFFSET_PRESSOES_BOLA_Y, 23),
+            ),
             fundoDoMenu = prefs.getString(FUNDO_MENU, null)
                 ?.let { nome -> FundoDoCluster.entries.find { it.name == nome } }
                 ?: padrao.fundoDoMenu,
@@ -863,6 +885,7 @@ object Cluster {
                 ?.split(",")
                 ?.mapNotNull { nome -> ItemDoCluster.entries.find { it.name == nome } }
                 ?: padrao.itensDaDespedida,
+            mostrarAnelAzul = prefs.getBoolean(MOSTRAR_ANEL_AZUL, padrao.mostrarAnelAzul),
         )
     }
 
@@ -898,6 +921,8 @@ object Cluster {
             .putInt(EMPURRAO_CARRO_BOLA_X, novo.empurraoDoCarroNaBola.x)
             .putInt(EMPURRAO_CARRO_BOLA_Y, novo.empurraoDoCarroNaBola.y)
             .putInt(ZOOM_CARRO_BOLA, novo.zoomDoCarroNaBola.porcento)
+            .putInt(OFFSET_PRESSOES_BOLA_X, novo.offsetPressoesNaBola.x)
+            .putInt(OFFSET_PRESSOES_BOLA_Y, novo.offsetPressoesNaBola.y)
             .putString(ITENS_MENU, novo.itensDoMenu.joinToString(",") { it.name })
             .putString(FUNDO_MENU, novo.fundoDoMenu.name)
             .putString(ROTULO_MENU, novo.rotuloDoMenu.name)
@@ -912,6 +937,7 @@ object Cluster {
             .putString(ITENS_DESPEDIDA, novo.itensDaDespedida.joinToString(",") { it.name })
             .putInt(AFASTAMENTO_CARRO_MENU, novo.afastamentoDoCarroNoMenu)
             .putString(TAMANHO_CARRO_MENU, novo.tamanhoDoCarroNoMenu.name)
+            .putBoolean(MOSTRAR_ANEL_AZUL, novo.mostrarAnelAzul)
             .apply()
     }
 
@@ -1050,6 +1076,10 @@ object Cluster {
 
     fun alternarHabilitarPaginaComVisoes() = gravar(
         _ajustes.value.copy(habilitarPaginaComVisoes = !_ajustes.value.habilitarPaginaComVisoes),
+    )
+
+    fun alternarMostrarAnelAzul() = gravar(
+        _ajustes.value.copy(mostrarAnelAzul = !_ajustes.value.mostrarAnelAzul),
     )
 
     /** Troca o jeito de identificar cada dado na bola. Ver [RotuloDoCluster]. */

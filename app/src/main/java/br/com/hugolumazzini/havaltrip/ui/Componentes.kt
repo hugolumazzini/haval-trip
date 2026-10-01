@@ -114,7 +114,7 @@ fun LinhaDetalhe(rotulo: String, valor: String, destaque: Boolean = false) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 7.dp),
+            .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         // Quando falta largura, quem cede é o rótulo: "59 km/" numa linha e
@@ -129,7 +129,9 @@ fun LinhaDetalhe(rotulo: String, valor: String, destaque: Boolean = false) {
         Text(
             valor,
             color = if (destaque) Cores.Destaque else Cores.Texto,
-            style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+            style = androidx.compose.material3.MaterialTheme.typography.titleMedium.copy(
+                fontSize = if (destaque) 22.sp else 20.sp
+            ),
             softWrap = false,
         )
     }

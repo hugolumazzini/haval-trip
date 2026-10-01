@@ -1,5 +1,6 @@
 package br.com.hugolumazzini.havaltrip.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -26,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -224,6 +226,22 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
                 ),
             contentAlignment = Alignment.Center,
         ) {
+            // O anel azul que o painel desenha, se o motorista não o desabilitou.
+            if (ajustes.mostrarAnelAzul) {
+                Canvas(
+                    Modifier
+                        .fillMaxSize()
+                        .align(Alignment.Center),
+                ) {
+                    val traco = size.minDimension * GROSSURA_DO_ANEL
+                    drawCircle(
+                        color = AZUL_DO_PAINEL,
+                        radius = (size.minDimension - traco) / 2f,
+                        style = Stroke(width = traco),
+                    )
+                }
+            }
+
             // Em pé ou deitado conforme o que vai dentro. Ver [LARGURA_UTIL].
             val deitado = visao is Visao.Carro ||
                 ajustes.ItensDoMenuSeguros.size > MUITOS_ITENS
@@ -404,6 +422,8 @@ private fun Conteudo(
                         },
                         legenda = false,
                         aproximacao = ajustes.afastamentoDoCarroNaBola / 100f,
+                        offsetX = if (apertado) ajustes.offsetPressoesNaBola.x else 0,
+                        offsetY = if (apertado) ajustes.offsetPressoesNaBola.y else 0,
                     )
 
                     is Visao.DeTrip -> Painel(
@@ -456,7 +476,7 @@ private fun Conteudo(
  * é essa sobra que eles ocupam, sem encostar na curva, onde o texto sairia
  * cortado nas pontas.
  */
-private const val MARGEM_DA_BOLA = 0.07f
+private const val MARGEM_DA_BOLA = 0.080f
 
 /**
  * Tamanho do título na bola, em fração do diâmetro.
@@ -466,7 +486,7 @@ private const val MARGEM_DA_BOLA = 0.07f
  * número sai de casar com o que o [TITULO_NA_ALTURA] dava antes de o zoom do
  * conteúdo existir.
  */
-private const val TITULO_NA_BOLA = 0.034f
+private const val TITULO_NA_BOLA = 0.063f
 
 /**
  * De quantos dados em diante a bola passa a mostrar duas colunas.
@@ -562,10 +582,10 @@ private val FAIXA_DAS_BOLINHAS = 20.dp
  * troca de página: a coluna inteira dançava, e o olho ia atrás do movimento em
  * vez de ir ao número. Quem marca a página agora é só a opacidade.
  */
-private val TAMANHO_DA_BOLINHA = 4.dp
+private val TAMANHO_DA_BOLINHA = 12.dp
 
 /** Espaço entre uma bolinha e a seguinte. */
-private val ENTRE_BOLINHAS = 5.dp
+private val ENTRE_BOLINHAS = 10.dp
 
 /** Quantas visões existem e em qual estamos, do jeito que o painel do carro mostra. */
 @Composable

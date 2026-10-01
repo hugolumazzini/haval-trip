@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,6 +37,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -104,6 +107,8 @@ fun Diagrama(
     modifier: Modifier = Modifier,
     legenda: Boolean = true,
     aproximacao: Float = APROXIMACAO,
+    offsetX: Int = 0,
+    offsetY: Int = 0,
 ) {
     val pneus = painel.pneus.associateBy { it.roda }
 
@@ -131,7 +136,10 @@ fun Diagrama(
                 // porque as portas abertas avançam para fora do contorno do carro e
                 // passariam por baixo do número se ele avançasse mais.
                 Column(
-                    Modifier.fillMaxHeight(0.80f).fillMaxWidth(aproximacao),
+                    Modifier
+                        .fillMaxHeight(0.80f)
+                        .fillMaxWidth(aproximacao)
+                        .offset(x = offsetX.dp, y = offsetY.dp),
                     verticalArrangement = Arrangement.SpaceBetween,
                 ) {
                     LinhaDePneus(painel, pneus, Roda.DIANTEIRA_ESQ, Roda.DIANTEIRA_DIR, corpo)
@@ -162,7 +170,7 @@ fun Diagrama(
  * impedem os dois extremos — número maior que o carro numa janela minúscula, e
  * número gigante numa tela cheia.
  */
-private const val PRESSAO_NA_ALTURA = 0.11f
+private const val PRESSAO_NA_ALTURA = 0.06f
 
 @Composable
 private fun LinhaDePneus(
@@ -400,8 +408,14 @@ private val VERMELHO_DA_LANTERNA = Color(0xFFFF3B2F)
  * Nada disto acende quando a propriedade não chegou. Ver [PainelDoVeiculo.Luzes].
  */
 @Composable
-private fun Luzes(luzes: PainelDoVeiculo.Luzes, modifier: Modifier = Modifier) {
-    if (!luzes.algumaLeitura) return
+private fun Luzes(
+    luzes: PainelDoVeiculo.Luzes,
+    painel: PainelDoVeiculo,
+    modifier: Modifier = Modifier,
+) {
+    val desenhaLuzes = luzes.algumaLeitura
+
+    if (!desenhaLuzes && painel.combustivelBaixo != true) return
 
     // Uma piscada só para os quatro cantos: com relógios separados, o
     // pisca-alerta acenderia as setas em contratempo, e no carro elas acendem
@@ -430,8 +444,9 @@ private fun Luzes(luzes: PainelDoVeiculo.Luzes, modifier: Modifier = Modifier) {
         val escala = size.height / 720f
         val largura = 794f * escala
         val x0 = (size.width - largura) / 2f
+        val altura = size.height
 
-        val comprimento = LUZ_COMPRIMENTO * size.height
+        val comprimento = LUZ_COMPRIMENTO * altura
         val espessura = LUZ_ESPESSURA * largura
 
         /**
@@ -491,40 +506,63 @@ private fun Luzes(luzes: PainelDoVeiculo.Luzes, modifier: Modifier = Modifier) {
             drawCircle(color = cor, radius = raio, center = centro, alpha = forca)
         }
 
-        // O farol. O alto desenha a mesma peça maior, que é a única diferença
-        // entre os dois que dá para mostrar numa vista de cima.
-        if (luzes.baixo == true || luzes.alto == true) {
-            val tamanho = if (luzes.alto == true) 1.45f else 1.1f
-            FAROL.forEach { acender(it, AZUL_DO_FAROL, forca = 1f, tamanho = tamanho) }
+        if (desenhaLuzes) {
+            // O farol. O alto desenha a mesma peça maior, que é a única diferença
+            // entre os dois que dá para mostrar numa vista de cima.
+            if (luzes.baixo == true || luzes.alto == true) {
+                val tamanho = if (luzes.alto == true) 1.45f else 1.1f
+                FAROL.forEach { acender(it, AZUL_DO_FAROL, forca = 1f, tamanho = tamanho) }
+            }
+
+            if (luzes.neblinaDianteira == true) {
+                NEBLINA.forEach { acender(it, AMARELO_DO_NEBLINA, forca = 1f) }
+            }
+
+            // A lanterna traseira acompanha o farol, porque é assim no carro: não há
+            // como andar de farol aceso e lanterna apagada. Ela não tem propriedade
+            // própria — o que existe é a luz de posição, e é dela que o vermelho de
+            // trás sai quando só o "meia-luz" está ligado. Ver `Luzes.tras`.
+            //
+            if (luzes.tras) {
+                LANTERNA.forEach { acender(it, VERMELHO_DA_LANTERNA, forca = 0.9f) }
+            }
+
+            // O neblina de trás, no meio do para-choque: uma lâmpada só, redonda.
+            if (luzes.neblinaTraseira == true) {
+                acenderPonto(NEBLINA_TRASEIRA, VERMELHO_DA_LANTERNA, forca = 1f)
+            }
+
+            // E as setas por último, piscando: no carro elas dividem o bloco óptico
+            // com o farol, e é por cima dele que aparecem.
+            if (luzes.esquerdaAcesa) {
+                acender(SETA_DIANTEIRA[0], AMARELO_DA_SETA, acesa)
+                acender(SETA_TRASEIRA[0], AMARELO_DA_SETA, acesa)
+            }
+            if (luzes.direitaAcesa) {
+                acender(SETA_DIANTEIRA[1], AMARELO_DA_SETA, acesa)
+                acender(SETA_TRASEIRA[1], AMARELO_DA_SETA, acesa)
+            }
         }
 
-        if (luzes.neblinaDianteira == true) {
-            NEBLINA.forEach { acender(it, AMARELO_DO_NEBLINA, forca = 1f) }
-        }
+        // Indicador de combustível baixo: luz amarela igual à do painel.
+        if (painel.combustivelBaixo == true) {
+            val x = x0 + largura * 0.073f
+            val y = altura * 0.472f
+            val tamanho = largura * 0.12f
 
-        // A lanterna traseira acompanha o farol, porque é assim no carro: não há
-        // como andar de farol aceso e lanterna apagada. Ela não tem propriedade
-        // própria — o que existe é a luz de posição, e é dela que o vermelho de
-        // trás sai quando só o "meia-luz" está ligado. Ver `Luzes.tras`.
-        //
-        if (luzes.tras) {
-            LANTERNA.forEach { acender(it, VERMELHO_DA_LANTERNA, forca = 0.9f) }
-        }
+            // Círculo grande amarelo bem visível
+            drawCircle(
+                color = Cores.Atencao,
+                radius = tamanho / 2f,
+                center = Offset(x + tamanho / 2f, y + tamanho / 2f),
+            )
 
-        // O neblina de trás, no meio do para-choque: uma lâmpada só, redonda.
-        if (luzes.neblinaTraseira == true) {
-            acenderPonto(NEBLINA_TRASEIRA, VERMELHO_DA_LANTERNA, forca = 1f)
-        }
-
-        // E as setas por último, piscando: no carro elas dividem o bloco óptico
-        // com o farol, e é por cima dele que aparecem.
-        if (luzes.esquerdaAcesa) {
-            acender(SETA_DIANTEIRA[0], AMARELO_DA_SETA, acesa)
-            acender(SETA_TRASEIRA[0], AMARELO_DA_SETA, acesa)
-        }
-        if (luzes.direitaAcesa) {
-            acender(SETA_DIANTEIRA[1], AMARELO_DA_SETA, acesa)
-            acender(SETA_TRASEIRA[1], AMARELO_DA_SETA, acesa)
+            // Círculo interno preto para contraste
+            drawCircle(
+                color = Color.Black,
+                radius = tamanho / 4f,
+                center = Offset(x + tamanho / 2f, y + tamanho / 2f),
+            )
         }
     }
 }
@@ -534,7 +572,7 @@ private fun Luzes(luzes: PainelDoVeiculo.Luzes, modifier: Modifier = Modifier) {
  * o limite é a porta aberta, que sai da silhueta e não pode ficar por baixo do
  * texto.
  */
-private const val APROXIMACAO = 0.84f
+private const val APROXIMACAO = 1.53f
 
 /** A proporção do quadro em que todas as camadas foram desenhadas: 794 × 720. */
 private const val QUADRO = 794f / 720f
@@ -688,7 +726,7 @@ internal fun CarroEmCamadas(
             // As luzes por último: o feixe do farol sai para fora da lataria e a
             // seta encosta na borda, então qualquer camada desenhada depois
             // passaria por cima justamente da parte que interessa.
-            Luzes(painel.luzes, Modifier.fillMaxSize())
+            Luzes(painel.luzes, painel, Modifier.fillMaxSize())
         }
     }
 }
@@ -717,6 +755,12 @@ private fun Avisos(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
             painel.tudoCerto -> Linha("Tudo certo", Cores.Confirmacao)
 
             else -> {
+                // Combustível baixo: aviso prioritário que aparece antes dos
+                // outros. O ícone já está no desenho do carro, mas a linha aqui
+                // reforça e dá nome ao aviso amarelo.
+                if (painel.combustivelBaixo == true) {
+                    Linha("Combustível baixo", Cores.Atencao)
+                }
                 // O pneu: o número já está em âmbar logo acima, mas
                 // sozinho ele só diz que está baixo comparado a quê. A linha
                 // nomeia a roda, que é o que decide de que lado do carro

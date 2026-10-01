@@ -22,6 +22,8 @@ data class PainelDoVeiculo(
     val pneus: List<Pneu> = emptyList(),
     val unidadeDePressao: Unidade = Unidade.BAR,
     val luzes: Luzes = Luzes(),
+    /** O aviso de reserva de combustível — a mesma luz amarela do painel. */
+    val combustivelBaixo: Boolean? = null,
 ) {
     /** O que está aberto agora. Vazio é o estado normal do carro andando. */
     val abertas: List<Abertura> get() = acionados(aberturas)
@@ -71,7 +73,8 @@ data class PainelDoVeiculo(
      * gente desprotegida; um vidro aberto, na pior das hipóteses, é chuva.
      */
     val avisos: List<String>
-        get() = semCinto.map { it.rotulo } +
+        get() = (if (combustivelBaixo == true) listOf("Combustível baixo") else emptyList()) +
+            semCinto.map { it.rotulo } +
             pneusMurchos.map { "Pneu ${it.nome}" } +
             abertas.map { it.rotulo } +
             vidrosAbertos.map { it.rotulo } +
@@ -282,6 +285,7 @@ data class PainelDoVeiculo(
             lampadaEsquerda: String? = null,
             lampadaDireita: String? = null,
             pisca: String? = null,
+            combustivelBaixo: String? = null,
         ): PainelDoVeiculo {
             return PainelDoVeiculo(
                 aberturas = combinar(Abertura.entries, portas),
@@ -303,6 +307,7 @@ data class PainelDoVeiculo(
                     lampadaDireita = ligado(lampadaDireita),
                     pisca = ligado(pisca),
                 ),
+                combustivelBaixo = ligado(combustivelBaixo),
             )
         }
 

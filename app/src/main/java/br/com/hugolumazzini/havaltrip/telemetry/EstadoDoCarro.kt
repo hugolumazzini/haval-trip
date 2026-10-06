@@ -99,6 +99,16 @@ class EstadoDoCarro(private val diario: DiarioDeCampo) {
     fun publicarFita() = diario.publicarFita()
 
     /**
+     * Detecta se o veículo é PHEV (plug-in hybrid) ou HEV (híbrido puro).
+     *
+     * PHEV tem conector de carga (charging_gun_conn_state existe).
+     * HEV só regenera, não carrega na tomada → não paga energia elétrica.
+     *
+     * Retorna `true` se for PHEV, `false` se for HEV ou ICE puro.
+     */
+    fun isPHEV(): Boolean = cache.containsKey("car.ev_info.charging_gun_conn_state")
+
+    /**
      * O estado físico do carro — portas, cintos, pneus — para a lateral da tela.
      *
      * Fica fora de [montarAmostra] porque não é amostra: nada disso entra no
@@ -128,6 +138,8 @@ class EstadoDoCarro(private val diario: DiarioDeCampo) {
             ?: cache[HavalTelemetrySource.CHAVE_SETA_DIR_INDICADOR],
         pisca = cache[HavalTelemetrySource.CHAVE_PISCA_ALERTA],
         combustivelBaixo = cache[HavalTelemetrySource.CHAVE_COMBUSTIVEL_BAIXO],
+        combustivelPercent = numero(HavalTelemetrySource.CHAVE_TANQUE_PERCENTUAL)?.div(100.0),
+        bateriaVoltagem = numero(HavalTelemetrySource.CHAVE_TENSAO_BATERIA),
     )
 
     fun montarAmostra(): TelemetrySample {
@@ -142,8 +154,27 @@ class EstadoDoCarro(private val diario: DiarioDeCampo) {
             fuelLevelL = Unidades.litrosNoTanque(percentual),
             ignition = ignicao(velocidade),
             autonomyKmFromCar = autonomiaDoCarro(),
+            batteryVoltageV = numero(HavalTelemetrySource.CHAVE_TENSAO_BATERIA),
+            batteryCurrentA = numero(HavalTelemetrySource.CHAVE_CORRENTE_BATERIA),
+            iceActive = motorCombustaoAtivo(),
         )
     }
+
+    /**
+     * Se o motor a combustão está ativo agora, ou `null` se não for híbrido.
+     *
+     * O Impulse usa a chave `haval.power.ice` para identificar quando o motor
+     * a combustão está tocando o carro, permitindo separar km elétricos de km
+     * a combustão.
+     */
+    private fun motorCombustaoAtivo(): Boolean? =
+        cache[HavalTelemetrySource.CHAVE_MOTOR_COMBUSTAO]?.let { valor ->
+            when (valor.trim()) {
+                "1", "true" -> true
+                "0", "false" -> false
+                else -> null
+            }
+        }
 
     /**
      * A autonomia que o próprio carro calcula, em km, ou `null` se ele não diz.

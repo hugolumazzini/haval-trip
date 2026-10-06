@@ -55,6 +55,12 @@ enum class TipoCombustivel(val rotulo: String) {
  * @param autonomyKmFromCar a autonomia que o próprio carro calcula, em km, ou
  *   `null` quando ele não publica nenhuma. Ver [Trip] e o motor de cálculo:
  *   quando ela existe, é ela que vai para a tela.
+ * @param batteryVoltageV tensão da bateria de tração, em volts. Usado para
+ *   calcular kWh. `null` se não disponível (carro não-híbrido ou valor não publicado).
+ * @param batteryCurrentA corrente da bateria de tração, em amperes. Positivo =
+ *   consumo; negativo = frenagem regenerativa. `null` se não disponível.
+ * @param iceActive `true` se o motor a combustão está tocando o carro agora;
+ *   `false` se está no elétrico puro; `null` se não detectável (carro não-híbrido).
  */
 @Serializable
 data class TelemetrySample(
@@ -65,6 +71,9 @@ data class TelemetrySample(
     val fuelLevelL: Double,
     val ignition: IgnitionState,
     val autonomyKmFromCar: Double? = null,
+    val batteryVoltageV: Double? = null,
+    val batteryCurrentA: Double? = null,
+    val iceActive: Boolean? = null,
 )
 
 /**
@@ -84,7 +93,14 @@ data class TripMetrics(
     val fuelLitres: Double = 0.0,
     /** Maior velocidade vista na Trip, em km/h. */
     val maxSpeedKmh: Double = 0.0,
-    /** kWh consumidos na Trip (para PHEV/híbridos), integral de tensão × corrente. `null` se não coletado. */
+    /** kWh consumidos na Trip (para PHEV/híbridos), integral de tensão × corrente quando positiva. `null` se não coletado. */
+    val kwhOut: Double? = null,
+    /** kWh recuperados na Trip (frenagem regenerativa), integral de tensão × corrente quando negativa. `null` se não coletado. */
+    val kwhIn: Double? = null,
+    /** km rodados em modo elétrico puro (motor a combustão desligado). `null` se não detectável. */
+    val evKm: Double? = null,
+    /** Legado: kWh consumidos. Use [kwhOut] e [kwhIn]. */
+    @Deprecated("Use kwhOut e kwhIn", ReplaceWith("kwhOut"))
     val kwhIntegrado: Double? = null,
 ) {
     /** Tempo total da Trip com o carro ligado, em segundos. */
@@ -134,12 +150,32 @@ data class TripMetrics(
     val idleRatio: Double? get() =
         if (totalTimeS > EPSILON) idleTimeS / totalTimeS else null
 
-    /** Consumo médio de energia, em kWh/km. `null` sem coleta de energia ou distância insuficiente. */
-    val avgEnergyConsumptionKwhPerKm: Double? get() = when {
-        kwhIntegrado == null -> null
-        distanceKm < MIN_KM_PARA_MEDIA -> null
-        kwhIntegrado <= EPSILON -> null
-        else -> kwhIntegrado / distanceKm
+    /** Total de kWh (consumido menos recuperado). Negativo significa mais recuperação que consumo. */
+    val kwhNet: Double? get() = when {
+        kwhOut == null || kwhIn == null -> null
+        else -> kwhOut - kwhIn
+    }
+
+    /**
+     * Eficiência energética, em km/kWh. Similar a km/L de combustível.
+     *
+     * Usa energia **líquida** (consumida - recuperada), então regeneração
+     * melhora a eficiência. `null` sem coleta de energia ou distância insuficiente.
+     */
+    val avgEnergyEfficiencyKmPerKwh: Double? get() {
+        val net = kwhNet ?: return null
+        return when {
+            distanceKm < MIN_KM_PARA_MEDIA -> null
+            net <= EPSILON -> null // Sem consumo líquido
+            else -> distanceKm / net
+        }
+    }
+
+    /** Percentual da distância rodada em modo elétrico puro (0.0 a 1.0). `null` sem coleta. */
+    val evRatio: Double? get() = when {
+        evKm == null -> null
+        distanceKm < EPSILON -> null
+        else -> (evKm / distanceKm).coerceIn(0.0, 1.0)
     }
 
     companion object {
@@ -238,10 +274,29 @@ data class TripRecord(
     val precoDolitroCombustivel: Double? = null,
     /** Tipo de combustível desta viagem. `null` = não informado. */
     val tipoCombustivel: TipoCombustivel? = null,
+    /** Preço do kWh de energia elétrica desta viagem, em reais. `null` = sem preço. */
+    val precoKwh: Double? = null,
 ) {
-    /** Custo estimado da viagem, em reais. `null` se sem preço configurado. */
-    val custoBR: Double? get() =
+    /** Custo do combustível da viagem, em reais. `null` se sem preço configurado. */
+    val custoCombustivelBR: Double? get() =
         precoDolitroCombustivel?.takeIf { it > 0 }?.let { metrics.fuelLitres * it }
+
+    /** Custo da energia elétrica da viagem, em reais. `null` se sem preço configurado ou sem dados de energia. */
+    val custoEnergiaBR: Double? get() =
+        precoKwh?.takeIf { it > 0 }?.let { preco ->
+            metrics.kwhOut?.let { kwh -> kwh * preco }
+        }
+
+    /** Custo total da viagem (combustível + energia), em reais. `null` se sem nenhum custo. */
+    val custoTotalBR: Double? get() {
+        val combustivel = custoCombustivelBR ?: 0.0
+        val energia = custoEnergiaBR ?: 0.0
+        return if (combustivel > 0 || energia > 0) combustivel + energia else null
+    }
+
+    /** Custo estimado da viagem, em reais. `null` se sem preço configurado. @deprecated Use custoTotalBR */
+    @Deprecated("Use custoTotalBR, custoCombustivelBR ou custoEnergiaBR", ReplaceWith("custoTotalBR"))
+    val custoBR: Double? get() = custoTotalBR
 }
 
 /**

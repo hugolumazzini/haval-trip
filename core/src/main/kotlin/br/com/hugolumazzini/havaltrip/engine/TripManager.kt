@@ -202,9 +202,19 @@ class TripManager(
      * motorista espera ao apertar "zerar" na estrada. Uma Trip pausada continua
      * pausada, só que em zero.
      */
-    fun resetTrip(tripId: String, kwhIntegrado: Double? = null) = alterar(tripId) { trip ->
+    fun resetTrip(
+        tripId: String,
+        kwhIntegrado: Double? = null,  // legado: vira kwhOut se fornecido
+        kwhOut: Double? = null,
+        kwhIn: Double? = null,
+        evKm: Double? = null,
+    ) = alterar(tripId) { trip ->
         trip.copy(
-            metrics = trip.metrics.copy(kwhIntegrado = kwhIntegrado),
+            metrics = trip.metrics.copy(
+                kwhOut = kwhOut ?: kwhIntegrado,
+                kwhIn = kwhIn,
+                evKm = evKm,
+            ),
             startedAtMs = clock(),
             endedAtMs = null,
             odometerStartKm = odometroConhecido(),
@@ -283,12 +293,18 @@ class TripManager(
         return true
     }
 
-    fun updateRecordPrice(recordId: String, precoDolitro: Double, tipoCombustivel: TipoCombustivel? = null): Boolean {
+    fun updateRecordPrice(
+        recordId: String,
+        precoDolitro: Double,
+        tipoCombustivel: TipoCombustivel? = null,
+        precoKwh: Double? = null
+    ): Boolean {
         val indice = history.indexOfFirst { it.recordId == recordId }
         if (indice < 0) return false
         history[indice] = history[indice].copy(
             precoDolitroCombustivel = if (precoDolitro > 0) precoDolitro else null,
             tipoCombustivel = tipoCombustivel,
+            precoKwh = precoKwh?.takeIf { it > 0 },
         )
         salvarAgora(clock())
         publicar()

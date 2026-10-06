@@ -154,12 +154,39 @@ class TripEngine(val config: EngineConfig = EngineConfig()) {
         // ligado no semáforo gasta combustível e isso tem que aparecer na média.
         val deltaLitros = max(sample.fuelRateLph, 0.0) * (deltaS / 3600.0)
 
+        // Energia elétrica: tensão × corrente × tempo, em kWh.
+        // Como o Impulse: corrente positiva é consumo, negativa é regeneração.
+        val deltaHoras = deltaS / 3600.0
+        val kw = if (sample.batteryVoltageV != null && sample.batteryCurrentA != null)
+            sample.batteryVoltageV * sample.batteryCurrentA / 1000.0
+        else null
+        val deltaKwhOut = when {
+            kw == null -> null
+            kw >= 0 -> (metrics.kwhOut ?: 0.0) + kw * deltaHoras
+            else -> metrics.kwhOut
+        }
+        val deltaKwhIn = when {
+            kw == null -> null
+            kw < 0 -> (metrics.kwhIn ?: 0.0) - kw * deltaHoras  // negada para ficar positiva
+            else -> metrics.kwhIn
+        }
+
+        // km elétricos: conta quando em movimento E motor a combustão desligado.
+        val deltaEvKm = when {
+            !emMovimento -> metrics.evKm
+            sample.iceActive == false -> (metrics.evKm ?: 0.0) + deltaKm
+            else -> metrics.evKm
+        }
+
         return metrics.copy(
             distanceKm = metrics.distanceKm + deltaKm,
             movingTimeS = if (emMovimento) metrics.movingTimeS + deltaS else metrics.movingTimeS,
             idleTimeS = if (emMovimento) metrics.idleTimeS else metrics.idleTimeS + deltaS,
             fuelLitres = metrics.fuelLitres + deltaLitros,
             maxSpeedKmh = max(metrics.maxSpeedKmh, sample.speedKmh),
+            kwhOut = deltaKwhOut,
+            kwhIn = deltaKwhIn,
+            evKm = deltaEvKm,
         )
     }
 

@@ -40,6 +40,8 @@ object TripFormat {
 
     fun kwh(valor: Double?) = valor?.let { "${decimal(it, 2)} kWh" } ?: AUSENTE
 
+    fun kmPorKwh(valor: Double?) = valor?.let { "${decimal(it, 1)} km/kWh" } ?: AUSENTE
+
     fun kwhPerKm(valor: Double?) = valor?.let { "${decimal(it, 3)} kWh/km" } ?: AUSENTE
 
     fun reais(valor: Double?) = valor?.let { "R$ ${decimal(it, 2)}" } ?: AUSENTE

@@ -121,6 +121,7 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
     val diario get() = motor.diario
     val shisukuInstalado get() = motor.shisukuInstalado
     val painelDoVeiculo: StateFlow<PainelDoVeiculo> get() = motor.painelDoVeiculo
+    val isPHEV: StateFlow<Boolean> get() = motor.isPHEV
     val situacaoShizuku: StateFlow<ShizukuTelemetrySource.Situacao> get() = motor.situacaoShizuku
     val fonte: StateFlow<Fonte> get() = motor.fonte
     val fonteReal: StateFlow<Boolean> get() = motor.fonteReal
@@ -473,8 +474,13 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
         _modoHistorico.value = ModoHistorico.Vendo()
     }
 
-    fun atualizarPrecoRegistro(recordId: String, precoDolitro: Double, tipoCombustivel: TipoCombustivel? = null) {
-        motor.atualizarPrecoRegistro(recordId, precoDolitro, tipoCombustivel)
+    fun atualizarPrecoRegistro(
+        recordId: String,
+        precoDolitro: Double,
+        tipoCombustivel: TipoCombustivel? = null,
+        precoKwh: Double? = null
+    ) {
+        motor.atualizarPrecoRegistro(recordId, precoDolitro, tipoCombustivel, precoKwh)
     }
 
     /**

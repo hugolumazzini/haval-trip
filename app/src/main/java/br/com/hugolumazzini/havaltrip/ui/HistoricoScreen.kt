@@ -93,6 +93,7 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
     val comparando = modo is ModoHistorico.Comparando
     val emFoco = vm.registroEmFoco(modo, estado.history)
     val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
+    val isPHEV by vm.isPHEV.collectAsStateWithLifecycle()
 
     /** `null` = nenhum diálogo aberto. Estado da tela, não do módulo. */
     var renomeando by remember { mutableStateOf<TripRecord?>(null) }
@@ -144,6 +145,7 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
                 modo = modo,
                 emFoco = emFoco,
                 comparando = comparando,
+                isPHEV = isPHEV,
                 onRenomear = { renomeando = it },
                 onEditarPreco = { editandoPreco = it },
                 onExcluir = { excluindo = it },
@@ -186,7 +188,9 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
 
     editandoPreco?.let { registro ->
         var digitos by remember(registro.recordId) { mutableStateOf(registro.precoDolitroCombustivel?.let { "%d".format((it * 1000).toLong()) } ?: "") }
+        var digitosKwh by remember(registro.recordId) { mutableStateOf(registro.precoKwh?.let { "%d".format((it * 100).toLong()) } ?: "") }
         var tipoCombustivel by remember(registro.recordId) { mutableStateOf(registro.tipoCombustivel ?: TipoCombustivel.GASOLINA_COMUM) }
+
         val digitsOnly = digitos.filter { it.isDigit() }
         val precoFormatado = when {
             digitsOnly.isEmpty() -> ""
@@ -196,10 +200,21 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
         val preco = digitsOnly.toLongOrNull()?.toDouble()?.div(1000) ?: 0.0
         val custoExato = preco * registro.metrics.fuelLitres
         val custoArredondado = kotlin.math.ceil(custoExato * 100) / 100
+
+        val digitsOnlyKwh = digitosKwh.filter { it.isDigit() }
+        val precoKwhFormatado = when {
+            digitsOnlyKwh.isEmpty() -> ""
+            digitsOnlyKwh.length <= 2 -> digitsOnlyKwh
+            else -> digitsOnlyKwh.dropLast(2) + "," + digitsOnlyKwh.takeLast(2)
+        }
+        val precoKwh = digitsOnlyKwh.toLongOrNull()?.toDouble()?.div(100) ?: 0.0
+        val custoEnergiaExato = registro.metrics.kwhOut?.let { precoKwh * it } ?: 0.0
+        val custoEnergiaArredondado = kotlin.math.ceil(custoEnergiaExato * 100) / 100
+
         AlertDialog(
             onDismissRequest = { editandoPreco = null },
             containerColor = Cores.Superficie,
-            title = { Text("Preço do combustível", color = Cores.Texto) },
+            title = { Text("Preços da viagem", color = Cores.Texto) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Tipo:", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
@@ -235,14 +250,47 @@ fun HistoricoScreen(vm: TripViewModel, estado: TripState) {
                     Text("Valor com 3 casas decimais", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
                     if (preco > 0) {
                         Spacer(Modifier.height(8.dp))
-                        Text("Estimativa: ${TripFormat.reais(custoArredondado)}", style = MaterialTheme.typography.bodySmall, color = Cores.Destaque)
+                        Text("Estimativa combustível: ${TripFormat.reais(custoArredondado)}", style = MaterialTheme.typography.bodySmall, color = Cores.Destaque)
+                    }
+
+                    // Energia elétrica (só mostra se há dados de energia E for PHEV)
+                    // HEV só regenera, não carrega na tomada → não paga energia
+                    if (isPHEV && (registro.metrics.kwhOut != null || registro.metrics.kwhIn != null)) {
+                        Spacer(Modifier.height(16.dp))
+                        HorizontalDivider(color = Cores.Contorno)
+                        Spacer(Modifier.height(12.dp))
+                        Text("Energia elétrica:", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("R$ ", style = MaterialTheme.typography.bodyMedium)
+                            OutlinedTextField(
+                                value = precoKwhFormatado,
+                                onValueChange = { novoValor ->
+                                    digitosKwh = novoValor.filter { it.isDigit() }.take(5)
+                                },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            )
+                            Text("/ kWh", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Text("Valor com 2 casas decimais", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+                        if (precoKwh > 0 && custoEnergiaArredondado > 0) {
+                            Spacer(Modifier.height(8.dp))
+                            Text("Estimativa energia: ${TripFormat.reais(custoEnergiaArredondado)}", style = MaterialTheme.typography.bodySmall, color = Cores.Confirmacao)
+                        }
+                        if (preco > 0 && precoKwh > 0) {
+                            Spacer(Modifier.height(4.dp))
+                            val custoTotalArredondado = kotlin.math.ceil((custoArredondado + custoEnergiaArredondado) * 100) / 100
+                            Text("Total: ${TripFormat.reais(custoTotalArredondado)}", style = MaterialTheme.typography.bodyMedium, color = Cores.Destaque)
+                        }
                     }
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        vm.atualizarPrecoRegistro(registro.recordId, preco, tipoCombustivel); editandoPreco = null
+                        vm.atualizarPrecoRegistro(registro.recordId, preco, tipoCombustivel, if (precoKwh > 0) precoKwh else null)
+                        editandoPreco = null
                     },
                 ) { Text("Salvar", color = Cores.Destaque) }
             },
@@ -311,6 +359,7 @@ private fun ItemHistorico(
 @Composable
 private fun DetalhesDaViagem(
     registro: TripRecord,
+    isPHEV: Boolean,
     onComparar: () -> Unit,
     onRenomear: () -> Unit,
     onEditarPreco: () -> Unit,
@@ -340,7 +389,7 @@ private fun DetalhesDaViagem(
         // mexem, e no rodapé elas caíam abaixo da dobra numa tela de 600 px.
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             BotaoAcao("Renomear", onRenomear)
-            BotaoAcao("Preço combustível", onEditarPreco)
+            BotaoAcao("Preços", onEditarPreco)
             BotaoAcao("Comparar com outra", onComparar)
             BotaoAcao("Excluir", onExcluir, corTexto = Cores.Erro)
         }
@@ -356,8 +405,28 @@ private fun DetalhesDaViagem(
                         style = EstiloRotulo.copy(fontSize = 14.sp),
                     )
                     LinhaDetalheViagem("Distância", TripFormat.km(m.distanceKm), destaque = true)
+                    // Tempo: total em uma linha, mov./parado embaixo
+                    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                        Text(
+                            "Tempo total",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 18.sp),
+                            color = Cores.TextoApoio,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            TripFormat.duracao(m.totalTimeS),
+                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 24.sp),
+                            color = Cores.Texto,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "${TripFormat.duracao(m.movingTimeS)} em movimento • ${TripFormat.duracao(m.idleTimeS)} parado",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            color = Cores.TextoApoio,
+                        )
+                    }
+                    HorizontalDivider(color = Cores.Contorno, modifier = Modifier.padding(vertical = 8.dp))
                     LinhaDetalheViagem("Velocidade média", TripFormat.kmh(m.avgSpeedKmh))
-                    LinhaDetalheViagem("Média andando", TripFormat.kmh(m.avgMovingSpeedKmh))
                     LinhaDetalheViagem("Máxima", TripFormat.kmh(m.maxSpeedKmh))
                     HorizontalDivider(color = Cores.Contorno, modifier = Modifier.padding(vertical = 8.dp))
                     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
@@ -377,18 +446,40 @@ private fun DetalhesDaViagem(
 
                 Spacer(Modifier.width(48.dp))
 
-                // Coluna 2: Tempo e Consumo
+                // Coluna 2: Consumo
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "TEMPO E CONSUMO",
+                        "CONSUMO",
                         style = EstiloRotulo.copy(fontSize = 14.sp),
                     )
-                    LinhaDetalheViagem("Tempo total", TripFormat.duracao(m.totalTimeS), destaque = true)
-                    LinhaDetalheViagem("Em movimento", TripFormat.duracao(m.movingTimeS))
-                    LinhaDetalheViagem("Parado, motor ligado", TripFormat.duracao(m.idleTimeS))
-                    HorizontalDivider(color = Cores.Contorno, modifier = Modifier.padding(vertical = 8.dp))
                     LinhaDetalheViagem("Consumo médio", TripFormat.kml(m.avgFuelConsumptionKml))
                     LinhaDetalheViagem("Combustível", TripFormat.litros(m.fuelLitres))
+
+                    // Informações de energia (híbrido/elétrico)
+                    if (m.kwhOut != null || m.kwhIn != null || m.evKm != null) {
+                        HorizontalDivider(color = Cores.Contorno, modifier = Modifier.padding(vertical = 8.dp))
+                        // Energia: consumo médio em destaque, detalhes embaixo
+                        Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                            Text(
+                                "Consumo elétrico",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 18.sp),
+                                color = Cores.TextoApoio,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                TripFormat.kmPorKwh(m.avgEnergyEfficiencyKmPerKwh),
+                                style = MaterialTheme.typography.titleMedium.copy(fontSize = 24.sp),
+                                color = Cores.Texto,
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "${TripFormat.kwh(m.kwhOut)} consumida • ${TripFormat.kwh(m.kwhIn)} regenerada",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                                color = Cores.TextoApoio,
+                            )
+                        }
+                        LinhaDetalheViagem("% em elétrico", m.evRatio?.let { "${TripFormat.decimal(it * 100, 0)}%" } ?: "—")
+                    }
                 }
 
                 Spacer(Modifier.width(48.dp))
@@ -399,10 +490,47 @@ private fun DetalhesDaViagem(
                         "CUSTO",
                         style = EstiloRotulo.copy(fontSize = 14.sp),
                     )
-                    if (registro.custoBR != null) {
-                        LinhaDetalheViagem("Tipo", registro.tipoCombustivel?.rotulo ?: "—")
-                        LinhaDetalheViagem("Valor", TripFormat.reais(registro.precoDolitroCombustivel!!) + " / L", destaque = true)
-                        LinhaDetalheViagem("Custo da viagem", TripFormat.reais(registro.custoBR), destaque = true)
+                    val temCusto = registro.custoTotalBR != null
+
+                    if (temCusto) {
+                        // Custo de combustível
+                        if (registro.custoCombustivelBR != null) {
+                            LinhaDetalheViagem("Combustível", registro.tipoCombustivel?.rotulo ?: "—")
+                            LinhaDetalheViagem(
+                                "Preço",
+                                TripFormat.reais(registro.precoDolitroCombustivel!!) + " / L"
+                            )
+                            LinhaDetalheViagem(
+                                "Custo combustível",
+                                TripFormat.reais(registro.custoCombustivelBR)
+                            )
+                        }
+
+                        // Custo de energia (só PHEV paga energia)
+                        if (isPHEV && registro.custoEnergiaBR != null) {
+                            if (registro.custoCombustivelBR != null) {
+                                HorizontalDivider(color = Cores.Contorno, modifier = Modifier.padding(vertical = 8.dp))
+                            }
+                            LinhaDetalheViagem(
+                                "Preço energia",
+                                TripFormat.reais(registro.precoKwh!!) + " / kWh"
+                            )
+                            LinhaDetalheViagem(
+                                "Custo energia",
+                                TripFormat.reais(registro.custoEnergiaBR)
+                            )
+                        }
+
+                        // Custo total
+                        if ((registro.custoCombustivelBR != null && registro.custoEnergiaBR != null) ||
+                            registro.custoTotalBR != null) {
+                            HorizontalDivider(color = Cores.Contorno, modifier = Modifier.padding(vertical = 8.dp))
+                            LinhaDetalheViagem(
+                                "Custo total",
+                                TripFormat.reais(registro.custoTotalBR!!),
+                                destaque = true
+                            )
+                        }
                     } else {
                         Text(
                             "Sem informações de custo",
@@ -581,6 +709,7 @@ private fun TelaViagensHistorico(
     modo: ModoHistorico,
     emFoco: TripRecord?,
     comparando: Boolean,
+    isPHEV: Boolean,
     onRenomear: (TripRecord) -> Unit,
     onEditarPreco: (TripRecord) -> Unit,
     onExcluir: (TripRecord) -> Unit,
@@ -613,6 +742,7 @@ private fun TelaViagensHistorico(
                 comparando -> Vazio("Toque na segunda viagem, na lista ao lado.")
                 emFoco != null -> DetalhesDaViagem(
                     registro = emFoco,
+                    isPHEV = isPHEV,
                     onComparar = { vm.compararComOutra(emFoco.recordId) },
                     onRenomear = { onRenomear(emFoco) },
                     onEditarPreco = { onEditarPreco(emFoco) },

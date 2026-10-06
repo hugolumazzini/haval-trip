@@ -108,6 +108,21 @@ class HavalTelemetrySource(
         /** Qual motor está tocando o carro neste instante. */
         const val CHAVE_TREM_DE_FORCA = "car.ev_info.hcu_power_train_state"
 
+        /** Tensão da bateria de tração, em volts. Para calcular kWh com a corrente. */
+        const val CHAVE_TENSAO_BATERIA = "car.ev_info.power_battery_voltage"
+
+        /** Corrente da bateria, em amperes. Positivo = consumo; negativo = regeneração. */
+        const val CHAVE_CORRENTE_BATERIA = "car.ev_info.cur_charge_current"
+
+        /**
+         * Motor a combustão (Internal Combustion Engine) ativo neste momento.
+         *
+         * Indica se o motor a combustão está tocando o carro (true) ou se está
+         * rodando no elétrico puro (false). Usado para separar km elétricos de
+         * km a combustão, como o Impulse faz.
+         */
+        const val CHAVE_MOTOR_COMBUSTAO = "haval.power.ice"
+
         /**
          * O estado físico do carro: o que está aberto, solto ou sem ar.
          *
@@ -228,6 +243,9 @@ class HavalTelemetrySource(
             CHAVE_BATERIA,
             CHAVE_FLUXO_DE_ENERGIA,
             CHAVE_TREM_DE_FORCA,
+            CHAVE_TENSAO_BATERIA,
+            CHAVE_CORRENTE_BATERIA,
+            CHAVE_MOTOR_COMBUSTAO,
             "car.ev_info.fuel_consume_info",
             "car.ev_info.cycle_fuel_consume_info",
             CHAVE_PORTAS,

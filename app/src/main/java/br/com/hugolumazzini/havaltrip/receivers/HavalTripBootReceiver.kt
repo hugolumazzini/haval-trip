@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.SystemClock
-import android.provider.Settings
 import android.util.Log
 import br.com.hugolumazzini.havaltrip.ServicoDeBordo
 
@@ -18,8 +17,8 @@ class HavalTripBootReceiver : BroadcastReceiver() {
         private const val ACTION_RETRY_START = "br.com.hugolumazzini.havaltrip.action.RETRY_START"
         private const val EXTRA_ATTEMPT = "attempt"
 
-        // Backoff progressivo: 30s, 60s, 120s
-        private val RETRY_BACKOFF_MS = longArrayOf(30000, 60000, 120000)
+        // Backoff progressivo: 3s, 10s, 30s
+        private val RETRY_BACKOFF_MS = longArrayOf(3000, 10000, 30000)
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -63,13 +62,6 @@ class HavalTripBootReceiver : BroadcastReceiver() {
         attempt: Int,
         startTime: Long
     ) {
-        // Verifica permissão de overlay (necessária para alguns recursos)
-        if (!Settings.canDrawOverlays(context)) {
-            Log.e(TAG, "Overlay permission not available yet (attempt=$attempt)")
-            scheduleRetry(context, attempt)
-            return
-        }
-
         try {
             // Inicia o ServicoDeBordo (ForegroundService)
             ServicoDeBordo.garantir(context)

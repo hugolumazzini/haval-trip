@@ -93,6 +93,12 @@ class MotorDeBordo private constructor(private val app: Application) {
         .distinctUntilChanged()
         .stateIn(escopo, SharingStarted.Eagerly, PainelDoVeiculo())
 
+    /** `true` se o veículo é PHEV (plug-in hybrid), `false` se for HEV puro ou ICE. */
+    val isPHEV: StateFlow<Boolean> = diario.atual
+        .map { estadoDoCarro.isPHEV() }
+        .distinctUntilChanged()
+        .stateIn(escopo, SharingStarted.Eagerly, false)
+
     val situacaoShizuku: StateFlow<ShizukuTelemetrySource.Situacao> = linhaDireta.situacao
 
     /**
@@ -200,7 +206,12 @@ class MotorDeBordo private constructor(private val app: Application) {
     fun gravarAgora() = manager.flush()
     fun renomearRegistro(recordId: String, label: String) = manager.renameRecord(recordId, label)
     fun excluirRegistro(recordId: String) = manager.deleteRecord(recordId)
-    fun atualizarPrecoRegistro(recordId: String, precoDolitro: Double, tipoCombustivel: TipoCombustivel? = null) = manager.updateRecordPrice(recordId, precoDolitro, tipoCombustivel)
+    fun atualizarPrecoRegistro(
+        recordId: String,
+        precoDolitro: Double,
+        tipoCombustivel: TipoCombustivel? = null,
+        precoKwh: Double? = null
+    ) = manager.updateRecordPrice(recordId, precoDolitro, tipoCombustivel, precoKwh)
     fun definirContadoresManuais(quantos: Int) = manager.definirContadoresManuais(quantos)
     fun definirZeragemAutomatica(segundos: Double?) = manager.definirZeragemAutomatica(segundos)
 

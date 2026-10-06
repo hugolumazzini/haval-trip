@@ -54,6 +54,11 @@ class SimulatedTelemetrySource(
     private var alvoKmh = 0.0
     private var segundosNoTrecho = 0
 
+    // Simulação de bateria híbrida
+    private var tensaoBateria = 330.0
+    private var correnteBateria = 0.0
+    private var motorCombustaoLigado = false
+
     override fun samples(): Flow<TelemetrySample> = flow {
         while (true) {
             delay(intervaloMs)
@@ -67,6 +72,9 @@ class SimulatedTelemetrySource(
                     odometerTotalKm = odometroKm,
                     fuelLevelL = tanqueL,
                     ignition = ignicao,
+                    batteryVoltageV = tensaoBateria,
+                    batteryCurrentA = correnteBateria,
+                    iceActive = motorCombustaoLigado,
                 )
             )
         }
@@ -80,6 +88,18 @@ class SimulatedTelemetrySource(
      * que o aviso acende e apaga; num carro de verdade, quem manda é o sensor.
      */
     private fun publicarEstadoDoVeiculo() {
+        // Calcula valores de bateria sempre, mesmo sem EstadoDoCarro
+        tensaoBateria = 330.0
+        correnteBateria = when {
+            velocidadeKmh < 0.5 -> 0.0
+            aceleracaoKmhPorS < -3.0 -> -45.0
+            aceleracaoKmhPorS < -1.0 -> -25.0
+            aceleracaoKmhPorS > 2.0 -> 60.0
+            velocidadeKmh > 60 -> 25.0
+            else -> 15.0
+        }
+        motorCombustaoLigado = velocidadeKmh > 60 || aceleracaoKmhPorS > 2.0
+
         val alvo = estado ?: return
         val motoristaAberta = if (velocidadeKmh < 0.5 && segundosNoTrecho % 20 < 8) 1 else 0
         alvo.registrar(HavalTelemetrySource.CHAVE_PORTAS, "{$motoristaAberta,0,0,0,0,0}")
@@ -109,6 +129,15 @@ class SimulatedTelemetrySource(
         alvo.registrar(HavalTelemetrySource.CHAVE_SETA_ESQ_LAMPADA, if (fase == 1) "1" else "0")
         alvo.registrar(HavalTelemetrySource.CHAVE_SETA_DIR_LAMPADA, if (fase == 2) "1" else "0")
         alvo.registrar(HavalTelemetrySource.CHAVE_PISCA_ALERTA, "0")
+
+        // Publica valores de bateria já calculados no início da função
+        alvo.registrar(HavalTelemetrySource.CHAVE_TENSAO_BATERIA, tensaoBateria.toString())
+        alvo.registrar(HavalTelemetrySource.CHAVE_CORRENTE_BATERIA, correnteBateria.toString())
+        alvo.registrar(HavalTelemetrySource.CHAVE_MOTOR_COMBUSTAO, if (motorCombustaoLigado) "1" else "0")
+
+        // Percentual do tanque (simulando entre 20% e 100%)
+        val percentualTanque = ((tanqueL / 60.0) * 100.0).coerceIn(0.0, 100.0)
+        alvo.registrar(HavalTelemetrySource.CHAVE_TANQUE_PERCENTUAL, percentualTanque.toString())
     }
 
     private fun avancar(deltaS: Double) {

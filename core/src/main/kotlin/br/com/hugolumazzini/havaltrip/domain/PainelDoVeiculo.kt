@@ -24,6 +24,10 @@ data class PainelDoVeiculo(
     val luzes: Luzes = Luzes(),
     /** O aviso de reserva de combustível — a mesma luz amarela do painel. */
     val combustivelBaixo: Boolean? = null,
+    /** Nível de combustível em percentual (0.0 a 1.0). */
+    val combustivelPercent: Double? = null,
+    /** Nível de bateria em percentual (0.0 a 1.0). */
+    val bateriaPercent: Double? = null,
 ) {
     /** O que está aberto agora. Vazio é o estado normal do carro andando. */
     val abertas: List<Abertura> get() = acionados(aberturas)
@@ -286,6 +290,8 @@ data class PainelDoVeiculo(
             lampadaDireita: String? = null,
             pisca: String? = null,
             combustivelBaixo: String? = null,
+            combustivelPercent: Double? = null,
+            bateriaVoltagem: Double? = null,
         ): PainelDoVeiculo {
             return PainelDoVeiculo(
                 aberturas = combinar(Abertura.entries, portas),
@@ -308,7 +314,22 @@ data class PainelDoVeiculo(
                     pisca = ligado(pisca),
                 ),
                 combustivelBaixo = ligado(combustivelBaixo),
+                combustivelPercent = combustivelPercent,
+                bateriaPercent = bateriaVoltagem?.let { calcularPercentualBateria(it) },
             )
+        }
+
+        /**
+         * Calcula percentual da bateria baseado na voltagem.
+         *
+         * Baterias híbridas do H6 operam tipicamente entre 300V (baixo) e 360V (alto),
+         * mas o sistema mantém entre ~20% e ~80% para preservar a vida útil.
+         * Esta função mapeia a faixa de trabalho para 0-100%.
+         */
+        private fun calcularPercentualBateria(voltagem: Double): Double {
+            val voltMinima = 300.0  // ~20% SOC real
+            val voltMaxima = 360.0  // ~80% SOC real
+            return ((voltagem - voltMinima) / (voltMaxima - voltMinima)).coerceIn(0.0, 1.0)
         }
 
         private fun <T> acionados(lista: List<Estado<T>>) =

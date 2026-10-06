@@ -101,10 +101,10 @@ private val PARADAS = listOf(0, 1, 2, 5, 10, 15, 20, 30, 45, 60, 90, 120, 150, 1
 
 /** O rótulo de cada parada, na linguagem de quem está lendo o painel. */
 fun rotuloDoTempo(minutos: Int): String = when {
-    minutos == 0 -> "na hora de desligar"
-    minutos < 60 -> "$minutos min"
-    minutos % 60 == 0 -> "${minutos / 60} h"
-    else -> "${minutos / 60} h ${minutos % 60} min"
+    minutos == 0 -> "na hora"
+    minutos < 60 -> "${minutos}min"
+    minutos % 60 == 0 -> "${minutos / 60}h"
+    else -> "${minutos / 60}h ${minutos % 60}min"
 }
 
 /** A parada mais próxima do que está gravado — o que a barra mostra ao abrir. */
@@ -400,7 +400,7 @@ private fun ZeragemAutomatica(vm: TripViewModel, estado: TripState) {
                 rotuloDoTempo(minutos),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Cores.Destaque,
-                modifier = Modifier.widthIn(min = 60.dp),
+                modifier = Modifier.widthIn(min = 85.dp),
             )
         }
         Row(Modifier.widthIn(max = 700.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -587,6 +587,10 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
                         modifier = Modifier.scale(0.75f),
                     )
                 }
+
+                Spacer(Modifier.height(18.dp))
+
+                // TODO: Implementar preços padrão em próxima sessão
 
                 Spacer(Modifier.height(18.dp))
 
@@ -1052,6 +1056,29 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
         FundoDoCluster.entries.forEach { fundo ->
             Opcao(fundo.rotulo, ajustes.fundoDoMenu == fundo) { Cluster.usarFundoDoMenu(fundo) }
         }
+    }
+
+    Spacer(Modifier.height(14.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Borda", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Contorno azul da bola (aspecto original do painel). Desative com fundo transparente para deixar o desenho do painel aparecer.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Cores.TextoApoio,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Switch(
+            checked = ajustes.mostrarAnelAzul,
+            onCheckedChange = { Cluster.alternarMostrarAnelAzul() },
+            modifier = Modifier.scale(0.75f),
+        )
     }
 
     // Lista própria, e não a da aba "Números": são duas janelas com espaços

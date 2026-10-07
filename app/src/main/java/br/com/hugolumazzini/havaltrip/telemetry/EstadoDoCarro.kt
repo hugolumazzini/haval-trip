@@ -167,14 +167,39 @@ class EstadoDoCarro(private val diario: DiarioDeCampo) {
      * a combustão está tocando o carro, permitindo separar km elétricos de km
      * a combustão.
      */
-    private fun motorCombustaoAtivo(): Boolean? =
+    private fun motorCombustaoAtivo(): Boolean? {
+        // Tenta primeiro haval.power.ice (mais direto)
         cache[HavalTelemetrySource.CHAVE_MOTOR_COMBUSTAO]?.let { valor ->
-            when (valor.trim()) {
+            return when (valor.trim()) {
                 "1", "true" -> true
                 "0", "false" -> false
                 else -> null
             }
         }
+
+        // Fallback 1: energy_drive_state ("EV" = elétrico, "HEV"/"Engine" = motor ligado)
+        cache[HavalTelemetrySource.CHAVE_MODO_DRIVE]?.let { modo ->
+            return when (modo.trim().uppercase()) {
+                "EV" -> false  // Modo elétrico puro
+                "HEV", "ENGINE" -> true  // Motor a combustão ativo
+                else -> null
+            }
+        }
+
+        // Fallback 2: hcu_power_train_state (estado do trem de força)
+        cache[HavalTelemetrySource.CHAVE_TREM_DE_FORCA]?.let { trem ->
+            // Valores típicos: "1" = elétrico, "2" = híbrido/motor
+            return when (trem.trim()) {
+                "0", "1" -> false  // Elétrico
+                "2", "3" -> true   // Motor ligado
+                else -> null
+            }
+        }
+
+        // Se nenhuma propriedade disponível, assume que pode usar modo elétrico (otimista)
+        // Isso garante que evKm inicialize como 0.0 e o % apareça
+        return false
+    }
 
     /**
      * A autonomia que o próprio carro calcula, em km, ou `null` se ele não diz.

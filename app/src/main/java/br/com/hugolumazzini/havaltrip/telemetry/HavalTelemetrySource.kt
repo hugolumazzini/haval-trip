@@ -128,6 +128,12 @@ class HavalTelemetrySource(
         const val CHAVE_MOTOR_COMBUSTAO = "haval.power.ice"
 
         /**
+         * Modo de energia atual: "EV" (elétrico), "HEV" (híbrido), "Engine" (combustão).
+         * Propriedade alternativa para detectar modo elétrico.
+         */
+        const val CHAVE_MODO_DRIVE = "car.ev_info.energy_drive_state"
+
+        /**
          * O estado físico do carro: o que está aberto, solto ou sem ar.
          *
          * Não entra em cálculo nenhum — é o que a lateral da tela mostra. Cada
@@ -250,6 +256,7 @@ class HavalTelemetrySource(
             CHAVE_TENSAO_BATERIA,
             CHAVE_CORRENTE_BATERIA,
             CHAVE_MOTOR_COMBUSTAO,
+            CHAVE_MODO_DRIVE,
             "car.ev_info.fuel_consume_info",
             "car.ev_info.cycle_fuel_consume_info",
             CHAVE_PORTAS,

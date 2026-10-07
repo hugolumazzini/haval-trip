@@ -150,12 +150,15 @@ fun DiagnosticoScreen(vm: TripViewModel) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 BotaoAcao("Pedir tudo ao carro", vm::pedirTudoAoCarro)
                 if (vm.shisukuInstalado) BotaoAcao("Abrir HavalShisuku", vm::abrirShisuku)
-                BotaoAcao(
-                    texto = "Fonte: ${fonte.rotulo}",
-                    onClick = vm::proximaFonte,
-                    cor = if (fonteReal) Cores.Campo else Cores.SuperficieSelecionada,
-                    corTexto = if (fonteReal) Cores.Texto else Cores.Atencao,
-                )
+                // Botão de alternar fonte: só no emulador/debug, não no carro real
+                if (BuildConfig.DEBUG) {
+                    BotaoAcao(
+                        texto = "Fonte: ${fonte.rotulo}",
+                        onClick = vm::proximaFonte,
+                        cor = if (fonteReal) Cores.Campo else Cores.SuperficieSelecionada,
+                        corTexto = if (fonteReal) Cores.Texto else Cores.Atencao,
+                    )
+                }
                 BotaoAcao(
                     texto = when (envio) {
                         is Envio.Enviando -> "Enviando…"

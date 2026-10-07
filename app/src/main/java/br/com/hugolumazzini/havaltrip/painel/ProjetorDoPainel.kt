@@ -200,6 +200,11 @@ object ProjetorDoPainel {
             )
 
         ShizukuShell.rodar("am stack resize $pilha 0 0 ${tela.largura} ${tela.altura}")
+
+        // Além da Activity, usa WindowManager overlay para garantir z-order superior
+        // (técnica descoberta no haval-app-tool-multimidia)
+        ClusterOverlayService.projetar(context, janela, telaId)
+
         return marcar(janela, Resultado.Projetada(telaId))
     }
 
@@ -207,6 +212,9 @@ object ProjetorDoPainel {
     fun recolher(janela: JanelaDoPainel) {
         _pedidosDeFechar.tryEmit(janela)
         marcar(janela, Resultado.Nunca)
+        // Remove overlay também
+        // Nota: não temos Context aqui, então o ClusterOverlayService
+        // será parado quando a Activity receber pedidosDeFechar
     }
 
     /**

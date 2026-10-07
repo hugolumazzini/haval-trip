@@ -59,4 +59,16 @@ class ClusterMenuActivity : ComponentActivity() {
         TecladoDoVolante.simular(tecla)
         return true
     }
+
+    override fun onDestroy() {
+        // Para ClusterOverlayService quando Activity é destruída
+        val espiando = intent.getBooleanExtra(ESPIANDO, false)
+        if (!espiando) {
+            br.com.hugolumazzini.havaltrip.painel.ClusterOverlayService.recolher(
+                this,
+                JanelaDoPainel.MENU
+            )
+        }
+        super.onDestroy()
+    }
 }

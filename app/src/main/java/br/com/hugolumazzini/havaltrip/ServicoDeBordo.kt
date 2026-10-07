@@ -38,21 +38,35 @@ class ServicoDeBordo : Service() {
         // igual e só fica mais sujeito a ser morto se faltar memória. A central
         // do H6 é Android 9, onde a recusa não existe.
         runCatching { startForeground(ID_DA_NOTIFICACAO, montarNotificacao()) }
-        // Basta pedir: o motor começa a escutar o carro no próprio construtor.
-        MotorDeBordo.de(this)
-        // E, se o motorista escolheu telas para as janelas do painel, colocá-las
-        // lá sozinho — é o que substitui o cadastro na tela "Telas" do Impulse.
-        // Fica no serviço, e não numa Activity, porque na partida do carro
-        // ninguém abre o app: o serviço é o único que sobe de qualquer jeito.
+
+        // BOOT GRADUAL: iniciar o essencial imediatamente, adiar o resto.
+        // Evita sobrecarregar a central nos primeiros segundos críticos do boot,
+        // quando outros apps (Shizuku, AutoPanel, Impulse) também estão subindo.
+
+        // ESTÁGIO 1 (imediato): O essencial - começar a contar quilômetros JÁ.
+        // Cluster.iniciar é leve (só lê SharedPreferences) e necessário para saber
+        // qual janela usar na despedida ao desligar.
         Cluster.iniciar(this)
-        ProjetorDoPainel.projetarNaPartida(this, Cluster::telasEscolhidas)
-        // E ouvir o carrossel de bolas do painel. Aqui pelo mesmo motivo: o
-        // aviso de troca de página tem de estar de pé antes de a janela
-        // aparecer, senão ela nasce mostrando na página errada até o motorista
-        // girar o carrossel uma vez.
-        PaginaDoCluster.acompanhar(this)
-        // E a cruzinha do volante, que é como se troca de visão na página.
-        TecladoDoVolante.acompanhar(this)
+        MotorDeBordo.de(this)
+
+        // ESTÁGIO 2 (15s depois): Receivers do painel - podem esperar um pouco.
+        // Não afetam a contagem, só a navegação entre visões do cluster.
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            runCatching {
+                PaginaDoCluster.acompanhar(this)
+                TecladoDoVolante.acompanhar(this)
+            }
+        }, 15_000)
+
+        // ESTÁGIO 3 (30s depois): Projetar no painel - quando Shizuku já estabilizou.
+        // Se o motorista escolheu telas para as janelas do painel, colocá-las
+        // lá sozinho — é o que substitui o cadastro na tela "Telas" do Impulse.
+        // Adiado porque depende de Shizuku/displays secundários estarem prontos.
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            runCatching {
+                ProjetorDoPainel.projetarNaPartida(this, Cluster::telasEscolhidas)
+            }
+        }, 30_000)
     }
 
     /**

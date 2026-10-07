@@ -17,8 +17,10 @@ class HavalTripBootReceiver : BroadcastReceiver() {
         private const val ACTION_RETRY_START = "br.com.hugolumazzini.havaltrip.action.RETRY_START"
         private const val EXTRA_ATTEMPT = "attempt"
 
-        // Backoff progressivo: 3s, 10s, 30s
-        private val RETRY_BACKOFF_MS = longArrayOf(3000, 10000, 30000)
+        // Backoff progressivo: 5s, 15s, 45s
+        // Não tão agressivo quanto antes (3s/10s/30s) para dar tempo da central
+        // estabilizar displays, Shizuku e outros serviços do sistema no boot.
+        private val RETRY_BACKOFF_MS = longArrayOf(5000, 15000, 45000)
     }
 
     override fun onReceive(context: Context, intent: Intent) {

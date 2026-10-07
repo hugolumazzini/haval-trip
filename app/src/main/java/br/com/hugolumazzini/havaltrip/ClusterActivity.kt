@@ -53,6 +53,21 @@ class ClusterActivity : ComponentActivity() {
         super.onStop()
         vm.gravarAgora()
     }
+
+    override fun onDestroy() {
+        // Para ClusterOverlayService quando Activity é destruída
+        if (!espiando) {
+            br.com.hugolumazzini.havaltrip.painel.ClusterOverlayService.recolher(
+                this,
+                JanelaDoPainel.NUMEROS
+            )
+        }
+        super.onDestroy()
+    }
+
+    private val espiando by lazy {
+        intent.getBooleanExtra(ESPIANDO, false)
+    }
 }
 
 /**

@@ -222,18 +222,20 @@ class MotorDeBordo private constructor(private val app: Application) {
     }
 
     /**
-     * Força a janela de despedida para a frente IMEDIATAMENTE ao desligar a ignição.
+     * Garante que a despedida apareça ao desligar o carro com PRIORIDADE TOTAL.
      *
-     * Isso garante que a despedida tenha PRIORIDADE TOTAL e apareça na frente de
-     * qualquer outra janela, incluindo as do Impulse ou outros apps.
+     * Usa ClusterOverlayService (técnica do haval-app-tool-multimidia) para:
+     * 1. Remover overlays de outros apps (Impulse, AutoPanel)
+     * 2. Projetar despedida via WindowManager overlay
+     * 3. Garantir visibilidade absoluta
      */
     private fun forcarDespedidaNaFrente() {
         escopo.launch(Dispatchers.Default) {
             try {
-                // Pequena pausa para garantir que as composables processem a mudança de ignição
-                delay(100)
+                Log.i("MotorDeBordo", "🚗 Ignição OFF - DESPEDIDA COM PRIORIDADE TOTAL")
 
                 val ajustes = Cluster.ajustes.value
+                Log.d("MotorDeBordo", "Telas: numeros=${ajustes.telaDosNumeros}, menu=${ajustes.telaDoMenu}, carro=${ajustes.telaDoCarro}")
 
                 // Determina qual janela vai mostrar a despedida
                 val janelaComDespedida = when {
@@ -243,31 +245,37 @@ class MotorDeBordo private constructor(private val app: Application) {
                     else -> null
                 }
 
-                janelaComDespedida?.let { (janela, telaId) ->
-                    // PRIMEIRO: Limpa TUDO que está no cluster (incluindo AutoPanel e outros apps)
-                    ProjetorDoPainel.limparTudoNoCluster(telaId)
+                if (janelaComDespedida == null) {
+                    Log.w("MotorDeBordo", "❌ Nenhuma tela configurada - despedida não será exibida")
+                    return@launch
+                }
 
-                    // Pequena pausa para garantir limpeza
-                    delay(200)
+                val (janela, telaId) = janelaComDespedida
 
-                    // DEPOIS: Reprojetar COM INSISTÊNCIA para que fique NA FRENTE de tudo
-                    ProjetorDoPainel.projetar(
-                        context = app,
-                        janela = janela,
-                        telaId = telaId,
-                        insistir = true  // FORÇA a janela para frente
-                    )
-                    Log.i("MotorDeBordo", "Despedida forçada na frente: $janela na tela $telaId")
-
-                    // Recolhe as outras janelas do Haval Trip que não mostram despedida
-                    JanelaDoPainel.entries.forEach { outraJanela ->
-                        if (outraJanela != janela) {
-                            ProjetorDoPainel.recolher(outraJanela)
-                        }
+                // Recolhe as outras janelas do Haval Trip (palco limpo)
+                JanelaDoPainel.entries.forEach { outraJanela ->
+                    if (outraJanela != janela) {
+                        ProjetorDoPainel.recolher(outraJanela)
                     }
                 }
+
+                // Pequeno delay para composable processar ignição OFF
+                delay(100)
+
+                // DESPEDIDA COM PRIORIDADE TOTAL via ClusterOverlayService:
+                // - Remove outros apps (Impulse, AutoPanel) do display
+                // - Projeta overlay WindowManager com parâmetros da engenharia reversa
+                // - Garante que NADA fica por cima
+                Log.i("MotorDeBordo", "🎯 Projetando despedida com remoção de outros apps")
+                br.com.hugolumazzini.havaltrip.painel.ClusterOverlayService.projetarDespedida(
+                    app,
+                    janela,
+                    telaId
+                )
+                Log.i("MotorDeBordo", "✅ Despedida projetada com prioridade total!")
+
             } catch (e: Exception) {
-                Log.w("MotorDeBordo", "Erro ao forçar despedida na frente", e)
+                Log.e("MotorDeBordo", "❌ Erro ao mostrar despedida", e)
             }
         }
     }

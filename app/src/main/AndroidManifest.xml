@@ -151,6 +151,16 @@
             android:foregroundServiceType="dataSync" />
 
         <!--
+            Serviço de overlay para cluster.
+            Usa WindowManager overlays (técnica do haval-app-tool-multimidia)
+            para garantir que janelas do Haval Trip fiquem sempre visíveis.
+        -->
+        <service
+            android:name=".painel.ClusterOverlayService"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!--
             BootReceiver prioritário com Direct Boot - recebe eventos de boot
             ANTES de qualquer outro app (priority=1000) e inicia antes do unlock
             (directBootAware=true) para garantir que a medição comece no primeiro

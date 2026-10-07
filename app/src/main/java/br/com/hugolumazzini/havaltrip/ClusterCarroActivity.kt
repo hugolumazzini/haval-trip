@@ -36,4 +36,16 @@ class ClusterCarroActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onDestroy() {
+        // Para ClusterOverlayService quando Activity é destruída
+        val espiando = intent.getBooleanExtra(ESPIANDO, false)
+        if (!espiando) {
+            br.com.hugolumazzini.havaltrip.painel.ClusterOverlayService.recolher(
+                this,
+                JanelaDoPainel.CARRO
+            )
+        }
+        super.onDestroy()
+    }
 }

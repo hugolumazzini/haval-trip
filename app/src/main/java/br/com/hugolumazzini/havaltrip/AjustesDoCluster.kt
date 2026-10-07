@@ -563,10 +563,10 @@ data class AjustesDoCluster(
      */
     val afastamentoDoCarroNoMenu: Int = 100,
     /**
-     * Tamanho do carro (pressão dos pneus e temperatura) na página integrada.
-     * Separado do tamanho do carro solto (tamanhoDoCarro).
+     * Tamanho das pressões dos pneus na bola, com ajuste fino por zoom.
+     * Substitui o antigo `tamanhoDoCarroNoMenu` (enum) por controle contínuo.
      */
-    val tamanhoDoCarroNoMenu: TamanhoDoCarro = TamanhoDoCarro.MEDIO,
+    val zoomPressoesNaBola: Zoom = Zoom(),
     /**
      * Como os dados se identificam dentro da bola. Ver [RotuloDoCluster].
      *
@@ -671,6 +671,8 @@ object Cluster {
     private const val AFASTAMENTO_CARRO_SOLTO = "afastamentoDoCarroSolto"
     private const val AFASTAMENTO_CARRO_NA_BOLA = "afastamentoDoCarroNaBola"
     private const val AFASTAMENTO_CARRO_MENU = "afastamentoDoCarroNoMenu"
+    private const val ZOOM_PRESSOES_BOLA = "zoomPressoesNaBola"
+    @Deprecated("Substituído por ZOOM_PRESSOES_BOLA")
     private const val TAMANHO_CARRO_MENU = "tamanhoDoCarroNoMenu"
     private const val HABILITAR_NUMEROS = "habilitarNumerosNoPainel"
     private const val HABILITAR_CARRO = "habilitarCarroNoPainel"
@@ -865,9 +867,17 @@ object Cluster {
                 .coerceIn(50, 100),
             afastamentoDoCarroNoMenu = prefs.getInt(AFASTAMENTO_CARRO_MENU, padrao.afastamentoDoCarroNoMenu)
                 .coerceIn(50, 100),
-            tamanhoDoCarroNoMenu = prefs.getString(TAMANHO_CARRO_MENU, null)
-                ?.let { nome -> TamanhoDoCarro.entries.find { it.name == nome } }
-                ?: padrao.tamanhoDoCarroNoMenu,
+            zoomPressoesNaBola = run {
+                // Migração: se tiver o enum antigo, converte para Zoom
+                val enumAntigo = prefs.getString(TAMANHO_CARRO_MENU, null)
+                    ?.let { nome -> TamanhoDoCarro.entries.find { it.name == nome } }
+                if (enumAntigo != null) {
+                    // Converte fração do enum para porcento do Zoom (100 = padrão)
+                    Zoom(((enumAntigo.fracao - 1.0f) * 100).toInt() + 100)
+                } else {
+                    Zoom(prefs.getInt(ZOOM_PRESSOES_BOLA, padrao.zoomPressoesNaBola.porcento))
+                }
+            },
             habilitarNumerosNoPainel = prefs.getBoolean(HABILITAR_NUMEROS, padrao.habilitarNumerosNoPainel),
             habilitarCarroNoPainel = prefs.getBoolean(HABILITAR_CARRO, padrao.habilitarCarroNoPainel),
             habilitarPaginaComVisoes = prefs.getBoolean(HABILITAR_PAGINA, padrao.habilitarPaginaComVisoes),
@@ -936,7 +946,7 @@ object Cluster {
             .putBoolean(HABILITAR_PAGINA, novo.habilitarPaginaComVisoes)
             .putString(ITENS_DESPEDIDA, novo.itensDaDespedida.joinToString(",") { it.name })
             .putInt(AFASTAMENTO_CARRO_MENU, novo.afastamentoDoCarroNoMenu)
-            .putString(TAMANHO_CARRO_MENU, novo.tamanhoDoCarroNoMenu.name)
+            .putInt(ZOOM_PRESSOES_BOLA, novo.zoomPressoesNaBola.porcento)
             .putBoolean(MOSTRAR_ANEL_AZUL, novo.mostrarAnelAzul)
             .apply()
     }
@@ -1042,6 +1052,20 @@ object Cluster {
         ),
     )
 
+    fun afastamentoNaturalNaBola() = gravar(
+        _ajustes.value.copy(afastamentoNaBola = Zoom()),
+    )
+
+    fun empurrarPressoesNaBola(dx: Int, dy: Int) = gravar(
+        _ajustes.value.copy(
+            offsetPressoesNaBola = _ajustes.value.offsetPressoesNaBola.mais(dx, dy),
+        ),
+    )
+
+    fun centralizarPressoesNaBola() = gravar(
+        _ajustes.value.copy(offsetPressoesNaBola = Empurrao()),
+    )
+
     fun usarFormatoDoCarro(formato: FormatoDoCarro) =
         gravar(_ajustes.value.copy(formatoDoCarro = formato))
 
@@ -1063,8 +1087,18 @@ object Cluster {
         ),
     )
 
-    fun usarTamanhoDoCarroNoMenu(tamanho: TamanhoDoCarro) =
-        gravar(_ajustes.value.copy(tamanhoDoCarroNoMenu = tamanho))
+    fun ampliarPressoesNaBola(delta: Int) = gravar(
+        _ajustes.value.copy(
+            zoomPressoesNaBola = Zoom(
+                (_ajustes.value.zoomPressoesNaBola.util + delta)
+                    .coerceIn(Zoom.MINIMO, Zoom.MAXIMO),
+            ),
+        ),
+    )
+
+    fun tamanhoNaturalPressoesNaBola() = gravar(
+        _ajustes.value.copy(zoomPressoesNaBola = Zoom()),
+    )
 
     fun alternarHabilitarNumerosNoPainel() = gravar(
         _ajustes.value.copy(habilitarNumerosNoPainel = !_ajustes.value.habilitarNumerosNoPainel),

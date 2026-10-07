@@ -54,40 +54,27 @@ fun PainelScreen(vm: TripViewModel, estado: TripState) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
             CelulaVeiculo("HODÔMETRO", TripFormat.km(estado.live.odometerTotalKm))
             CelulaVeiculo("AUTONOMIA", TripFormat.kmSemDecimal(estado.live.autonomyDteKm))
-            // % Elétrico com número e barra ao lado
-            Column(Modifier.padding(end = 24.dp)) {
-                Text("% EM ELÉTRICO", style = EstiloRotulo)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        m.evRatio?.let { "${TripFormat.decimal(it * 100, 0)}%" } ?: TripFormat.AUSENTE,
-                        style = EstiloNumeroMedio
-                    )
-                    Box(
-                        Modifier
-                            .width(60.dp)
-                            .height(6.dp)
-                            .background(Cores.Superficie, RoundedCornerShape(3.dp))
-                    ) {
-                        Box(
-                            Modifier
-                                .fillMaxHeight()
-                                .fillMaxWidth((m.evRatio ?: 0.0).toFloat().coerceIn(0f, 1f))
-                                .background(
-                                    Brush.horizontalGradient(
-                                        colors = listOf(
-                                            Cores.Destaque.copy(alpha = 0.7f),
-                                            Cores.Destaque
-                                        )
-                                    ),
-                                    RoundedCornerShape(3.dp)
-                                )
-                        )
-                    }
-                }
-            }
+
+            // % Combustível
+            BarraPercentual(
+                rotulo = "COMBUSTÍVEL",
+                percentual = veiculo.combustivelPercent,
+                corBarra = Cores.Atencao
+            )
+
+            // % Bateria
+            BarraPercentual(
+                rotulo = "BATERIA",
+                percentual = veiculo.bateriaPercent,
+                corBarra = Cores.Confirmacao
+            )
+
+            // % Elétrico
+            BarraPercentual(
+                rotulo = "% EM ELÉTRICO",
+                percentual = m.evRatio,
+                corBarra = Cores.Destaque
+            )
             Spacer(Modifier.weight(1f))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PontoStatus(trip.status, tamanho = 12)
@@ -262,6 +249,54 @@ private fun BarraMinimalista(percentual: Double, modifier: Modifier = Modifier) 
                                 )
                             ),
                             RoundedCornerShape(4.dp)
+                        )
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Barra de percentual com rótulo, número e barra de progresso.
+ *
+ * Componente reutilizável para mostrar combustível, bateria e % elétrico
+ * com estilo consistente.
+ */
+@Composable
+private fun BarraPercentual(
+    rotulo: String,
+    percentual: Double?,
+    corBarra: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.padding(end = 24.dp)) {
+        Text(rotulo, style = EstiloRotulo)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                percentual?.let { "${TripFormat.decimal(it * 100, 0)}%" } ?: TripFormat.AUSENTE,
+                style = EstiloNumeroMedio
+            )
+            Box(
+                Modifier
+                    .width(60.dp)
+                    .height(6.dp)
+                    .background(Cores.Superficie, RoundedCornerShape(3.dp))
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth((percentual ?: 0.0).toFloat().coerceIn(0f, 1f))
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    corBarra.copy(alpha = 0.7f),
+                                    corBarra
+                                )
+                            ),
+                            RoundedCornerShape(3.dp)
                         )
                 )
             }

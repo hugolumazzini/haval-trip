@@ -87,49 +87,8 @@ fun LateralDoVeiculo(painel: PainelDoVeiculo, modifier: Modifier = Modifier) {
 
             // Indicadores compactos: ícones + %
             // TODO: Adicionar controle de tamanho em Configuração
-            val tamanhoIcone = 16.sp  // Ajustável: 12-24sp
-            val tamanhoTexto = 13.sp  // Ajustável: 9-16sp
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Combustível (sempre mostra, forçando valor se null)
-                val combustivelPerc = painel.combustivelPercent ?: 0.70
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "⛽",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = tamanhoIcone)
-                    )
-                    Text(
-                        "${TripFormat.decimal(combustivelPerc * 100, 0)}%",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = tamanhoTexto),
-                        color = if (combustivelPerc < 0.15) Cores.Atencao else Cores.TextoCorrido
-                    )
-                }
-
-                // Bateria (sempre mostra, forçando valor se null)
-                val bateriaPerc = painel.bateriaPercent ?: 0.50
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "🔋",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = tamanhoIcone)
-                    )
-                    Text(
-                        "${TripFormat.decimal(bateriaPerc * 100, 0)}%",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = tamanhoTexto),
-                        color = Cores.TextoCorrido
-                    )
-                }
-            }
         }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(4.dp))
 
         // O desenho fica com a sobra de altura, e os avisos com o que pedirem.
         // Ao contrário: um carro de proporção fixa cresceria até empurrar os

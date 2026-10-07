@@ -226,28 +226,61 @@ object ProjetorDoPainel {
      * numa viagem inteira — daí esperar pelo aviso de binder em vez de olhar
      * uma vez só. O `Sticky` cobre o caso oposto, de o Shizuku já estar pronto
      * quando chegamos.
+     *
+     * FALLBACK: o `Sticky` nem sempre funciona na prática (bug da biblioteca?),
+     * então também tentamos projetar após 5s — se o Shizuku já estiver pronto,
+     * vai funcionar; se não, o `projetar()` só retorna erro e não quebra nada.
+     * Uma flag garante que só execute uma vez (listener OU fallback, não os dois).
      */
     fun projetarNaPartida(context: Context, escolhas: () -> Map<JanelaDoPainel, Int?>) {
         val aplicacao = context.applicationContext
-        val aoChegarBinder = Shizuku.OnBinderReceivedListener {
-            escopo.launch {
-                escolhas().forEach { (janela, tela) ->
-                    if (tela != null) runCatching { projetar(aplicacao, janela, tela) }
+        var jaExecutou = false
+
+        val executarProjecao = {
+            if (!jaExecutou) {
+                jaExecutou = true
+                escopo.launch {
+                    Log.d(TAG, "projetarNaPartida: iniciando projeção...")
+                    escolhas().forEach { (janela, tela) ->
+                        if (tela != null) {
+                            Log.d(TAG, "projetando $janela → tela $tela")
+                            runCatching { projetar(aplicacao, janela, tela) }
+                                .onSuccess { Log.d(TAG, "$janela projetada com sucesso") }
+                                .onFailure { Log.w(TAG, "falha ao projetar $janela", it) }
+                        }
+                    }
+                    // O reforço, e o motivo dele é a ordem de quem sobe: o Impulse
+                    // projeta as janelas dele na mesma partida, e a última chamada a
+                    // `am start` é a que fica por cima. Como não há como saber quem
+                    // termina primeiro, insistimos uma vez depois que a poeira
+                    // baixou. Uma só — reprojetar em laço seria uma queda de braço
+                    // com o outro app, piscando o painel inteiro.
+                    delay(REFORCO_MS)
+                    Log.d(TAG, "reforçando projeção...")
+                    escolhas().forEach { (janela, tela) ->
+                        if (tela != null) runCatching { projetar(aplicacao, janela, tela, insistir = true) }
+                    }
                 }
-                // O reforço, e o motivo dele é a ordem de quem sobe: o Impulse
-                // projeta as janelas dele na mesma partida, e a última chamada a
-                // `am start` é a que fica por cima. Como não há como saber quem
-                // termina primeiro, insistimos uma vez depois que a poeira
-                // baixou. Uma só — reprojetar em laço seria uma queda de braço
-                // com o outro app, piscando o painel inteiro.
-                delay(REFORCO_MS)
-                escolhas().forEach { (janela, tela) ->
-                    if (tela != null) runCatching { projetar(aplicacao, janela, tela, insistir = true) }
-                }
+            } else {
+                Log.d(TAG, "projeção já executada, ignorando")
             }
         }
+
+        // Caminho 1: esperar pelo callback do Shizuku (pode não funcionar)
+        val aoChegarBinder = Shizuku.OnBinderReceivedListener {
+            Log.d(TAG, "Shizuku binder recebido via listener")
+            executarProjecao()
+        }
         runCatching { Shizuku.addBinderReceivedListenerSticky(aoChegarBinder) }
+            .onSuccess { Log.d(TAG, "listener Sticky adicionado") }
             .onFailure { Log.w(TAG, "não deu para esperar pelo Shizuku", it) }
+
+        // Caminho 2: FALLBACK - tentar de qualquer jeito após 5s
+        // (se Shizuku já estiver pronto, funciona; se não, só loga erro)
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            Log.d(TAG, "fallback: tentando projetar mesmo sem callback do Sticky")
+            executarProjecao()
+        }, 5_000)
     }
 
     /**

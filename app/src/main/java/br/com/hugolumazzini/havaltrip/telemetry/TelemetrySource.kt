@@ -90,15 +90,19 @@ class SimulatedTelemetrySource(
     private fun publicarEstadoDoVeiculo() {
         // Calcula valores de bateria sempre, mesmo sem EstadoDoCarro
         tensaoBateria = 330.0
+
+        // Motor a combustão: só liga em alta velocidade ou aceleração muito forte
+        // PHEV roda em elétrico até ~70 km/h em condução normal
+        motorCombustaoLigado = velocidadeKmh > 70 || aceleracaoKmhPorS > 3.5
+
         correnteBateria = when {
             velocidadeKmh < 0.5 -> 0.0
-            aceleracaoKmhPorS < -3.0 -> -45.0
-            aceleracaoKmhPorS < -1.0 -> -25.0
-            aceleracaoKmhPorS > 2.0 -> 60.0
-            velocidadeKmh > 60 -> 25.0
-            else -> 15.0
+            aceleracaoKmhPorS < -3.0 -> -45.0  // Regeneração forte
+            aceleracaoKmhPorS < -1.0 -> -25.0  // Regeneração leve
+            aceleracaoKmhPorS > 3.5 -> 60.0    // Aceleração forte (motor liga)
+            velocidadeKmh > 70 -> 25.0          // Alta velocidade (motor ligado)
+            else -> 15.0                        // Elétrico normal
         }
-        motorCombustaoLigado = velocidadeKmh > 60 || aceleracaoKmhPorS > 2.0
 
         val alvo = estado ?: return
         val motoristaAberta = if (velocidadeKmh < 0.5 && segundosNoTrecho % 20 < 8) 1 else 0

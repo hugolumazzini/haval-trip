@@ -172,10 +172,12 @@ class TripEngine(val config: EngineConfig = EngineConfig()) {
         }
 
         // km elétricos: conta quando em movimento E motor a combustão desligado.
+        // Se iceActive não é null, inicializa evKm como 0.0 (carro híbrido detectado)
         val deltaEvKm = when {
-            !emMovimento -> metrics.evKm
-            sample.iceActive == false -> (metrics.evKm ?: 0.0) + deltaKm
-            else -> metrics.evKm
+            sample.iceActive == null -> null  // Carro não-híbrido, mantém null
+            !emMovimento -> metrics.evKm ?: 0.0  // Inicializa como 0.0 se ainda null
+            sample.iceActive == false -> (metrics.evKm ?: 0.0) + deltaKm  // Acumula km elétricos
+            else -> metrics.evKm ?: 0.0  // Motor ligado, mas inicializa se ainda null
         }
 
         return metrics.copy(

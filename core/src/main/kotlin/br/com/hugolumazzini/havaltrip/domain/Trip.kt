@@ -97,7 +97,7 @@ data class TripMetrics(
     val kwhOut: Double? = null,
     /** kWh recuperados na Trip (frenagem regenerativa), integral de tensão × corrente quando negativa. `null` se não coletado. */
     val kwhIn: Double? = null,
-    /** km rodados em modo elétrico puro (motor a combustão desligado). `null` se não detectável. */
+    /** km rodados em modo elétrico puro (motor a combustão desligado). `null` se não detectável (carro não-híbrido). */
     val evKm: Double? = null,
     /** Legado: kWh consumidos. Use [kwhOut] e [kwhIn]. */
     @Deprecated("Use kwhOut e kwhIn", ReplaceWith("kwhOut"))
@@ -159,15 +159,16 @@ data class TripMetrics(
     /**
      * Eficiência energética, em km/kWh. Similar a km/L de combustível.
      *
-     * Usa energia **líquida** (consumida - recuperada), então regeneração
-     * melhora a eficiência. `null` sem coleta de energia ou distância insuficiente.
+     * Usa energia **bruta consumida** (kwhOut), não líquida. A regeneração
+     * (kwhIn) é um bônus separado e não deve inflar artificialmente a eficiência.
+     * `null` sem coleta de energia ou distância insuficiente.
      */
     val avgEnergyEfficiencyKmPerKwh: Double? get() {
-        val net = kwhNet ?: return null
+        val consumed = kwhOut ?: return null
         return when {
             distanceKm < MIN_KM_PARA_MEDIA -> null
-            net <= EPSILON -> null // Sem consumo líquido
-            else -> distanceKm / net
+            consumed <= EPSILON -> null // Sem consumo
+            else -> distanceKm / consumed
         }
     }
 

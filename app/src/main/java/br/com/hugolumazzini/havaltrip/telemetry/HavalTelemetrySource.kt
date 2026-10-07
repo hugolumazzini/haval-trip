@@ -111,8 +111,12 @@ class HavalTelemetrySource(
         /** Tensão da bateria de tração, em volts. Para calcular kWh com a corrente. */
         const val CHAVE_TENSAO_BATERIA = "car.ev_info.power_battery_voltage"
 
-        /** Corrente da bateria, em amperes. Positivo = consumo; negativo = regeneração. */
-        const val CHAVE_CORRENTE_BATERIA = "car.ev_info.cur_charge_current"
+        /**
+         * Corrente da bateria de tração, em amperes.
+         * Positivo = descarga/consumo, Negativo = carga/regeneração.
+         * IMPORTANTE: Usa power_battery_current (não cur_charge_current que só funciona durante carga via cabo).
+         */
+        const val CHAVE_CORRENTE_BATERIA = "car.ev_info.power_battery_current"
 
         /**
          * Motor a combustão (Internal Combustion Engine) ativo neste momento.

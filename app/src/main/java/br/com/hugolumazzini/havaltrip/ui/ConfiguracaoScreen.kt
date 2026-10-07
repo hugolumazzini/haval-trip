@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -1133,53 +1134,14 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
         }
     }
 
-    Spacer(Modifier.height(14.dp))
-    Text("Posição do carro (pressão e temperatura)", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(20.dp))
+    HorizontalDivider(color = Cores.Contorno.copy(alpha = 0.5f), thickness = 1.dp)
+    Spacer(Modifier.height(20.dp))
+    Text("AJUSTE VISUAL DA BOLA", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
     Spacer(Modifier.height(4.dp))
     Text(
-        "Ajusta a distância em que a pressão dos pneus e temperatura do carrinho aparecem. Independente do ajuste do carro solto.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = Cores.TextoApoio,
-    )
-    Spacer(Modifier.height(8.dp))
-    Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-        BotaoAcao("−", { Cluster.afastarDoCarroNoMenu(-5) }, modifier = Modifier.width(40.dp))
-        Spacer(Modifier.width(16.dp))
-        Text("${ajustes.afastamentoDoCarroNoMenu}%", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
-        Spacer(Modifier.width(16.dp))
-        BotaoAcao("+", { Cluster.afastarDoCarroNoMenu(5) }, modifier = Modifier.width(40.dp))
-    }
-
-    Spacer(Modifier.height(14.dp))
-    Text("Tamanho do carro (pressão e temperatura)", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-    Spacer(Modifier.height(4.dp))
-    Text(
-        "Redimensiona a pressão dos pneus e temperatura juntas. Independente do tamanho do carro solto.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = Cores.TextoApoio,
-    )
-    Spacer(Modifier.height(8.dp))
-    FlowRowSimples {
-        TamanhoDoCarro.Escolhiveis.forEach { tamanho ->
-            Opcao(tamanho.rotulo, ajustes.tamanhoDoCarroNoMenu == tamanho) {
-                Cluster.usarTamanhoDoCarroNoMenu(tamanho)
-            }
-        }
-    }
-
-    // Calibração, não ajuste de motorista. Não há mais escolha de formato: esta
-    // página é sempre a bola que o Impulse deixa vazia, e oferecer "painel
-    // inteiro" era oferecer um modo que o app não usa. O que fica aqui é só a
-    // medida, enquanto ela não estiver acertada de vez: quem mede é quem está
-    // sentado no carro, e a régua da janela é o único jeito de saber onde a bola
-    // caiu. Quando o número estiver fechado, isto sai e vira constante, como
-    // [BolaDoPainel] já é.
-    Spacer(Modifier.height(18.dp))
-    Text("Calibração", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
-    Spacer(Modifier.height(4.dp))
-    Text(
-        "Temporário: serve para acertar onde a bola cai neste painel e me contar o " +
-            "resultado. Vai virar padrão do app.",
+        "Acerte a posição e tamanho de cada elemento para que fique perfeito no painel " +
+            "do seu carro. Use \"Ver como fica a página\" para conferir.",
         style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
@@ -1474,82 +1436,165 @@ private fun SetasDeTamanho(
  */
 @Composable
 private fun AjusteFinoDaBola(ajustes: AjustesDoCluster) {
+    Text("🎯 Posição da bola no painel", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "Move a bola inteira para encaixá-la no círculo que o painel desenha. " +
+            "Seta dupla = atravessa a tela, seta simples = ajuste fino pixel a pixel.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(8.dp))
     SetasDePosicao(
-        titulo = "Ajuste fino da posição",
-        texto = "Move a bola inteira pelo painel, para encaixá-la na que o carro " +
-            "desenha embaixo. A dupla atravessa, a simples acerta o fio. Isto vale " +
-            "para as duas visões: a bola é uma só.",
+        titulo = "",
+        texto = "",
         empurrao = ajustes.empurraoDoMenu,
         empurrar = { dx, dy -> Cluster.empurrar(JanelaDoPainel.MENU, dx, dy) },
         desfazer = { Cluster.centralizar(JanelaDoPainel.MENU) },
     )
 
-    Spacer(Modifier.height(18.dp))
-    Text("O carro na bola", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
+    Spacer(Modifier.height(24.dp))
+    Text("🚗 CARRINHO (pressão e temperatura)", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
     Spacer(Modifier.height(4.dp))
     Text(
-        "Vale só para a visão do carro. Gire a cruzinha do volante até ela aparecer " +
-            "no painel antes de mexer aqui.",
+        "Ajusta a vista do carro com pressão dos pneus. Use a cruzinha do volante para " +
+            "ver essa visão no painel enquanto ajusta.",
         style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
-    Spacer(Modifier.height(10.dp))
+    Spacer(Modifier.height(12.dp))
+
+    Text("Posição do carrinho", style = MaterialTheme.typography.titleSmall, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text("Move o desenho do carro dentro da bola.", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+    Spacer(Modifier.height(6.dp))
     SetasDePosicao(
-        titulo = "Posição do carro",
-        texto = "Move o desenho dentro da bola, sem tirar a bola do lugar.",
+        titulo = "",
+        texto = "",
         empurrao = ajustes.empurraoDoCarroNaBola,
         empurrar = { dx, dy -> Cluster.empurrarNaBola(AlvoNaBola.CARRO, dx, dy) },
         desfazer = { Cluster.centralizarNaBola(AlvoNaBola.CARRO) },
     )
+
     Spacer(Modifier.height(14.dp))
+    Text("Tamanho do carrinho", style = MaterialTheme.typography.titleSmall, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text("Aumenta ou diminui o desenho do carro.", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+    Spacer(Modifier.height(6.dp))
     SetasDeTamanho(
-        titulo = "Tamanho do carro",
-        texto = "Estica ou encolhe o desenho. A bola em si não muda: ela é a do " +
-            "painel, e tem de continuar encaixada na que o carro desenha embaixo.",
+        titulo = "",
+        texto = "",
         zoom = ajustes.zoomDoCarroNaBola,
         ampliar = { delta -> Cluster.ampliarNaBola(AlvoNaBola.CARRO, delta) },
         desfazer = { Cluster.tamanhoNaturalNaBola(AlvoNaBola.CARRO) },
     )
 
     Spacer(Modifier.height(18.dp))
-    Text("Os dados na bola", style = MaterialTheme.typography.titleLarge, color = Cores.Texto)
+    HorizontalDivider(color = Cores.Contorno.copy(alpha = 0.3f), thickness = 1.dp)
+    Spacer(Modifier.height(18.dp))
+    Text("🎯 Pressão e Temperatura dos Pneus", style = MaterialTheme.typography.titleSmall, color = Cores.Texto)
     Spacer(Modifier.height(4.dp))
     Text(
-        "Vale para as visões dos contadores. Pare o volante numa delas antes de " +
-            "mexer aqui.",
+        "Ajusta onde os números de pressão (PSI/kPa/Bar) e temperatura aparecem em volta do carro.",
+        style = MaterialTheme.typography.bodySmall,
+        color = Cores.TextoApoio,
+    )
+    Spacer(Modifier.height(12.dp))
+
+    Text("Posição das pressões", style = MaterialTheme.typography.titleSmall, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text("Move os números de pressão/temperatura.", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+    Spacer(Modifier.height(6.dp))
+    SetasDePosicao(
+        titulo = "",
+        texto = "",
+        empurrao = ajustes.offsetPressoesNaBola,
+        empurrar = { dx, dy -> Cluster.empurrarPressoesNaBola(dx, dy) },
+        desfazer = { Cluster.centralizarPressoesNaBola() },
+    )
+
+    Spacer(Modifier.height(14.dp))
+    Text("Proximidade das pressões", style = MaterialTheme.typography.titleSmall, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text("Afasta ou aproxima os números do centro do carro.", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+    Spacer(Modifier.height(8.dp))
+    FlowRowSimples {
+        Seta("−−", "bem mais perto") { Cluster.afastarNaBola(-Zoom.SALTO) }
+        Seta("−", "um pouco mais perto") { Cluster.afastarNaBola(-Zoom.PASSO) }
+        Seta("+", "um pouco mais longe") { Cluster.afastarNaBola(Zoom.PASSO) }
+        Seta("++", "bem mais longe") { Cluster.afastarNaBola(Zoom.SALTO) }
+        BotaoAcao(
+            "Desfazer",
+            onClick = { Cluster.afastamentoNaturalNaBola() },
+            habilitado = !ajustes.afastamentoNaBola.natural,
+        )
+    }
+    Spacer(Modifier.height(6.dp))
+    Text(
+        if (ajustes.afastamentoNaBola.natural) {
+            "Afastamento padrão."
+        } else {
+            "${ajustes.afastamentoNaBola.porcento}% do raio."
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = Cores.TextoApoio,
+    )
+
+    Spacer(Modifier.height(14.dp))
+    Text("Tamanho das pressões", style = MaterialTheme.typography.titleSmall, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text("Aumenta ou diminui os números.", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+    Spacer(Modifier.height(6.dp))
+    SetasDeTamanho(
+        titulo = "",
+        texto = "",
+        zoom = ajustes.zoomPressoesNaBola,
+        ampliar = { delta -> Cluster.ampliarPressoesNaBola(delta) },
+        desfazer = { Cluster.tamanhoNaturalPressoesNaBola() },
+    )
+
+    Spacer(Modifier.height(24.dp))
+    Text("📊 DADOS DA VIAGEM (distância, média, tempo...)", style = MaterialTheme.typography.titleMedium, color = Cores.Texto)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "Ajusta as visões com números das trips. Use a cruzinha do volante para " +
+            "navegar entre os contadores no painel.",
         style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
-    Spacer(Modifier.height(10.dp))
+    Spacer(Modifier.height(12.dp))
+
+    Text("Posição dos dados", style = MaterialTheme.typography.titleSmall, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text("Move os números e o título dentro da bola.", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+    Spacer(Modifier.height(6.dp))
     SetasDePosicao(
-        titulo = "Posição dos dados",
-        texto = "Move os números, o título e as bolinhas dentro da bola, sem tirar a " +
-            "bola do lugar.",
+        titulo = "",
+        texto = "",
         empurrao = ajustes.empurraoDentroDoMenu,
         empurrar = { dx, dy -> Cluster.empurrarNaBola(AlvoNaBola.DADOS, dx, dy) },
         desfazer = { Cluster.centralizarNaBola(AlvoNaBola.DADOS) },
     )
+
     Spacer(Modifier.height(14.dp))
+    Text("Tamanho dos dados", style = MaterialTheme.typography.titleSmall, color = Cores.TextoCorrido)
+    Spacer(Modifier.height(4.dp))
+    Text("Aumenta ou diminui os números.", style = MaterialTheme.typography.bodySmall, color = Cores.TextoApoio)
+    Spacer(Modifier.height(6.dp))
     SetasDeTamanho(
-        titulo = "Tamanho dos dados",
-        texto = "Estica ou encolhe os números dentro da bola. A bola em si não muda.",
+        titulo = "",
+        texto = "",
         zoom = ajustes.zoomDoMenu,
         ampliar = { delta -> Cluster.ampliarNaBola(AlvoNaBola.DADOS, delta) },
         desfazer = { Cluster.tamanhoNaturalNaBola(AlvoNaBola.DADOS) },
     )
 
     Spacer(Modifier.height(14.dp))
-    Text(
-        "Afastamento entre os dados",
-        style = MaterialTheme.typography.titleMedium,
-        color = Cores.TextoCorrido,
-    )
+    Text("Proximidade dos itens", style = MaterialTheme.typography.titleSmall, color = Cores.TextoCorrido)
     Spacer(Modifier.height(4.dp))
     Text(
-        "Aproxima ou espalha os dados na altura da bola, sem mexer no tamanho " +
-            "deles — é o botão para quando está tudo grudado ou esparramado demais. " +
-            "Espalhar mais que a bola inteira não dá: o que passasse disso seria cortado.",
-        style = MaterialTheme.typography.bodyMedium,
+        "Junta ou espalha os dados. Útil quando está tudo grudado ou muito separado.",
+        style = MaterialTheme.typography.bodySmall,
         color = Cores.TextoApoio,
     )
     Spacer(Modifier.height(8.dp))

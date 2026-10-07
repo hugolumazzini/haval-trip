@@ -156,9 +156,12 @@ class TripEngine(val config: EngineConfig = EngineConfig()) {
 
         // Energia elétrica: tensão × corrente × tempo, em kWh.
         // Como o Impulse: corrente positiva é consumo, negativa é regeneração.
+        // CORREÇÃO: A corrente vem em MILIAMPERES (mA), não amperes!
+        // Potência (W) = V × (mA / 1000), convertendo para kW: / 1000 novamente
+        // Resultado: V × mA / 1.000.000 = kW
         val deltaHoras = deltaS / 3600.0
         val kw = if (sample.batteryVoltageV != null && sample.batteryCurrentA != null)
-            sample.batteryVoltageV * sample.batteryCurrentA / 1000.0
+            sample.batteryVoltageV * sample.batteryCurrentA / 1_000_000.0
         else null
         val deltaKwhOut = when {
             kw == null -> null

@@ -113,7 +113,6 @@ class ClusterOverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "Service created")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -123,8 +122,6 @@ class ClusterOverlayService : Service() {
         val janelaNome = intent?.getStringExtra(EXTRA_JANELA)
         val displayId = intent?.getIntExtra(EXTRA_DISPLAY_ID, -1) ?: -1
         val despedida = intent?.getBooleanExtra(EXTRA_DESPEDIDA, false) ?: false
-
-        Log.d(TAG, "Comando: $comando, janela: $janelaNome, display: $displayId, despedida: $despedida")
 
         val janela = janelaNome?.let { nome ->
             JanelaDoPainel.entries.find { it.name == nome }
@@ -215,7 +212,6 @@ class ClusterOverlayService : Service() {
     private fun mostrarOverlay(janela: JanelaDoPainel, displayId: Int, despedida: Boolean) {
         // Se já está mostrando a mesma janela, só garante visibilidade
         if (janelaAtual == janela && displayIdAtual == displayId && overlayView != null) {
-            Log.d(TAG, "Overlay já existe, garantindo visibilidade")
             garantirVisibilidade()
             return
         }
@@ -227,7 +223,6 @@ class ClusterOverlayService : Service() {
             // Obtém display do cluster
             val display = obterDisplay(displayId)
             if (display == null) {
-                Log.w(TAG, "Display $displayId não encontrado")
                 return
             }
 
@@ -343,14 +338,11 @@ class ClusterOverlayService : Service() {
                 garantirVisibilidade()
             }
         }
-
-        Log.d(TAG, "🐕 Watchdog iniciado (${WATCHDOG_INTERVAL_MS}ms)")
     }
 
     private fun pararWatchdog() {
         watchdogJob?.cancel()
         watchdogJob = null
-        Log.d(TAG, "🐕 Watchdog parado")
     }
 
     /**
@@ -365,10 +357,9 @@ class ClusterOverlayService : Service() {
                     if (params != null) {
                         wm.removeView(view)
                         wm.addView(view, params)
-                        Log.d(TAG, "🔄 Visibilidade garantida (reprojetado)")
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Erro ao garantir visibilidade", e)
+                    // Silencioso - não loga em produção
                 }
             }
         }
@@ -380,7 +371,6 @@ class ClusterOverlayService : Service() {
         overlayView?.let { view ->
             try {
                 windowManager?.removeView(view)
-                Log.d(TAG, "❌ Overlay removido")
             } catch (e: Exception) {
                 Log.w(TAG, "Erro ao remover overlay", e)
             } finally {
@@ -412,7 +402,6 @@ class ClusterOverlayService : Service() {
     }
 
     override fun onDestroy() {
-        Log.d(TAG, "Service destroyed")
         esconderOverlay()
         super.onDestroy()
     }

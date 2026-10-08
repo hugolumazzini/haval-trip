@@ -146,8 +146,8 @@ fun PainelScreen(vm: TripViewModel, estado: TripState) {
                         apoio = sobreAMedia(m),
                     )
                     Quadrante(
-                        "CONSUMO ELÉTRICO",
-                        TripFormat.kmPorKwh(m.avgEnergyEfficiencyKmPerKwh),
+                        "ENERGIA CONSUMIDA",
+                        TripFormat.kwh(m.kwhOut),
                         "",
                         Modifier.weight(1f).fillMaxSize(),
                     )

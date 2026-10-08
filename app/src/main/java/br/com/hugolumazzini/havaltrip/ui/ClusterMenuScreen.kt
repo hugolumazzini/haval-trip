@@ -415,15 +415,24 @@ private fun Conteudo(
                                 .fillMaxWidth()
                                 .aspectRatio(LARGURA_POR_ALTURA)
                                 .medindoPeca("carrinho")
+                                .offset(
+                                    x = ajustes.empurraoDoCarroNaBola.x.dp,
+                                    y = ajustes.empurraoDoCarroNaBola.y.dp
+                                )
                         } else {
                             Modifier
                                 .fillMaxHeight(ajustes.zoomDoCarroNaBola.fator.coerceIn(0.2f, 1f))
                                 .aspectRatio(LARGURA_POR_ALTURA)
+                                .offset(
+                                    x = ajustes.empurraoDoCarroNaBola.x.dp,
+                                    y = ajustes.empurraoDoCarroNaBola.y.dp
+                                )
                         },
                         legenda = false,
-                        aproximacao = ajustes.afastamentoDoCarroNaBola / 100f,
-                        offsetX = if (apertado) ajustes.offsetPressoesNaBola.x else 0,
-                        offsetY = if (apertado) ajustes.offsetPressoesNaBola.y else 0,
+                        // CORREÇÃO: usa afastamentoNaBola (específico) em vez de afastamentoDoCarroNaBola
+                        aproximacao = (ajustes.afastamentoNaBola.util / 100f).coerceIn(0.5f, 1.2f),
+                        offsetX = ajustes.offsetPressoesNaBola.x,
+                        offsetY = ajustes.offsetPressoesNaBola.y,
                     )
 
                     is Visao.DeTrip -> Painel(

@@ -401,7 +401,7 @@ private fun ZeragemAutomatica(vm: TripViewModel, estado: TripState) {
                 rotuloDoTempo(minutos),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Cores.Destaque,
-                modifier = Modifier.widthIn(min = 85.dp),
+                modifier = Modifier.widthIn(min = 100.dp),
             )
         }
         Row(Modifier.widthIn(max = 700.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -519,9 +519,15 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
                 // Números
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.Start,
                     verticalAlignment = Alignment.Top,
                 ) {
+                    Switch(
+                        checked = ajustes.habilitarNumerosNoPainel,
+                        onCheckedChange = { Cluster.alternarHabilitarNumerosNoPainel() },
+                        modifier = Modifier.scale(1.1f),
+                    )
+                    Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Números", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
                         Spacer(Modifier.height(4.dp))
@@ -531,12 +537,6 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
                             color = Cores.TextoApoio,
                         )
                     }
-                    Spacer(Modifier.width(8.dp))
-                    Switch(
-                        checked = ajustes.habilitarNumerosNoPainel,
-                        onCheckedChange = { Cluster.alternarHabilitarNumerosNoPainel() },
-                        modifier = Modifier.scale(0.75f),
-                    )
                 }
 
                 Spacer(Modifier.height(12.dp))
@@ -544,9 +544,15 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
                 // Carrinho
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.Start,
                     verticalAlignment = Alignment.Top,
                 ) {
+                    Switch(
+                        checked = ajustes.habilitarCarroNoPainel,
+                        onCheckedChange = { Cluster.alternarHabilitarCarroNoPainel() },
+                        modifier = Modifier.scale(1.1f),
+                    )
+                    Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Carrinho", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
                         Spacer(Modifier.height(4.dp))
@@ -556,12 +562,6 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
                             color = Cores.TextoApoio,
                         )
                     }
-                    Spacer(Modifier.width(8.dp))
-                    Switch(
-                        checked = ajustes.habilitarCarroNoPainel,
-                        onCheckedChange = { Cluster.alternarHabilitarCarroNoPainel() },
-                        modifier = Modifier.scale(0.75f),
-                    )
                 }
 
                 Spacer(Modifier.height(12.dp))
@@ -569,9 +569,15 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
                 // Integrar ao painel
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.Start,
                     verticalAlignment = Alignment.Top,
                 ) {
+                    Switch(
+                        checked = ajustes.habilitarPaginaComVisoes,
+                        onCheckedChange = { Cluster.alternarHabilitarPaginaComVisoes() },
+                        modifier = Modifier.scale(1.1f),
+                    )
+                    Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Integrar ao painel", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
                         Spacer(Modifier.height(4.dp))
@@ -581,12 +587,6 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
                             color = Cores.TextoApoio,
                         )
                     }
-                    Spacer(Modifier.width(8.dp))
-                    Switch(
-                        checked = ajustes.habilitarPaginaComVisoes,
-                        onCheckedChange = { Cluster.alternarHabilitarPaginaComVisoes() },
-                        modifier = Modifier.scale(0.75f),
-                    )
                 }
 
                 Spacer(Modifier.height(18.dp))
@@ -1062,9 +1062,15 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
     Spacer(Modifier.height(14.dp))
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.Top,
     ) {
+        Switch(
+            checked = ajustes.mostrarAnelAzul,
+            onCheckedChange = { Cluster.alternarMostrarAnelAzul() },
+            modifier = Modifier.scale(1.1f),
+        )
+        Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text("Borda", style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
             Spacer(Modifier.height(4.dp))
@@ -1074,12 +1080,6 @@ private fun PaginaComVisoes(ajustes: AjustesDoCluster, espiar: (Class<*>) -> Uni
                 color = Cores.TextoApoio,
             )
         }
-        Spacer(Modifier.width(8.dp))
-        Switch(
-            checked = ajustes.mostrarAnelAzul,
-            onCheckedChange = { Cluster.alternarMostrarAnelAzul() },
-            modifier = Modifier.scale(0.75f),
-        )
     }
 
     // Lista própria, e não a da aba "Números": são duas janelas com espaços

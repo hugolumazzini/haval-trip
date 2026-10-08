@@ -112,8 +112,11 @@ class MotorDeBordo private constructor(private val app: Application) {
 
     private val _fonte = MutableStateFlow(
         when {
-            ShizukuTelemetrySource.disponivel() -> Fonte.SHIZUKU
+            // PRIORIDADE 1: HavalShisuku service (mais confiável, usado pelo Impulse)
             shisukuInstalado -> Fonte.SHISUKU
+            // PRIORIDADE 2: Linha direta via Shizuku (fallback)
+            ShizukuTelemetrySource.disponivel() -> Fonte.SHIZUKU
+            // PRIORIDADE 3: Simulador (emulador/teste)
             else -> Fonte.SIMULADOR
         }
     )

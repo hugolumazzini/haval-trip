@@ -60,13 +60,13 @@ val EstiloNumeroMedio = TextStyle(
 
 /** Tela de carro: tudo um degrau maior que o padrão do Material. */
 val TipografiaCarro = Typography(
-    headlineSmall = TextStyle(fontFamily = PlexSans, fontSize = 24.sp, fontWeight = FontWeight.SemiBold),
-    titleLarge = TextStyle(fontFamily = PlexSans, fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
-    titleMedium = TextStyle(fontFamily = PlexSans, fontSize = 17.sp, fontWeight = FontWeight.SemiBold),
-    titleSmall = TextStyle(fontFamily = PlexSans, fontSize = 15.sp, fontWeight = FontWeight.Medium),
-    bodyLarge = TextStyle(fontFamily = PlexSans, fontSize = 16.sp),
-    bodyMedium = TextStyle(fontFamily = PlexSans, fontSize = 14.sp),
-    bodySmall = TextStyle(fontFamily = PlexSans, fontSize = 13.sp),
-    labelLarge = TextStyle(fontFamily = PlexSans, fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
-    labelMedium = TextStyle(fontFamily = PlexSans, fontSize = 13.sp, fontWeight = FontWeight.Medium),
+    headlineSmall = TextStyle(fontFamily = PlexSans, fontSize = 30.sp, fontWeight = FontWeight.SemiBold),
+    titleLarge = TextStyle(fontFamily = PlexSans, fontSize = 26.sp, fontWeight = FontWeight.SemiBold),
+    titleMedium = TextStyle(fontFamily = PlexSans, fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
+    titleSmall = TextStyle(fontFamily = PlexSans, fontSize = 20.sp, fontWeight = FontWeight.Medium),
+    bodyLarge = TextStyle(fontFamily = PlexSans, fontSize = 21.sp),
+    bodyMedium = TextStyle(fontFamily = PlexSans, fontSize = 19.sp),
+    bodySmall = TextStyle(fontFamily = PlexSans, fontSize = 18.sp),
+    labelLarge = TextStyle(fontFamily = PlexSans, fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
+    labelMedium = TextStyle(fontFamily = PlexSans, fontSize = 18.sp, fontWeight = FontWeight.Medium),
 )

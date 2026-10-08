@@ -240,13 +240,9 @@ object ProjetorDoPainel {
             if (!jaExecutou) {
                 jaExecutou = true
                 escopo.launch {
-                    Log.d(TAG, "projetarNaPartida: iniciando projeção...")
                     escolhas().forEach { (janela, tela) ->
                         if (tela != null) {
-                            Log.d(TAG, "projetando $janela → tela $tela")
                             runCatching { projetar(aplicacao, janela, tela) }
-                                .onSuccess { Log.d(TAG, "$janela projetada com sucesso") }
-                                .onFailure { Log.w(TAG, "falha ao projetar $janela", it) }
                         }
                     }
                     // O reforço, e o motivo dele é a ordem de quem sobe: o Impulse
@@ -256,31 +252,24 @@ object ProjetorDoPainel {
                     // baixou. Uma só — reprojetar em laço seria uma queda de braço
                     // com o outro app, piscando o painel inteiro.
                     delay(REFORCO_MS)
-                    Log.d(TAG, "reforçando projeção...")
                     escolhas().forEach { (janela, tela) ->
                         if (tela != null) runCatching { projetar(aplicacao, janela, tela, insistir = true) }
                     }
                 }
-            } else {
-                Log.d(TAG, "projeção já executada, ignorando")
             }
         }
 
         // Caminho 1: esperar pelo callback do Shizuku (pode não funcionar)
         val aoChegarBinder = Shizuku.OnBinderReceivedListener {
-            Log.d(TAG, "Shizuku binder recebido via listener")
             executarProjecao()
         }
         runCatching { Shizuku.addBinderReceivedListenerSticky(aoChegarBinder) }
-            .onSuccess { Log.d(TAG, "listener Sticky adicionado") }
-            .onFailure { Log.w(TAG, "não deu para esperar pelo Shizuku", it) }
 
-        // Caminho 2: FALLBACK - tentar de qualquer jeito após 5s
-        // (se Shizuku já estiver pronto, funciona; se não, só loga erro)
+        // Caminho 2: FALLBACK - tentar de qualquer jeito após 10s
+        // (se Shizuku já estiver pronto, funciona; se não, só retorna erro silencioso)
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-            Log.d(TAG, "fallback: tentando projetar mesmo sem callback do Sticky")
             executarProjecao()
-        }, 5_000)
+        }, 10_000)
     }
 
     /**

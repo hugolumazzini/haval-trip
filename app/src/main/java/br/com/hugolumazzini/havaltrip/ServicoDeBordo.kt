@@ -58,15 +58,16 @@ class ServicoDeBordo : Service() {
             }
         }, 15_000)
 
-        // ESTÁGIO 3 (30s depois): Projetar no painel - quando Shizuku já estabilizou.
+        // ESTÁGIO 3 (40s depois): Projetar no painel - quando Shizuku já estabilizou.
         // Se o motorista escolheu telas para as janelas do painel, colocá-las
         // lá sozinho — é o que substitui o cadastro na tela "Telas" do Impulse.
-        // Adiado porque depende de Shizuku/displays secundários estarem prontos.
+        // Adiado 40s (não 30s) para dar mais tempo ao sistema estabilizar e não
+        // sobrecarregar a central no boot. A MEDIÇÃO começa imediatamente (estágio 1).
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
             runCatching {
                 ProjetorDoPainel.projetarNaPartida(this, Cluster::telasEscolhidas)
             }
-        }, 30_000)
+        }, 40_000)
     }
 
     /**

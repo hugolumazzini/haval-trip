@@ -246,8 +246,13 @@ class ShizukuTelemetrySource(
             IIntelligentVehicleControlService.Stub.asInterface(ShizukuBinderWrapper(cru))
         }.getOrNull()
 
-        /** `true` se o Shizuku está instalado e rodando nesta central. */
-        fun disponivel(): Boolean = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
+        /**
+         * `true` se o Shizuku está instalado, rodando E autorizado.
+         *
+         * Só retorna true se realmente puder ler dados do carro - caso contrário
+         * o app ficaria congelado com dados estáticos sem o motorista entender por quê.
+         */
+        fun disponivel(): Boolean = autorizado()
 
         /** `true` se o dono já autorizou este app, em algum momento. */
         fun autorizado(): Boolean = runCatching {

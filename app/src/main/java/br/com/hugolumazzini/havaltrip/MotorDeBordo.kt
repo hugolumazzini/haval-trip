@@ -112,10 +112,10 @@ class MotorDeBordo private constructor(private val app: Application) {
 
     private val _fonte = MutableStateFlow(
         when {
-            // PRIORIDADE 1: HavalShisuku service (mais confiável, usado pelo Impulse)
-            shisukuInstalado -> Fonte.SHISUKU
-            // PRIORIDADE 2: Linha direta via Shizuku (fallback)
+            // PRIORIDADE 1: Linha direta via Shizuku (comprovadamente funciona)
             ShizukuTelemetrySource.disponivel() -> Fonte.SHIZUKU
+            // PRIORIDADE 2: HavalShisuku service (fallback)
+            shisukuInstalado -> Fonte.SHISUKU
             // PRIORIDADE 3: Simulador (emulador/teste)
             else -> Fonte.SIMULADOR
         }
@@ -134,8 +134,56 @@ class MotorDeBordo private constructor(private val app: Application) {
         // isto, o simulador voltaria a "desligado" e o módulo veria um corte de
         // ignição que nunca houve — e, passados 5 min, zeraria a Viagem atual.
         simulador.ignicao = manager.state.value.live.ignition
+
+        // FORÇA pedido de autorização do Shizuku se estiver rodando mas não autorizado.
+        // Sem isto, o app fica num catch-22: não usa SHIZUKU porque não está autorizado,
+        // mas nunca pede autorização porque não está usando SHIZUKU.
+        pedirAutorizacaoShizukuSeNecessario()
+
+        // Listener para quando autorização for concedida: trocar automaticamente para SHIZUKU
+        escopo.launch(Dispatchers.Main) {
+            runCatching {
+                rikka.shizuku.Shizuku.addRequestPermissionResultListener { requestCode, grantResult ->
+                    if (requestCode == 4321 && grantResult == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        Log.i("MotorDeBordo", "🎉 Shizuku autorizado! Trocando para fonte SHIZUKU")
+                        usarFonte(Fonte.SHIZUKU)
+                    }
+                }
+            }
+        }
+
         escutar()
         BancadaDeTestes.ligar(app, estadoDoCarro) { _fonte.value == Fonte.SIMULADOR }
+    }
+
+    /**
+     * Pede autorização do Shizuku se estiver rodando mas não autorizado.
+     *
+     * Resolve o catch-22: sem isto, se Shizuku não estivesse autorizado, o app
+     * nunca usaria SHIZUKU, logo nunca pediria autorização, ficando preso.
+     */
+    private fun pedirAutorizacaoShizukuSeNecessario() {
+        escopo.launch(Dispatchers.Main) {
+            try {
+                // Só pede se Shizuku estiver rodando mas não autorizado
+                if (ShizukuTelemetrySource.disponivel()) {
+                    Log.d("MotorDeBordo", "✅ Shizuku já autorizado")
+                    return@launch
+                }
+
+                // Shizuku rodando mas não autorizado? Pede!
+                if (runCatching { rikka.shizuku.Shizuku.pingBinder() }.getOrDefault(false)) {
+                    Log.i("MotorDeBordo", "🔑 Shizuku rodando sem autorização - pedindo agora")
+                    runCatching {
+                        rikka.shizuku.Shizuku.requestPermission(4321)
+                    }.onFailure {
+                        Log.w("MotorDeBordo", "Não conseguiu pedir autorização do Shizuku", it)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("MotorDeBordo", "Erro ao verificar Shizuku", e)
+            }
+        }
     }
 
     private fun escutar() {

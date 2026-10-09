@@ -150,6 +150,9 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
     /** Só faz sentido no simulador; no carro quem gira a chave é a chave. */
     fun alternarIgnicao() = motor.alternarIgnicao()
 
+    /** Força pedido de autorização do Shizuku (botão manual de recuperação). */
+    fun pedirAutorizacaoShizuku() = motor.pedirAutorizacaoShizuku()
+
     // ------------------------------------------------------------- Trips
 
     fun selecionar(tripId: String) = motor.selecionar(tripId)

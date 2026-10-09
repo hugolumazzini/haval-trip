@@ -67,6 +67,7 @@ class ShizukuTelemetrySource(
 
     override fun samples(): Flow<TelemetrySample> = callbackFlow {
         var servico: IIntelligentVehicleControlService? = null
+        var jaPediuAutorizacaoNestaConexao = false
 
         val ouvinte = object : IListener.Stub() {
             override fun onDataChanged(chave: String?, valor: String?) {
@@ -142,13 +143,30 @@ class ShizukuTelemetrySource(
                     // não funciona mais — que ficaria valendo.
                     runCatching { servico?.unRegisterDataChangedListener(PACOTE, ouvinte) }
                     servico = null
-                    // Só religa; não pede autorização de novo. O vigia roda
-                    // sozinho a viagem inteira, e pedir permissão em laço
-                    // encheria a tela do motorista de caixas de diálogo.
                     when {
-                        !Shizuku.pingBinder() -> _situacao.value = Situacao.SemShizuku
-                        !autorizado() -> _situacao.value = Situacao.PrecisaAutorizar
-                        else -> conectar()
+                        !Shizuku.pingBinder() -> {
+                            _situacao.value = Situacao.SemShizuku
+                            jaPediuAutorizacaoNestaConexao = false
+                        }
+                        !autorizado() -> {
+                            _situacao.value = Situacao.PrecisaAutorizar
+                            // Pede autorização UMA VEZ quando detecta revogação.
+                            // Evita loop de diálogos, mas permite recuperação automática.
+                            if (!jaPediuAutorizacaoNestaConexao) {
+                                jaPediuAutorizacaoNestaConexao = true
+                                Log.w(TAG, "🔑 Autorização revogada! Pedindo novamente...")
+                                runCatching {
+                                    Shizuku.requestPermission(PEDIDO_DE_PERMISSAO)
+                                }.onFailure {
+                                    Log.w(TAG, "Não conseguiu pedir autorização", it)
+                                }
+                            }
+                        }
+                        else -> {
+                            // Reconectou com sucesso, reseta flag
+                            jaPediuAutorizacaoNestaConexao = false
+                            conectar()
+                        }
                     }
                 }
 

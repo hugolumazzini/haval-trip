@@ -230,6 +230,31 @@ class MotorDeBordo private constructor(private val app: Application) {
         usarFonte(todas[(todas.indexOf(_fonte.value) + 1) % todas.size])
     }
 
+    /**
+     * Força pedido de autorização do Shizuku.
+     *
+     * Chamado pelo botão na tela de Configuração quando o usuário precisa
+     * re-autorizar o app (ex: Shizuku revogou a permissão).
+     */
+    fun pedirAutorizacaoShizuku() {
+        escopo.launch(Dispatchers.Main) {
+            try {
+                if (runCatching { rikka.shizuku.Shizuku.pingBinder() }.getOrDefault(false)) {
+                    Log.i("MotorDeBordo", "🔑 Pedindo autorização do Shizuku (manual)")
+                    runCatching {
+                        rikka.shizuku.Shizuku.requestPermission(4321)
+                    }.onFailure {
+                        Log.w("MotorDeBordo", "Não conseguiu pedir autorização do Shizuku", it)
+                    }
+                } else {
+                    Log.w("MotorDeBordo", "⚠️ Shizuku não está rodando")
+                }
+            } catch (e: Exception) {
+                Log.w("MotorDeBordo", "Erro ao pedir autorização do Shizuku", e)
+            }
+        }
+    }
+
     fun alternarIgnicao() {
         if (_fonte.value != Fonte.SIMULADOR) return
         val novo = if (state.value.live.ignition == IgnitionState.ON) IgnitionState.OFF else IgnitionState.ON

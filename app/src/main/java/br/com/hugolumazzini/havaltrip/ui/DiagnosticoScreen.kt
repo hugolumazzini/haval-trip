@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import br.com.hugolumazzini.havaltrip.BuildConfig
+import br.com.hugolumazzini.havaltrip.telemetry.Relatorio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -80,6 +81,8 @@ fun DiagnosticoScreen(vm: TripViewModel) {
     var tentandoIniciar by remember { mutableStateOf(false) }
     var logs by remember { mutableStateOf<String?>(null) }
     var capturandoLogs by remember { mutableStateOf(false) }
+    var linkLogs by remember { mutableStateOf<String?>(null) }
+    var enviandoLogs by remember { mutableStateOf(false) }
 
     // Carrega informações do sistema ao abrir a tela
     LaunchedEffect(Unit) {
@@ -294,6 +297,25 @@ fun DiagnosticoScreen(vm: TripViewModel) {
             title = { Text("Logs de Debug") },
             text = {
                 Column(Modifier.fillMaxWidth().height(400.dp)) {
+                    // Link gerado (se houver)
+                    if (linkLogs != null) {
+                        Text(
+                            "✅ Link copiado automaticamente!",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Cores.Destaque
+                        )
+                        Text(
+                            linkLogs ?: "",
+                            fontFamily = FontFamily.Monospace,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Cores.Texto,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        HorizontalDivider(color = Cores.Contorno)
+                        Spacer(Modifier.height(12.dp))
+                    }
+
                     Text(
                         "Últimas 500 linhas relevantes:",
                         style = MaterialTheme.typography.bodySmall,
@@ -312,14 +334,39 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                 }
             },
             confirmButton = {
-                BotaoAcao("Copiar", onClick = {
-                    val clipboard = contexto.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("Logs", logs))
-                })
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    BotaoAcao(
+                        texto = if (enviandoLogs) "Enviando..." else if (linkLogs != null) "✓ Link gerado" else "Gerar link",
+                        onClick = {
+                            if (!enviandoLogs && linkLogs == null) {
+                                enviandoLogs = true
+                                escopo.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                    try {
+                                        val resultado = Relatorio.enviar(logs ?: "")
+                                        resultado.onSuccess { url ->
+                                            linkLogs = url
+                                            // Copia automaticamente
+                                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                val clipboard = contexto.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                                clipboard.setPrimaryClip(ClipData.newPlainText("Link Logs", url))
+                                            }
+                                        }.onFailure {
+                                            linkLogs = "ERRO: ${it.message}"
+                                        }
+                                    } finally {
+                                        enviandoLogs = false
+                                    }
+                                }
+                            }
+                        }
+                    )
+                    BotaoAcao("Fechar", onClick = {
+                        logs = null
+                        linkLogs = null
+                    })
+                }
             },
-            dismissButton = {
-                BotaoAcao("Fechar", onClick = { logs = null })
-            }
+            dismissButton = null
         )
     }
 }

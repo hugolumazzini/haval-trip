@@ -78,6 +78,8 @@ fun DiagnosticoScreen(vm: TripViewModel) {
 
     var estadoSistema by remember { mutableStateOf<Diagnostico.EstadoDoSistema?>(null) }
     var tentandoIniciar by remember { mutableStateOf(false) }
+    var logs by remember { mutableStateOf<String?>(null) }
+    var capturandoLogs by remember { mutableStateOf(false) }
 
     // Carrega informações do sistema ao abrir a tela
     LaunchedEffect(Unit) {
@@ -150,6 +152,25 @@ fun DiagnosticoScreen(vm: TripViewModel) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 BotaoAcao("Pedir tudo ao carro", vm::pedirTudoAoCarro)
                 if (vm.shisukuInstalado) BotaoAcao("Abrir HavalShisuku", vm::abrirShisuku)
+                BotaoAcao(
+                    texto = if (capturandoLogs) "Capturando..." else "Ver Logs",
+                    onClick = {
+                        if (!capturandoLogs) {
+                            capturandoLogs = true
+                            escopo.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                try {
+                                    // Captura últimas 500 linhas dos logs relevantes
+                                    val resultado = br.com.hugolumazzini.havaltrip.painel.ShizukuShell.rodar(
+                                        "logcat -t 500 -s MotorDeBordo:* ProjetorDoPainel:* ClusterOverlayService:*"
+                                    )
+                                    logs = resultado ?: "Erro ao capturar logs (Shizuku não autorizado?)"
+                                } finally {
+                                    capturandoLogs = false
+                                }
+                            }
+                        }
+                    }
+                )
                 // Botão de alternar fonte: só no emulador/debug, não no carro real
                 if (BuildConfig.DEBUG) {
                     BotaoAcao(
@@ -264,6 +285,42 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                 }
             }
         }
+    }
+
+    // Dialog para mostrar logs
+    if (logs != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { logs = null },
+            title = { Text("Logs de Debug") },
+            text = {
+                Column(Modifier.fillMaxWidth().height(400.dp)) {
+                    Text(
+                        "Últimas 500 linhas relevantes:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Cores.TextoApoio
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        logs ?: "",
+                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                    )
+                }
+            },
+            confirmButton = {
+                BotaoAcao("Copiar", onClick = {
+                    val clipboard = contexto.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Logs", logs))
+                })
+            },
+            dismissButton = {
+                BotaoAcao("Fechar", onClick = { logs = null })
+            }
+        )
     }
 }
 

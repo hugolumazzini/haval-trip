@@ -86,6 +86,7 @@ class ClusterOverlayService : Service() {
          * Projeta despedida (remove outros apps primeiro)
          */
         fun projetarDespedida(context: Context, janela: JanelaDoPainel, displayId: Int) {
+            Log.i(TAG, "👋 projetarDespedida: $janela em display $displayId")
             val intent = Intent(context, ClusterOverlayService::class.java).apply {
                 putExtra(EXTRA_COMANDO, CMD_DESPEDIDA)
                 putExtra(EXTRA_JANELA, janela.name)
@@ -93,6 +94,7 @@ class ClusterOverlayService : Service() {
                 putExtra(EXTRA_DESPEDIDA, true)
             }
             context.startService(intent)
+            Log.d(TAG, "✅ Intent de despedida enviado")
         }
     }
 

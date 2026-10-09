@@ -233,16 +233,22 @@ object ProjetorDoPainel {
      * Uma flag garante que só execute uma vez (listener OU fallback, não os dois).
      */
     fun projetarNaPartida(context: Context, escolhas: () -> Map<JanelaDoPainel, Int?>) {
+        Log.i(TAG, "🚀 projetarNaPartida iniciado")
         val aplicacao = context.applicationContext
         var jaExecutou = false
 
         val executarProjecao = {
             if (!jaExecutou) {
+                Log.i(TAG, "🎯 Executando projeção automática...")
                 jaExecutou = true
                 escopo.launch {
-                    escolhas().forEach { (janela, tela) ->
+                    val mapa = escolhas()
+                    Log.d(TAG, "Escolhas: $mapa")
+                    mapa.forEach { (janela, tela) ->
                         if (tela != null) {
+                            Log.i(TAG, "Projetando $janela na tela $tela")
                             runCatching { projetar(aplicacao, janela, tela) }
+                                .onFailure { Log.e(TAG, "Erro ao projetar $janela", it) }
                         }
                     }
                     // O reforço, e o motivo dele é a ordem de quem sobe: o Impulse
@@ -261,13 +267,20 @@ object ProjetorDoPainel {
 
         // Caminho 1: esperar pelo callback do Shizuku (pode não funcionar)
         val aoChegarBinder = Shizuku.OnBinderReceivedListener {
+            Log.i(TAG, "📡 Shizuku binder chegou! Executando projeção...")
             executarProjecao()
         }
-        runCatching { Shizuku.addBinderReceivedListenerSticky(aoChegarBinder) }
+        runCatching {
+            Shizuku.addBinderReceivedListenerSticky(aoChegarBinder)
+            Log.d(TAG, "✅ Listener de Shizuku registrado")
+        }.onFailure {
+            Log.w(TAG, "⚠️ Não conseguiu registrar listener de Shizuku", it)
+        }
 
         // Caminho 2: FALLBACK - tentar de qualquer jeito após 10s
         // (se Shizuku já estiver pronto, funciona; se não, só retorna erro silencioso)
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            Log.i(TAG, "⏰ Fallback de 10s atingido, tentando projetar...")
             executarProjecao()
         }, 10_000)
     }

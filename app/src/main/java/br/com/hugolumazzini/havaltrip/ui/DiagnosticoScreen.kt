@@ -162,9 +162,9 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                             capturandoLogs = true
                             escopo.launch(kotlinx.coroutines.Dispatchers.IO) {
                                 try {
-                                    // Captura últimas 500 linhas dos logs relevantes
+                                    // Captura últimas 1000 linhas filtrando apenas o app
                                     val resultado = br.com.hugolumazzini.havaltrip.painel.ShizukuShell.rodar(
-                                        "logcat -t 500 -s MotorDeBordo:* ProjetorDoPainel:* ClusterOverlayService:*"
+                                        "logcat -t 1000 | grep -E 'br\\.com\\.hugolumazzini\\.havaltrip|MotorDeBordo|ProjetorDoPainel|ClusterOverlayService|ShizukuTelemetrySource|TripViewModel'"
                                     )
                                     logs = resultado ?: "Erro ao capturar logs (Shizuku não autorizado?)"
                                 } finally {

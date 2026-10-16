@@ -338,17 +338,18 @@ class MotorDeBordo private constructor(private val app: Application) {
                 // Pequeno delay para composable processar ignição OFF
                 delay(100)
 
-                // DESPEDIDA COM PRIORIDADE TOTAL via ClusterOverlayService:
-                // - Remove outros apps (Impulse, AutoPanel) do display
-                // - Projeta overlay WindowManager com parâmetros da engenharia reversa
-                // - Garante que NADA fica por cima
-                Log.i("MotorDeBordo", "🎯 Projetando despedida com remoção de outros apps")
-                br.com.hugolumazzini.havaltrip.painel.ClusterOverlayService.projetarDespedida(
+                // DESPEDIDA via Activity (am start --display) como no ad223a0:
+                // - NÃO precisa permissão SYSTEM_ALERT_WINDOW
+                // - Funciona SEMPRE (Activity normal)
+                // - Última chamada a am start fica por cima (insistir=true)
+                Log.i("MotorDeBordo", "🎯 Projetando despedida via Activity (insistir=true)")
+                ProjetorDoPainel.projetar(
                     app,
                     janela,
-                    telaId
+                    telaId,
+                    insistir = true  // Força reprojeção para ficar por cima
                 )
-                Log.i("MotorDeBordo", "✅ Despedida projetada com prioridade total!")
+                Log.i("MotorDeBordo", "✅ Despedida projetada!")
 
             } catch (e: Exception) {
                 Log.e("MotorDeBordo", "❌ Erro ao mostrar despedida", e)

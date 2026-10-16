@@ -318,12 +318,12 @@ class MotorDeBordo private constructor(private val app: Application) {
                     ajustes.telaDosNumeros != null -> JanelaDoPainel.NUMEROS to ajustes.telaDosNumeros
                     ajustes.telaDoMenu != null -> JanelaDoPainel.MENU to ajustes.telaDoMenu
                     ajustes.telaDoCarro != null -> JanelaDoPainel.CARRO to ajustes.telaDoCarro
-                    else -> null
-                }
-
-                if (janelaComDespedida == null) {
-                    Log.w("MotorDeBordo", "❌ Nenhuma tela configurada - despedida não será exibida")
-                    return@launch
+                    else -> {
+                        // SEM TELA CONFIGURADA: projeta NUMEROS no display 1 (cluster principal)
+                        // Isso faz a despedida funcionar MESMO sem configuração prévia!
+                        Log.w("MotorDeBordo", "⚠️ Sem tela configurada - usando NUMEROS display 1 (padrão)")
+                        JanelaDoPainel.NUMEROS to 1
+                    }
                 }
 
                 val (janela, telaId) = janelaComDespedida

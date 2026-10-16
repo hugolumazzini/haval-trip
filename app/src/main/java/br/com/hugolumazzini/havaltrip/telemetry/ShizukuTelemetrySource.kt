@@ -265,12 +265,15 @@ class ShizukuTelemetrySource(
         }.getOrNull()
 
         /**
-         * `true` se o Shizuku está instalado, rodando E autorizado.
+         * `true` se o Shizuku está instalado e rodando.
          *
-         * Só retorna true se realmente puder ler dados do carro - caso contrário
-         * o app ficaria congelado com dados estáticos sem o motorista entender por quê.
+         * NÃO exige autorização - só verifica se o processo do Shizuku está ativo.
+         * A autorização será pedida automaticamente quando tentar usar (MotorDeBordo.init).
+         * Isso permite que o app escolha Shizuku como fonte ANTES de ter autorização,
+         * e assim possa pedir autorização (se ficar esperando autorização para escolher,
+         * nunca pede = catch-22).
          */
-        fun disponivel(): Boolean = autorizado()
+        fun disponivel(): Boolean = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
 
         /** `true` se o dono já autorizou este app, em algum momento. */
         fun autorizado(): Boolean = runCatching {

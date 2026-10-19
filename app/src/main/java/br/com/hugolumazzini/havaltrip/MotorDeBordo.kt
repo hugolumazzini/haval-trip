@@ -134,56 +134,8 @@ class MotorDeBordo private constructor(private val app: Application) {
         // isto, o simulador voltaria a "desligado" e o módulo veria um corte de
         // ignição que nunca houve — e, passados 5 min, zeraria a Viagem atual.
         simulador.ignicao = manager.state.value.live.ignition
-
-        // FORÇA pedido de autorização do Shizuku se estiver rodando mas não autorizado.
-        // Sem isto, o app fica num catch-22: não usa SHIZUKU porque não está autorizado,
-        // mas nunca pede autorização porque não está usando SHIZUKU.
-        pedirAutorizacaoShizukuSeNecessario()
-
-        // Listener para quando autorização for concedida: trocar automaticamente para SHIZUKU
-        escopo.launch(Dispatchers.Main) {
-            runCatching {
-                rikka.shizuku.Shizuku.addRequestPermissionResultListener { requestCode, grantResult ->
-                    if (requestCode == 4321 && grantResult == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                        Log.i("MotorDeBordo", "🎉 Shizuku autorizado! Trocando para fonte SHIZUKU")
-                        usarFonte(Fonte.SHIZUKU)
-                    }
-                }
-            }
-        }
-
         escutar()
         BancadaDeTestes.ligar(app, estadoDoCarro) { _fonte.value == Fonte.SIMULADOR }
-    }
-
-    /**
-     * Pede autorização do Shizuku se estiver rodando mas não autorizado.
-     *
-     * Resolve o catch-22: sem isto, se Shizuku não estivesse autorizado, o app
-     * nunca usaria SHIZUKU, logo nunca pediria autorização, ficando preso.
-     */
-    private fun pedirAutorizacaoShizukuSeNecessario() {
-        escopo.launch(Dispatchers.Main) {
-            try {
-                // Só pede se Shizuku estiver rodando mas não autorizado
-                if (ShizukuTelemetrySource.disponivel()) {
-                    Log.d("MotorDeBordo", "✅ Shizuku já autorizado")
-                    return@launch
-                }
-
-                // Shizuku rodando mas não autorizado? Pede!
-                if (runCatching { rikka.shizuku.Shizuku.pingBinder() }.getOrDefault(false)) {
-                    Log.i("MotorDeBordo", "🔑 Shizuku rodando sem autorização - pedindo agora")
-                    runCatching {
-                        rikka.shizuku.Shizuku.requestPermission(4321)
-                    }.onFailure {
-                        Log.w("MotorDeBordo", "Não conseguiu pedir autorização do Shizuku", it)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w("MotorDeBordo", "Erro ao verificar Shizuku", e)
-            }
-        }
     }
 
     private fun escutar() {
@@ -203,15 +155,8 @@ class MotorDeBordo private constructor(private val app: Application) {
                     // ninguém apertar nada. Ela mesma se cala se estiver
                     // desligada, que é o caso de todo mundo menos quem está
                     // medindo um PHEV.
-                    if (amostra.ignition == IgnitionState.ON) {
-                        coletaDeEnergia.comecar()
-                    } else {
-                        coletaDeEnergia.terminar()
-                        // PRIORIDADE TOTAL DA DESPEDIDA: ao desligar, força a janela
-                        // de despedida para a frente IMEDIATAMENTE, sobrepondo qualquer
-                        // outra janela (incluindo do Impulse)
-                        forcarDespedidaNaFrente()
-                    }
+                    if (amostra.ignition == IgnitionState.ON) coletaDeEnergia.comecar()
+                    else coletaDeEnergia.terminar()
                 }
                 manager.processTelemetry(amostra)
             }
@@ -230,44 +175,14 @@ class MotorDeBordo private constructor(private val app: Application) {
         usarFonte(todas[(todas.indexOf(_fonte.value) + 1) % todas.size])
     }
 
-    /**
-     * Força pedido de autorização do Shizuku.
-     *
-     * Chamado pelo botão na tela de Configuração quando o usuário precisa
-     * re-autorizar o app (ex: Shizuku revogou a permissão).
-     */
-    fun pedirAutorizacaoShizuku() {
-        escopo.launch(Dispatchers.Main) {
-            try {
-                if (runCatching { rikka.shizuku.Shizuku.pingBinder() }.getOrDefault(false)) {
-                    Log.i("MotorDeBordo", "🔑 Pedindo autorização do Shizuku (manual)")
-                    runCatching {
-                        rikka.shizuku.Shizuku.requestPermission(4321)
-                    }.onFailure {
-                        Log.w("MotorDeBordo", "Não conseguiu pedir autorização do Shizuku", it)
-                    }
-                } else {
-                    Log.w("MotorDeBordo", "⚠️ Shizuku não está rodando")
-                }
-            } catch (e: Exception) {
-                Log.w("MotorDeBordo", "Erro ao pedir autorização do Shizuku", e)
-            }
-        }
-    }
-
     fun alternarIgnicao() {
         if (_fonte.value != Fonte.SIMULADOR) return
         val novo = if (state.value.live.ignition == IgnitionState.ON) IgnitionState.OFF else IgnitionState.ON
         simulador.ignicao = novo
         manager.handleIgnitionChange(novo)
         // Também inicia/termina a coleta de energia quando a ignição muda
-        if (novo == IgnitionState.ON) {
-            coletaDeEnergia.comecar()
-        } else {
-            coletaDeEnergia.terminar()
-            // PRIORIDADE TOTAL DA DESPEDIDA ao desligar
-            forcarDespedidaNaFrente()
-        }
+        if (novo == IgnitionState.ON) coletaDeEnergia.comecar()
+        else coletaDeEnergia.terminar()
     }
 
     fun selecionar(tripId: String) = manager.selectTrip(tripId)
@@ -295,66 +210,6 @@ class MotorDeBordo private constructor(private val app: Application) {
     fun pedirTudoAoCarro() {
         HavalTelemetrySource.pedirTudo(app)
         if (_fonte.value == Fonte.SHIZUKU) escutar()
-    }
-
-    /**
-     * Garante que a despedida apareça ao desligar o carro com PRIORIDADE TOTAL.
-     *
-     * Usa ClusterOverlayService (técnica do haval-app-tool-multimidia) para:
-     * 1. Remover overlays de outros apps (Impulse, AutoPanel)
-     * 2. Projetar despedida via WindowManager overlay
-     * 3. Garantir visibilidade absoluta
-     */
-    private fun forcarDespedidaNaFrente() {
-        escopo.launch(Dispatchers.Default) {
-            try {
-                Log.i("MotorDeBordo", "🚗 Ignição OFF - DESPEDIDA COM PRIORIDADE TOTAL")
-
-                val ajustes = Cluster.ajustes.value
-                Log.d("MotorDeBordo", "Telas: numeros=${ajustes.telaDosNumeros}, menu=${ajustes.telaDoMenu}, carro=${ajustes.telaDoCarro}")
-
-                // Determina qual janela vai mostrar a despedida
-                val janelaComDespedida = when {
-                    ajustes.telaDosNumeros != null -> JanelaDoPainel.NUMEROS to ajustes.telaDosNumeros
-                    ajustes.telaDoMenu != null -> JanelaDoPainel.MENU to ajustes.telaDoMenu
-                    ajustes.telaDoCarro != null -> JanelaDoPainel.CARRO to ajustes.telaDoCarro
-                    else -> {
-                        // SEM TELA CONFIGURADA: projeta NUMEROS no display 1 (cluster principal)
-                        // Isso faz a despedida funcionar MESMO sem configuração prévia!
-                        Log.w("MotorDeBordo", "⚠️ Sem tela configurada - usando NUMEROS display 1 (padrão)")
-                        JanelaDoPainel.NUMEROS to 1
-                    }
-                }
-
-                val (janela, telaId) = janelaComDespedida
-
-                // Recolhe as outras janelas do Haval Trip (palco limpo)
-                JanelaDoPainel.entries.forEach { outraJanela ->
-                    if (outraJanela != janela) {
-                        ProjetorDoPainel.recolher(outraJanela)
-                    }
-                }
-
-                // Pequeno delay para composable processar ignição OFF
-                delay(100)
-
-                // DESPEDIDA via Activity (am start --display) como no ad223a0:
-                // - NÃO precisa permissão SYSTEM_ALERT_WINDOW
-                // - Funciona SEMPRE (Activity normal)
-                // - Última chamada a am start fica por cima (insistir=true)
-                Log.i("MotorDeBordo", "🎯 Projetando despedida via Activity (insistir=true)")
-                ProjetorDoPainel.projetar(
-                    app,
-                    janela,
-                    telaId,
-                    insistir = true  // Força reprojeção para ficar por cima
-                )
-                Log.i("MotorDeBordo", "✅ Despedida projetada!")
-
-            } catch (e: Exception) {
-                Log.e("MotorDeBordo", "❌ Erro ao mostrar despedida", e)
-            }
-        }
     }
 
     companion object {

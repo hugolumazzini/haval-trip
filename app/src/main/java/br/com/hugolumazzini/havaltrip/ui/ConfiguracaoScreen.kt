@@ -617,34 +617,6 @@ private fun GeralNoPainel(vm: TripViewModel, estado: TripState) {
                         corTexto = Cores.Superficie,
                     )
                 }
-
-                Spacer(Modifier.height(18.dp))
-
-                // Autorização do Shizuku
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    val shizukuAutorizado = remember { ShizukuTelemetrySource.autorizado() }
-
-                    Text("Autorização do Shizuku", style = MaterialTheme.typography.bodyMedium, color = Cores.TextoCorrido)
-                    Spacer(Modifier.height(4.dp))
-
-                    Text(
-                        if (shizukuAutorizado) {
-                            "✅ Autorizado - captura de dados funcionando"
-                        } else {
-                            "⚠️ Não autorizado - clique abaixo para autorizar"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (shizukuAutorizado) Cores.TextoApoio else Cores.Atencao,
-                    )
-
-                    if (!shizukuAutorizado) {
-                        Spacer(Modifier.height(8.dp))
-                        BotaoAcao(
-                            "Pedir autorização",
-                            onClick = { vm.pedirAutorizacaoShizuku() },
-                        )
-                    }
-                }
             }
         }
 

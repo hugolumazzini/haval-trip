@@ -505,16 +505,20 @@ data class AjustesDoCluster(
      * alta, e o tamanho que deixa um encaixado deixa o outro sobrando ou
      * cortado. Com um ajuste só, acertar o carro desacertava os números —
      * era o que acontecia no painel.
+     *
+     * Valores ajustados baseados em testes reais no cluster (fração +0.712 x +0.619).
      */
-    val empurraoDoCarroNaBola: Empurrao = Empurrao(0, 27),
+    val empurraoDoCarroNaBola: Empurrao = Empurrao(67, 37),
     val zoomDoCarroNaBola: Zoom = Zoom(),
     /**
      * Offset das pressões dos pneus dentro da bola do carro.
      *
      * Ajuste fino para posicionar exatamente onde os números de pressão e
      * temperatura aparecem em relação ao desenho do carro na bola.
+     *
+     * Valores ajustados baseados em testes reais no cluster (fração +0.636 x +0.590).
      */
-    val offsetPressoesNaBola: Empurrao = Empurrao(-47, 23),
+    val offsetPressoesNaBola: Empurrao = Empurrao(43, 29),
     val afastamentoNaBola: Zoom = Zoom(),
     val formatoDoCarro: FormatoDoCarro = FormatoDoCarro.REDONDO,
     val afastamentoDoCarroSolto: Int = 100,

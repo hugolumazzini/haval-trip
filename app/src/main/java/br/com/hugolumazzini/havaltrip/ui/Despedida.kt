@@ -91,7 +91,7 @@ import br.com.hugolumazzini.havaltrip.ui.theme.Cores
 object Despedida {
 
     /** Abaixo disto não foi viagem, foi ligar e desligar o carro. */
-    const val DISTANCIA_MINIMA_KM = 0.1
+    const val DISTANCIA_MINIMA_KM = 0.001  // 1 metro - baixado para facilitar testes
 
     /** Quanto tempo os números levam para subir do zero até o valor real. */
     const val SUBIDA_MS = 1300

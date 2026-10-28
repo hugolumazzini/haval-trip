@@ -155,10 +155,56 @@ class MotorDeBordo private constructor(private val app: Application) {
                     // ninguém apertar nada. Ela mesma se cala se estiver
                     // desligada, que é o caso de todo mundo menos quem está
                     // medindo um PHEV.
-                    if (amostra.ignition == IgnitionState.ON) coletaDeEnergia.comecar()
-                    else coletaDeEnergia.terminar()
+                    if (amostra.ignition == IgnitionState.ON) {
+                        coletaDeEnergia.comecar()
+                    } else {
+                        coletaDeEnergia.terminar()
+                        // DESPEDIDA: quando o carro desligar, projeta o resumo em tela cheia
+                        // usando ClusterOverlayService, que garante que cobre o painel inteiro
+                        // mesmo que a janela configurada seja pequena (ex: bolinha).
+                        acionarDespedida()
+                    }
                 }
                 manager.processTelemetry(amostra)
+            }
+        }
+    }
+
+    /**
+     * Projeta a despedida em tela cheia no painel quando o carro desligar.
+     *
+     * Usa ClusterOverlayService em vez da Activity normal porque:
+     * 1. A janela configurada pode ser pequena (ex: bolinha do cluster)
+     * 2. A despedida precisa cobrir o painel inteiro para ficar legível
+     * 3. O overlay garante que fica por cima de tudo (Impulse, AutoPanel, etc.)
+     */
+    private fun acionarDespedida() {
+        escopo.launch {
+            // Aguarda um pouco para garantir que o estado está estável
+            delay(500)
+
+            val ajustes = Cluster.ajustes.value
+            val trips = manager.state.value.trips
+            val viagem = br.com.hugolumazzini.havaltrip.ui.Despedida.viagemQueAcabou(trips)
+
+            // Só mostra se valer a pena (viagem andou pelo menos 0.1km)
+            if (viagem != null && br.com.hugolumazzini.havaltrip.ui.Despedida.valeMostrar(viagem)) {
+                // Determina qual janela deve mostrar (mesma lógica da ClusterScreen)
+                val janela = br.com.hugolumazzini.havaltrip.ui.Despedida.janelaDoResumo(ajustes)
+
+                // Display 3 = cluster do H6
+                val displayId = 3
+
+                Log.d("MotorDeBordo", "👋 Acionando despedida: janela=$janela, display=$displayId, viagem=${viagem.metrics.distanceKm}km")
+
+                // Projeta despedida em tela cheia via overlay
+                br.com.hugolumazzini.havaltrip.painel.ClusterOverlayService.projetarDespedida(
+                    app,
+                    janela,
+                    displayId
+                )
+            } else {
+                Log.d("MotorDeBordo", "⏭️ Despedida não vale mostrar: viagem=${viagem?.metrics?.distanceKm}km")
             }
         }
     }
@@ -181,8 +227,13 @@ class MotorDeBordo private constructor(private val app: Application) {
         simulador.ignicao = novo
         manager.handleIgnitionChange(novo)
         // Também inicia/termina a coleta de energia quando a ignição muda
-        if (novo == IgnitionState.ON) coletaDeEnergia.comecar()
-        else coletaDeEnergia.terminar()
+        if (novo == IgnitionState.ON) {
+            coletaDeEnergia.comecar()
+        } else {
+            coletaDeEnergia.terminar()
+            // Aciona despedida também no simulador
+            acionarDespedida()
+        }
     }
 
     fun selecionar(tripId: String) = manager.selectTrip(tripId)

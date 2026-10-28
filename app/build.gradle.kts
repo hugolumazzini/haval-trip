@@ -25,8 +25,8 @@ android {
         // A numeração começou em 0.x durante desenvolvimento. A v1.0.0 marca
         // o primeiro release production-ready, após otimizações de segurança,
         // performance e consolidação de componentes.
-        versionCode = 64
-        versionName = "1.0.22"
+        versionCode = 65
+        versionName = "1.0.23"
     }
 
     signingConfigs {

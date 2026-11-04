@@ -272,10 +272,10 @@ class ClusterOverlayService : Service() {
 
             Log.i(TAG, "✅ Overlay criado: $janela no display $displayId (despedida=$despedida)")
 
-            // Inicia watchdog para garantir visibilidade (exceto na despedida)
-            if (!despedida) {
-                iniciarWatchdog()
-            }
+            // WATCHDOG SEMPRE ATIVO (inclusive na despedida!)
+            // É ESSENCIAL para manter despedida visível durante a noite
+            Log.i(TAG, "🔄 Iniciando watchdog para manter overlay visível")
+            iniciarWatchdog()
 
         } catch (e: Exception) {
             Log.e(TAG, "❌ Erro ao criar overlay", e)
@@ -334,9 +334,16 @@ class ClusterOverlayService : Service() {
     private fun iniciarWatchdog() {
         pararWatchdog()
 
+        Log.i(TAG, "🐕 Watchdog iniciado (intervalo: ${WATCHDOG_INTERVAL_MS}ms)")
+        var contador = 0
+
         watchdogJob = escopo.launch {
             while (isActive) {
                 delay(WATCHDOG_INTERVAL_MS)
+                contador++
+                if (contador % 12 == 0) {  // Log a cada 60s (12 x 5s)
+                    Log.d(TAG, "🐕 Watchdog ativo (${contador * WATCHDOG_INTERVAL_MS / 1000}s), despedida=$despedidaAtiva")
+                }
                 garantirVisibilidade()
             }
         }

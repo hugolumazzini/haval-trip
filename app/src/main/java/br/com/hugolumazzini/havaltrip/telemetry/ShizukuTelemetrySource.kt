@@ -68,6 +68,10 @@ class ShizukuTelemetrySource(
     }
 
     override fun samples(): Flow<TelemetrySample> = callbackFlow {
+        Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        Log.i(TAG, "🚀 INICIANDO FLOW SHIZUKU")
+        Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
         var servico: IIntelligentVehicleControlService? = null
         var listenerRegistrado = false
         var ultimaLeituraMs = 0L

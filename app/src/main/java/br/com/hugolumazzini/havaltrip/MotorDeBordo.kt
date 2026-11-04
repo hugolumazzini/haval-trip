@@ -110,45 +110,148 @@ class MotorDeBordo private constructor(private val app: Application) {
      */
     val coletaDeEnergia = ColetaDeEnergia(app, escopo)
 
-    private val _fonte = MutableStateFlow(
-        when {
-            // PRIORIDADE 1: Linha direta via Shizuku (comprovadamente funciona)
-            ShizukuTelemetrySource.disponivel() -> Fonte.SHIZUKU
-            // PRIORIDADE 2: HavalShisuku service (fallback)
-            shisukuInstalado -> Fonte.SHISUKU
-            // PRIORIDADE 3: Simulador (emulador/teste)
-            else -> Fonte.SIMULADOR
-        }
-    )
+    private val _fonte = MutableStateFlow(Fonte.SIMULADOR)  // Começa com SIMULADOR, escolhe depois
 
     val fonte: StateFlow<Fonte> = _fonte.asStateFlow()
 
     val fonteReal: StateFlow<Boolean> = _fonte
         .map { it != Fonte.SIMULADOR }
-        .stateIn(escopo, SharingStarted.Eagerly, _fonte.value != Fonte.SIMULADOR)
+        .stateIn(escopo, SharingStarted.Eagerly, false)
 
     private var escuta: Job? = null
 
     init {
+        Log.i("MotorDeBordo", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        Log.i("MotorDeBordo", "🚀 INICIANDO MOTOR DE BORDO")
+        Log.i("MotorDeBordo", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+        val disponivel = ShizukuTelemetrySource.disponivel()
+        val autorizado = ShizukuTelemetrySource.autorizado()
+        Log.i("MotorDeBordo", "📡 Shizuku disponível: $disponivel")
+        Log.i("MotorDeBordo", "🔑 Shizuku autorizado: $autorizado")
+        Log.i("MotorDeBordo", "📦 SHISUKU instalado: $shisukuInstalado")
+
         // A chave do carro não gira sozinha quando o processo é recriado. Sem
         // isto, o simulador voltaria a "desligado" e o módulo veria um corte de
         // ignição que nunca houve — e, passados 5 min, zeraria a Viagem atual.
         simulador.ignicao = manager.state.value.live.ignition
+
+        // Escolhe fonte inicial
+        escolherFonteInicial()
         escutar()
         BancadaDeTestes.ligar(app, estadoDoCarro) { _fonte.value == Fonte.SIMULADOR }
+
+        // WATCHDOG: Re-avalia fonte periodicamente para detectar quando Shizuku ficar disponível
+        escopo.launch {
+            delay(2000) // Aguarda 2s para sistema estabilizar no boot
+            Log.i("MotorDeBordo", "🔍 Iniciando watchdog de re-avaliação de fonte (a cada 5s)")
+
+            while (true) {
+                delay(5000) // Verifica a cada 5 segundos
+                reavaliarFonte()
+            }
+        }
+
+        Log.i("MotorDeBordo", "✅ Motor de Bordo inicializado")
+    }
+
+    /**
+     * Escolhe a fonte inicial de telemetria.
+     *
+     * PRIORIDADE:
+     * 1. SHIZUKU (se disponível E autorizado)
+     * 2. SHIZUKU (se disponível mas não autorizado - vai pedir)
+     * 3. SHISUKU (fallback se Shizuku não disponível)
+     * 4. SIMULADOR (se nada mais funcionar)
+     */
+    private fun escolherFonteInicial() {
+        val nova = when {
+            ShizukuTelemetrySource.disponivel() -> {
+                Log.i("MotorDeBordo", "✅ Shizuku disponível - escolhendo SHIZUKU como fonte")
+                Fonte.SHIZUKU
+            }
+            shisukuInstalado -> {
+                Log.i("MotorDeBordo", "⚠️ Shizuku NÃO disponível - usando SHISUKU como fallback")
+                Fonte.SHISUKU
+            }
+            else -> {
+                Log.i("MotorDeBordo", "⚠️ Nem Shizuku nem SHISUKU disponíveis - usando SIMULADOR")
+                Fonte.SIMULADOR
+            }
+        }
+
+        Log.i("MotorDeBordo", "🎯 Fonte escolhida: $nova")
+        _fonte.value = nova
+    }
+
+    /**
+     * Re-avalia a fonte de telemetria periodicamente.
+     *
+     * Se Shizuku ficar disponível e não estamos usando ele, troca automaticamente!
+     * Isso resolve o problema de Shizuku não estar pronto no boot.
+     */
+    private fun reavaliarFonte() {
+        val fonteAtual = _fonte.value
+        val disponivel = ShizukuTelemetrySource.disponivel()
+        val autorizado = ShizukuTelemetrySource.autorizado()
+
+        // Se Shizuku ficou disponível E não estamos usando ele, TROCA!
+        if (disponivel && fonteAtual != Fonte.SHIZUKU) {
+            Log.w("MotorDeBordo", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            Log.w("MotorDeBordo", "⚡ SHIZUKU FICOU DISPONÍVEL!")
+            Log.w("MotorDeBordo", "   Fonte atual: $fonteAtual")
+            Log.w("MotorDeBordo", "   Autorizado: $autorizado")
+            Log.w("MotorDeBordo", "   Trocando para SHIZUKU...")
+            Log.w("MotorDeBordo", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            usarFonte(Fonte.SHIZUKU)
+        }
+
+        // Se Shizuku morreu e estamos usando ele, volta para fallback
+        if (!disponivel && fonteAtual == Fonte.SHIZUKU) {
+            Log.e("MotorDeBordo", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            Log.e("MotorDeBordo", "💀 SHIZUKU PAROU DE RESPONDER!")
+            Log.e("MotorDeBordo", "   Voltando para fallback...")
+            Log.e("MotorDeBordo", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            val fallback = if (shisukuInstalado) Fonte.SHISUKU else Fonte.SIMULADOR
+            usarFonte(fallback)
+        }
     }
 
     private fun escutar() {
         escuta?.cancel()
-        val fonte: TelemetrySource = when (_fonte.value) {
-            Fonte.SHIZUKU -> linhaDireta
-            Fonte.SHISUKU -> carro
-            Fonte.SIMULADOR -> simulador
+
+        val fonteAtual = _fonte.value
+        Log.i("MotorDeBordo", "👂 Iniciando escuta com fonte: $fonteAtual")
+
+        val fonte: TelemetrySource = when (fonteAtual) {
+            Fonte.SHIZUKU -> {
+                Log.i("MotorDeBordo", "   Usando linhaDireta (ShizukuTelemetrySource)")
+                linhaDireta
+            }
+            Fonte.SHISUKU -> {
+                Log.i("MotorDeBordo", "   Usando carro (HavalTelemetrySource)")
+                carro
+            }
+            Fonte.SIMULADOR -> {
+                Log.i("MotorDeBordo", "   Usando simulador (SimulatedTelemetrySource)")
+                simulador
+            }
         }
+
         escuta = escopo.launch {
             var anterior = manager.state.value.live.ignition
+            var contador = 0
             fonte.samples().collect { amostra ->
+                contador++
+                if (contador == 1) {
+                    Log.i("MotorDeBordo", "📊 Primeira amostra recebida de $fonteAtual!")
+                } else if (contador % 60 == 0) {
+                    // Log a cada 60 amostras (~1 minuto)
+                    Log.d("MotorDeBordo", "💚 $contador amostras recebidas de $fonteAtual")
+                }
+
                 if (amostra.ignition != anterior) {
+                    Log.i("MotorDeBordo", "🔑 Mudança de ignição: $anterior → ${amostra.ignition}")
                     anterior = amostra.ignition
                     manager.handleIgnitionChange(amostra.ignition)
                     // A coleta de energia começa e termina com a chave, sem
@@ -210,10 +313,22 @@ class MotorDeBordo private constructor(private val app: Application) {
     }
 
     fun usarFonte(nova: Fonte) {
-        if (_fonte.value == nova) return
+        if (_fonte.value == nova) {
+            Log.d("MotorDeBordo", "   Fonte já é $nova, nada a fazer")
+            return
+        }
+
+        Log.i("MotorDeBordo", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        Log.i("MotorDeBordo", "🔄 MUDANÇA DE FONTE")
+        Log.i("MotorDeBordo", "   De: ${_fonte.value}")
+        Log.i("MotorDeBordo", "   Para: $nova")
+        Log.i("MotorDeBordo", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
         _fonte.value = nova
         if (nova == Fonte.SIMULADOR) simulador.ignicao = state.value.live.ignition
         escutar()
+
+        Log.i("MotorDeBordo", "✅ Fonte alterada com sucesso para $nova")
     }
 
     fun proximaFonte() {

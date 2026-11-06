@@ -39,12 +39,16 @@ class ClusterCarroActivity : ComponentActivity() {
 
     override fun onDestroy() {
         // Para ClusterOverlayService quando Activity é destruída
+        // MAS NÃO se despedida estiver ativa! Senão remove a despedida
         val espiando = intent.getBooleanExtra(ESPIANDO, false)
-        if (!espiando) {
+        if (!espiando && !br.com.hugolumazzini.havaltrip.painel.EstadoDaDespedida.estaAtiva()) {
+            android.util.Log.d("ClusterCarroActivity", "🔌 onDestroy: removendo overlay (despedida NÃO ativa)")
             br.com.hugolumazzini.havaltrip.painel.ClusterOverlayService.recolher(
                 this,
                 JanelaDoPainel.CARRO
             )
+        } else if (!espiando) {
+            android.util.Log.w("ClusterCarroActivity", "⚠️ onDestroy: NÃO removendo overlay (despedida ATIVA)")
         }
         super.onDestroy()
     }

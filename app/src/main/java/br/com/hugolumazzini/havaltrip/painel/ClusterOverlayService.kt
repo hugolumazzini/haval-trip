@@ -375,13 +375,28 @@ class ClusterOverlayService : Service() {
     }
 
     private fun esconderOverlay() {
+        Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        Log.i(TAG, "🗑️ ESCONDER OVERLAY CHAMADO")
+        Log.i(TAG, "   Janela atual: $janelaAtual")
+        Log.i(TAG, "   Despedida ativa: $despedidaAtiva")
+        Log.i(TAG, "   Estado global: ${EstadoDaDespedida.estaAtiva()}")
+
+        // Stack trace para saber QUEM chamou
+        val stackTrace = Thread.currentThread().stackTrace
+        Log.i(TAG, "   Chamado por:")
+        for (i in 3..minOf(6, stackTrace.lastIndex)) {
+            Log.i(TAG, "      ${stackTrace[i]}")
+        }
+        Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
         pararWatchdog()
 
         overlayView?.let { view ->
             try {
                 windowManager?.removeView(view)
+                Log.i(TAG, "✅ Overlay removido com sucesso")
             } catch (e: Exception) {
-                Log.w(TAG, "Erro ao remover overlay", e)
+                Log.w(TAG, "⚠️ Erro ao remover overlay", e)
             } finally {
                 overlayView = null
                 windowManager = null

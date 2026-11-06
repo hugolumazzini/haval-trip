@@ -19,11 +19,19 @@ object EstadoDaDespedida {
      * Deve ser chamado ANTES de projetar a despedida via overlay.
      */
     fun ativar() {
+        val jaEstava = ativa.getAndSet(true)
         Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         Log.i(TAG, "👋 DESPEDIDA ATIVADA")
-        Log.i(TAG, "   ClusterActivity NÃO deve remover overlays")
+        Log.i(TAG, "   Já estava ativa: $jaEstava")
+        Log.i(TAG, "   TODAS as Activities devem respeitar esta flag!")
+
+        // Stack trace para saber QUEM ativou
+        val stackTrace = Thread.currentThread().stackTrace
+        Log.i(TAG, "   Ativado por:")
+        for (i in 3..minOf(5, stackTrace.lastIndex)) {
+            Log.i(TAG, "      ${stackTrace[i]}")
+        }
         Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        ativa.set(true)
     }
 
     /**
@@ -31,12 +39,19 @@ object EstadoDaDespedida {
      * Deve ser chamado quando ignição voltar a ON.
      */
     fun desativar() {
-        if (ativa.get()) {
+        val estavaAtiva = ativa.getAndSet(false)
+        if (estavaAtiva) {
             Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             Log.i(TAG, "🔌 DESPEDIDA DESATIVADA")
-            Log.i(TAG, "   ClusterActivity pode remover overlays normalmente")
+            Log.i(TAG, "   Activities podem remover overlays normalmente")
+
+            // Stack trace para saber QUEM desativou
+            val stackTrace = Thread.currentThread().stackTrace
+            Log.i(TAG, "   Desativado por:")
+            for (i in 3..minOf(5, stackTrace.lastIndex)) {
+                Log.i(TAG, "      ${stackTrace[i]}")
+            }
             Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-            ativa.set(false)
         }
     }
 

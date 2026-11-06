@@ -32,6 +32,9 @@ object EstadoDaDespedida {
             Log.i(TAG, "      ${stackTrace[i]}")
         }
         Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+        // Registra no histórico visual
+        HistoricoDaDespedida.ativou()
     }
 
     /**
@@ -52,6 +55,9 @@ object EstadoDaDespedida {
                 Log.i(TAG, "      ${stackTrace[i]}")
             }
             Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+            // Registra no histórico visual
+            HistoricoDaDespedida.desativou()
         }
     }
 

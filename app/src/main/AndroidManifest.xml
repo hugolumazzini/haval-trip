@@ -156,6 +156,20 @@
             android:theme="@style/Theme.HavalTrip.Cluster" />
 
         <!--
+            DIAGNÓSTICO: Tela para debugar despedida sem precisar de ADB.
+            Mostra histórico de eventos da despedida em tempo real.
+            Acessível via botão na aba "Despedida" das configurações.
+        -->
+        <activity
+            android:name=".DiagnosticoDespedidaActivity"
+            android:exported="false"
+            android:label="Diagnóstico da Despedida"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|uiMode"
+            android:theme="@style/Theme.HavalTrip" />
+
+        <!--
             Serviço de bordo com Direct Boot - inicia antes do unlock
             da tela para começar a medir desde o primeiro frame do boot.
         -->

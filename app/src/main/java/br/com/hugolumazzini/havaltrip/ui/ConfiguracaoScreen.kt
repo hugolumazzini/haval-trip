@@ -833,6 +833,12 @@ private fun DespedidaNoPainel() {
                     .putExtra(DESPEDIDA, true),
             )
         })
+        Spacer(Modifier.height(8.dp))
+        BotaoAcao("🔍 Diagnóstico da Despedida", onClick = {
+            contexto.startActivity(
+                Intent(contexto, br.com.hugolumazzini.havaltrip.DiagnosticoDespedidaActivity::class.java)
+            )
+        })
     }
 }
 

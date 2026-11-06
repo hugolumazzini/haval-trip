@@ -137,7 +137,19 @@ class ClusterOverlayService : Service() {
             }
             CMD_ESCONDER -> {
                 if (janela != null) {
-                    esconderOverlay()
+                    // PROTEÇÃO EXTRA: Verifica se despedida está ativa
+                    // MESMO QUE alguém chame recolher(), NÃO remove se despedida ativa
+                    if (EstadoDaDespedida.estaAtiva()) {
+                        Log.w(TAG, "⚠️ CMD_ESCONDER BLOQUEADO - Despedida está ativa!")
+                        Log.w(TAG, "   Janela: $janela")
+                        Log.w(TAG, "   Ignorando pedido de remoção")
+
+                        // Registra bloqueio no histórico visual
+                        HistoricoDaDespedida.tentouRemover(janela.toString())
+                        HistoricoDaDespedida.bloqueou(janela.toString())
+                    } else {
+                        esconderOverlay()
+                    }
                 }
             }
             CMD_DESPEDIDA -> {
@@ -166,6 +178,9 @@ class ClusterOverlayService : Service() {
 
         // Projeta despedida
         mostrarOverlay(janela, displayId, despedida = true)
+
+        // Registra no histórico visual
+        HistoricoDaDespedida.projetou()
     }
 
     /**

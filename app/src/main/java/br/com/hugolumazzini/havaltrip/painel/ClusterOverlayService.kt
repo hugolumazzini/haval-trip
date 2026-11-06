@@ -294,6 +294,11 @@ class ClusterOverlayService : Service() {
 
         } catch (e: Exception) {
             Log.e(TAG, "❌ Erro ao criar overlay", e)
+
+            // REGISTRA NO HISTÓRICO VISUAL!
+            if (despedida) {
+                HistoricoDaDespedida.erro("Falha ao criar overlay: ${e.message}")
+            }
         }
     }
 
@@ -383,7 +388,21 @@ class ClusterOverlayService : Service() {
                         wm.addView(view, params)
                     }
                 } catch (e: Exception) {
-                    // Silencioso - não loga em produção
+                    // SE DER ERRO, o overlay foi REMOVIDO mas NÃO readicionado!
+                    // Isso faz a despedida sumir sem deixar rastro!
+                    Log.e(TAG, "❌ ERRO em garantirVisibilidade(): overlay REMOVIDO mas não readicionado!", e)
+
+                    // REGISTRA NO HISTÓRICO VISUAL!
+                    if (despedidaAtiva) {
+                        HistoricoDaDespedida.erro("garantirVisibilidade FALHOU: ${e.message}")
+                    }
+
+                    // Limpa estado porque view foi removida mas não está mais válida
+                    overlayView = null
+                    windowManager = null
+                    janelaAtual = null
+                    displayIdAtual = -1
+                    despedidaAtiva = false
                 }
             }
         }
@@ -403,6 +422,11 @@ class ClusterOverlayService : Service() {
             Log.i(TAG, "      ${stackTrace[i]}")
         }
         Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+        // REGISTRA NO HISTÓRICO VISUAL!
+        if (despedidaAtiva) {
+            HistoricoDaDespedida.erro("Overlay REMOVIDO enquanto despedida estava ativa!")
+        }
 
         pararWatchdog()
 

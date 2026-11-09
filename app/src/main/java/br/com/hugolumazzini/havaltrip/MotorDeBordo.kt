@@ -121,6 +121,7 @@ class MotorDeBordo private constructor(private val app: Application) {
     private var escuta: Job? = null
 
     init {
+        br.com.hugolumazzini.havaltrip.painel.HistoricoDaDespedida.iniciar(app)
         Log.i("MotorDeBordo", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         Log.i("MotorDeBordo", "🚀 INICIANDO MOTOR DE BORDO")
         Log.i("MotorDeBordo", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -261,8 +262,9 @@ class MotorDeBordo private constructor(private val app: Application) {
                     if (amostra.ignition == IgnitionState.ON) {
                         coletaDeEnergia.comecar()
                         // DESATIVA despedida quando carro ligar de novo
-                        br.com.hugolumazzini.havaltrip.painel.EstadoDaDespedida.desativar()
+                        br.com.hugolumazzini.havaltrip.painel.EstadoDaDespedida.desativar("ignição ligou")
                     } else {
+                        br.com.hugolumazzini.havaltrip.painel.HistoricoDaDespedida.info("🔑 Ignição desligou (fonte: $fonteAtual)")
                         coletaDeEnergia.terminar()
                         // DESPEDIDA: quando o carro desligar, projeta o resumo em tela cheia
                         // usando ClusterOverlayService, que garante que cobre o painel inteiro
@@ -309,7 +311,7 @@ class MotorDeBordo private constructor(private val app: Application) {
 
                 // MARCA DESPEDIDA COMO ATIVA ANTES de projetar
                 // Isso previne que ClusterActivity.onDestroy() remova o overlay
-                br.com.hugolumazzini.havaltrip.painel.EstadoDaDespedida.ativar()
+                br.com.hugolumazzini.havaltrip.painel.EstadoDaDespedida.ativar("ignição desligou, viagem de ${"%.3f".format(viagem.metrics.distanceKm)} km")
 
                 // Projeta despedida em tela cheia via overlay
                 br.com.hugolumazzini.havaltrip.painel.ClusterOverlayService.projetarDespedida(
@@ -321,6 +323,11 @@ class MotorDeBordo private constructor(private val app: Application) {
                 Log.i("MotorDeBordo", "✅ Despedida projetada com sucesso")
             } else {
                 Log.d("MotorDeBordo", "⏭️ Despedida não vale mostrar: viagem=${viagem?.metrics?.distanceKm}km")
+                br.com.hugolumazzini.havaltrip.painel.HistoricoDaDespedida.info(
+                    "⏭️ Ignição desligou, mas a despedida foi pulada: " +
+                        if (viagem == null) "não há viagem automática"
+                        else "viagem de ${"%.3f".format(viagem.metrics.distanceKm)} km (mínimo ${br.com.hugolumazzini.havaltrip.ui.Despedida.DISTANCIA_MINIMA_KM} km)",
+                )
             }
         }
     }
@@ -358,8 +365,9 @@ class MotorDeBordo private constructor(private val app: Application) {
         if (novo == IgnitionState.ON) {
             coletaDeEnergia.comecar()
             // DESATIVA despedida quando carro ligar de novo
-            br.com.hugolumazzini.havaltrip.painel.EstadoDaDespedida.desativar()
+            br.com.hugolumazzini.havaltrip.painel.EstadoDaDespedida.desativar("ignição ligou (simulador)")
         } else {
+            br.com.hugolumazzini.havaltrip.painel.HistoricoDaDespedida.info("🔑 Ignição desligou (simulador)")
             coletaDeEnergia.terminar()
             // Aciona despedida também no simulador
             acionarDespedida()

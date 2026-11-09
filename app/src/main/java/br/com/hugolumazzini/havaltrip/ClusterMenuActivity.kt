@@ -9,6 +9,7 @@ import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
 import br.com.hugolumazzini.havaltrip.painel.TeclaDoVolante
 import br.com.hugolumazzini.havaltrip.painel.TecladoDoVolante
 import br.com.hugolumazzini.havaltrip.painel.fecharQuandoPedirem
+import br.com.hugolumazzini.havaltrip.painel.registrarCicloDaJanela
 import br.com.hugolumazzini.havaltrip.ui.ClusterMenuScreen
 import br.com.hugolumazzini.havaltrip.ui.theme.HavalTripTheme
 
@@ -32,7 +33,10 @@ class ClusterMenuActivity : ComponentActivity() {
         Cluster.atualizarPaleta()
         ServicoDeBordo.garantir(this)
         val espiando = intent.getBooleanExtra(ESPIANDO, false)
-        if (!espiando) fecharQuandoPedirem(JanelaDoPainel.MENU)
+        if (!espiando) {
+            fecharQuandoPedirem(JanelaDoPainel.MENU)
+            registrarCicloDaJanela("criada")
+        }
         setContent {
             HavalTripTheme {
                 ClusterMenuScreen(vm, espiando = espiando)
@@ -64,6 +68,7 @@ class ClusterMenuActivity : ComponentActivity() {
         // Para ClusterOverlayService quando Activity é destruída
         // MAS NÃO se despedida estiver ativa! Senão remove a despedida
         val espiando = intent.getBooleanExtra(ESPIANDO, false)
+        if (!espiando) registrarCicloDaJanela("destruída")
         if (!espiando && !br.com.hugolumazzini.havaltrip.painel.EstadoDaDespedida.estaAtiva()) {
             android.util.Log.d("ClusterMenuActivity", "🔌 onDestroy: removendo overlay (despedida NÃO ativa)")
             br.com.hugolumazzini.havaltrip.painel.ClusterOverlayService.recolher(

@@ -1,68 +1,41 @@
 package br.com.hugolumazzini.havaltrip.painel
 
 import android.util.Log
-import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.getAndUpdate
 
 /**
- * Estado global da despedida.
+ * Se o carro acabou de ser desligado e a despedida é o que deve estar na tela.
  *
- * Previne race conditions entre MotorDeBordo, ClusterActivity e ClusterOverlayService.
- * Quando despedida está ativa, ClusterActivity NÃO deve remover overlays.
+ * Mora aqui, e não dentro da tela, porque a tela é refeita: a janela do painel
+ * pode ser fechada e aberta de novo, a view pode ser tirada e recolocada. O que
+ * uma tela "lembra" some junto com ela; este estado não. Toda janela que
+ * desenha a despedida consulta [fluxo], e por isso a mostra mesmo nascendo
+ * depois de o carro já ter sido desligado.
  */
 object EstadoDaDespedida {
     private const val TAG = "EstadoDaDespedida"
 
-    private val ativa = AtomicBoolean(false)
+    private val _ativa = MutableStateFlow(false)
+    val fluxo: StateFlow<Boolean> = _ativa.asStateFlow()
 
-    /**
-     * Marca despedida como ativa.
-     * Deve ser chamado ANTES de projetar a despedida via overlay.
-     */
-    fun ativar() {
-        val jaEstava = ativa.getAndSet(true)
-        Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        Log.i(TAG, "👋 DESPEDIDA ATIVADA")
-        Log.i(TAG, "   Já estava ativa: $jaEstava")
-        Log.i(TAG, "   TODAS as Activities devem respeitar esta flag!")
-
-        // Stack trace para saber QUEM ativou
-        val stackTrace = Thread.currentThread().stackTrace
-        Log.i(TAG, "   Ativado por:")
-        for (i in 3..minOf(5, stackTrace.lastIndex)) {
-            Log.i(TAG, "      ${stackTrace[i]}")
-        }
-        Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-
-        // Registra no histórico visual
-        HistoricoDaDespedida.ativou()
+    /** Marcar ANTES de projetar, para nenhuma janela remover a despedida no meio do caminho. */
+    fun ativar(origem: String) {
+        val jaEstava = _ativa.getAndUpdate { true }
+        Log.i(TAG, "👋 DESPEDIDA ATIVADA ($origem, já estava ativa: $jaEstava)")
+        if (!jaEstava) HistoricoDaDespedida.ativou(origem)
     }
 
-    /**
-     * Desativa despedida.
-     * Deve ser chamado quando ignição voltar a ON.
-     */
-    fun desativar() {
-        val estavaAtiva = ativa.getAndSet(false)
-        if (estavaAtiva) {
-            Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-            Log.i(TAG, "🔌 DESPEDIDA DESATIVADA")
-            Log.i(TAG, "   Activities podem remover overlays normalmente")
-
-            // Stack trace para saber QUEM desativou
-            val stackTrace = Thread.currentThread().stackTrace
-            Log.i(TAG, "   Desativado por:")
-            for (i in 3..minOf(5, stackTrace.lastIndex)) {
-                Log.i(TAG, "      ${stackTrace[i]}")
-            }
-            Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-
-            // Registra no histórico visual
-            HistoricoDaDespedida.desativou()
+    /** O carro ligou de novo: as janelas voltam aos números de dirigir. */
+    fun desativar(origem: String) {
+        val estava = _ativa.getAndUpdate { false }
+        if (estava) {
+            Log.i(TAG, "🔌 DESPEDIDA DESATIVADA ($origem)")
+            HistoricoDaDespedida.desativou(origem)
         }
     }
 
-    /**
-     * Verifica se despedida está ativa.
-     */
-    fun estaAtiva(): Boolean = ativa.get()
+    fun estaAtiva(): Boolean = _ativa.value
 }

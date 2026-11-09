@@ -130,6 +130,7 @@ private fun EventoCard(evento: HistoricoDaDespedida.Evento) {
         HistoricoDaDespedida.TipoEvento.TENTATIVA_REMOCAO -> Color(0xFFFFAA00)
         HistoricoDaDespedida.TipoEvento.PROJECAO -> Color(0xFFAA00FF)
         HistoricoDaDespedida.TipoEvento.ERRO -> Color(0xFFFF0000)
+        HistoricoDaDespedida.TipoEvento.INFO -> Color(0xFFDDDDDD)
     }
 
     Card(

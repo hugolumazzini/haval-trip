@@ -15,6 +15,18 @@ import android.view.View
 import android.view.WindowManager
 import androidx.compose.ui.platform.ComposeView
 import android.app.Application
+import br.com.hugolumazzini.havaltrip.domain.PilhasDoSistema
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.SavedStateRegistryController
+import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import br.com.hugolumazzini.havaltrip.TripViewModel
 import br.com.hugolumazzini.havaltrip.ui.ClusterCarroScreen
 import br.com.hugolumazzini.havaltrip.ui.ClusterMenuScreen
@@ -27,6 +39,29 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+
+/**
+ * Uma View solta no WindowManager, fora de qualquer Activity, não tem ciclo de
+ * vida; o Compose se recusa a desenhar sem um e derruba o app inteiro.
+ */
+private class DonoDoOverlay : LifecycleOwner, SavedStateRegistryOwner, ViewModelStoreOwner {
+    private val registro = LifecycleRegistry(this)
+    private val controlador = SavedStateRegistryController.create(this)
+    override val viewModelStore = ViewModelStore()
+    override val lifecycle: Lifecycle get() = registro
+    override val savedStateRegistry: SavedStateRegistry get() = controlador.savedStateRegistry
+
+    init {
+        controlador.performAttach()
+        controlador.performRestore(null)
+        registro.currentState = Lifecycle.State.RESUMED
+    }
+
+    fun encerrar() {
+        registro.currentState = Lifecycle.State.DESTROYED
+        viewModelStore.clear()
+    }
+}
 
 /**
  * Projeta conteúdo do Haval Trip no cluster usando WindowManager overlays.
@@ -107,14 +142,25 @@ class ClusterOverlayService : Service() {
     // State
     private var janelaAtual: JanelaDoPainel? = null
     private var displayIdAtual: Int = -1
-    private var despedidaAtiva = false
 
     // WindowManager e View
     private var windowManager: WindowManager? = null
     private var overlayView: ComposeView? = null
+    private var donoDoOverlay: DonoDoOverlay? = null
 
     override fun onCreate() {
         super.onCreate()
+        HistoricoDaDespedida.iniciar(applicationContext)
+
+        // O vigia traz a view para a frente refazendo-a, o que reinicia a
+        // animação. Na despedida isso arruinaria a imagem parada; quando o
+        // carro liga de novo, o overlay (que já voltou aos números sozinho,
+        // pelo mesmo estado) volta a ser vigiado.
+        escopo.launch {
+            EstadoDaDespedida.fluxo.collect { ativa ->
+                if (ativa) pararWatchdog() else if (overlayView != null) iniciarWatchdog()
+            }
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -168,66 +214,54 @@ class ClusterOverlayService : Service() {
      * 2. Projeta overlay do Haval Trip
      */
     private fun mostrarDespedida(janela: JanelaDoPainel, displayId: Int) {
-        Log.i(TAG, "🚗 DESPEDIDA - Limpando outros apps e projetando")
+        Log.i(TAG, "🚗 DESPEDIDA - projetando $janela no display $displayId")
 
-        // Remove outros apps do display ANTES de projetar
-        removerOutrosAppsDoDisplay(displayId)
-
-        // Pequena pausa para garantir limpeza
-        Thread.sleep(200)
-
-        // Projeta despedida
+        // Primeiro a despedida, depois a limpeza: o painel congela a última
+        // imagem pouco depois de o carro desligar, e cada décimo de segundo
+        // gasto em shell antes de mostrar é imagem que não chega a existir.
         mostrarOverlay(janela, displayId, despedida = true)
-
-        // Registra no histórico visual
-        HistoricoDaDespedida.projetou()
+        escopo.launch(Dispatchers.IO) { removerOutrosAppsDoDisplay(displayId) }
     }
 
     /**
-     * Remove pilhas de outros apps do display (técnica do Impulse)
+     * Tira da tela do painel as janelas de outros apps, para a despedida ser a
+     * única coisa nela. Nunca as nossas: ver [PilhasDoSistema].
      */
     private fun removerOutrosAppsDoDisplay(displayId: Int) {
         try {
-            val stackList = ShizukuShell.rodar("am stack list") ?: return
-            val pilhasParaRemover = mutableListOf<Int>()
-
-            for (linha in stackList.lines()) {
-                val match = Regex("""Stack id=(\d+).*displayId=(\d+)""").find(linha)
-                if (match != null) {
-                    val stackId = match.groupValues[1].toIntOrNull()
-                    val stackDisplayId = match.groupValues[2].toIntOrNull()
-
-                    if (stackDisplayId == displayId && stackId != null) {
-                        // Verifica se NÃO é nossa pilha
-                        val ehNossa = linha.contains("br.com.hugolumazzini.havaltrip")
-                        if (!ehNossa) {
-                            pilhasParaRemover.add(stackId)
-                        }
-                    }
-                }
+            val saida = ShizukuShell.rodar("am stack list")
+            if (saida == null) {
+                HistoricoDaDespedida.info("🧹 Limpeza da tela $displayId pulada: o Shizuku não respondeu ao 'am stack list'")
+                return
             }
 
-            // Remove pilhas de outros apps
-            pilhasParaRemover.forEach { stackId ->
-                try {
-                    ShizukuShell.rodar("am stack remove $stackId")
-                    Log.i(TAG, "✅ Removida pilha $stackId do display $displayId")
-                } catch (e: Exception) {
-                    Log.w(TAG, "Erro ao remover pilha $stackId", e)
-                }
+            val daTela = PilhasDoSistema.listar(saida, packageName).filter { it.tela == displayId }
+            val remover = daTela.filter { !it.nossa }.map { it.id }
+            val nossas = daTela.count { it.nossa }
+
+            remover.forEach { id ->
+                runCatching { ShizukuShell.rodar("am stack remove $id") }
+                    .onFailure { Log.w(TAG, "Não deu para remover a pilha $id", it) }
             }
 
-            if (pilhasParaRemover.isNotEmpty()) {
-                Log.i(TAG, "🗑️ ${pilhasParaRemover.size} pilha(s) de outros apps removidas")
+            val resumo = "🧹 Limpeza da tela $displayId: ${daTela.size} pilha(s), " +
+                "$nossas nossa(s) preservada(s), ${remover.size} de outros apps removida(s) $remover"
+            Log.i(TAG, resumo)
+            HistoricoDaDespedida.info(resumo)
+            if (daTela.isEmpty()) {
+                HistoricoDaDespedida.info("🧹 Nenhuma pilha na tela $displayId. Saída do comando: ${saida.take(300)}")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Erro ao remover outros apps", e)
+            Log.e(TAG, "Erro ao limpar a tela $displayId", e)
+            HistoricoDaDespedida.erro("Limpeza da tela $displayId falhou: ${e.message}")
         }
     }
 
     @SuppressLint("WrongConstant")
     private fun mostrarOverlay(janela: JanelaDoPainel, displayId: Int, despedida: Boolean) {
-        // Se já está mostrando a mesma janela, só garante visibilidade
+        // Se já está mostrando a mesma janela, não há o que refazer: quem decide
+        // se ela mostra os números ou a despedida é o [EstadoDaDespedida], que a
+        // própria tela observa.
         if (janelaAtual == janela && displayIdAtual == displayId && overlayView != null) {
             garantirVisibilidade()
             return
@@ -240,6 +274,10 @@ class ClusterOverlayService : Service() {
             // Obtém display do cluster
             val display = obterDisplay(displayId)
             if (display == null) {
+                Log.w(TAG, "Tela $displayId não encontrada: sem overlay")
+                if (despedida) {
+                    HistoricoDaDespedida.info("📽️ Tela $displayId não encontrada pelo app: sem overlay (a despedida fica por conta da janela do painel)")
+                }
                 return
             }
 
@@ -254,14 +292,29 @@ class ClusterOverlayService : Service() {
             }
 
             // Cria ComposeView com conteúdo
+            val dono = DonoDoOverlay()
+            donoDoOverlay = dono
             overlayView = ComposeView(displayContext).apply {
+                setViewTreeLifecycleOwner(dono)
+                setViewTreeSavedStateRegistryOwner(dono)
+                setViewTreeViewModelStoreOwner(dono)
+                if (despedida) {
+                    addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+                        override fun onViewAttachedToWindow(v: View) {
+                            HistoricoDaDespedida.info("📽️ Overlay da despedida anexado à janela")
+                        }
+
+                        override fun onViewDetachedFromWindow(v: View) {
+                            HistoricoDaDespedida.info("📽️ Overlay da despedida desanexado da janela")
+                        }
+                    })
+                }
                 setContent {
                     HavalTripTheme {
                         when (janela) {
                             JanelaDoPainel.NUMEROS -> ClusterScreen(
                                 vm = tripViewModel,
                                 espiando = false,
-                                forcarDespedida = despedida
                             )
                             JanelaDoPainel.CARRO -> ClusterCarroScreen(
                                 vm = tripViewModel,
@@ -283,14 +336,16 @@ class ClusterOverlayService : Service() {
 
             janelaAtual = janela
             displayIdAtual = displayId
-            despedidaAtiva = despedida
 
             Log.i(TAG, "✅ Overlay criado: $janela no display $displayId (despedida=$despedida)")
+            if (despedida) {
+                HistoricoDaDespedida.projetou("Overlay da despedida adicionado na tela $displayId ($janela)")
+            }
 
-            // WATCHDOG SEMPRE ATIVO (inclusive na despedida!)
-            // É ESSENCIAL para manter despedida visível durante a noite
-            Log.i(TAG, "🔄 Iniciando watchdog para manter overlay visível")
-            iniciarWatchdog()
+            // O vigia refaz a view de tempos em tempos para trazê-la à frente, e
+            // refazer reinicia a animação. Os números aguentam isso; a despedida
+            // é uma imagem que deve ficar parada a noite toda, então não.
+            if (!EstadoDaDespedida.estaAtiva()) iniciarWatchdog()
 
         } catch (e: Exception) {
             Log.e(TAG, "❌ Erro ao criar overlay", e)
@@ -362,7 +417,7 @@ class ClusterOverlayService : Service() {
                 delay(WATCHDOG_INTERVAL_MS)
                 contador++
                 if (contador % 12 == 0) {  // Log a cada 60s (12 x 5s)
-                    Log.d(TAG, "🐕 Watchdog ativo (${contador * WATCHDOG_INTERVAL_MS / 1000}s), despedida=$despedidaAtiva")
+                    Log.d(TAG, "🐕 Watchdog ativo (${contador * WATCHDOG_INTERVAL_MS / 1000}s), despedida=${EstadoDaDespedida.estaAtiva()}")
                 }
                 garantirVisibilidade()
             }
@@ -378,6 +433,7 @@ class ClusterOverlayService : Service() {
      * Garante que overlay está visível (traz para frente se necessário)
      */
     private fun garantirVisibilidade() {
+        if (EstadoDaDespedida.estaAtiva()) return
         overlayView?.let { view ->
             windowManager?.let { wm ->
                 try {
@@ -393,7 +449,7 @@ class ClusterOverlayService : Service() {
                     Log.e(TAG, "❌ ERRO em garantirVisibilidade(): overlay REMOVIDO mas não readicionado!", e)
 
                     // REGISTRA NO HISTÓRICO VISUAL!
-                    if (despedidaAtiva) {
+                    if (EstadoDaDespedida.estaAtiva()) {
                         HistoricoDaDespedida.erro("garantirVisibilidade FALHOU: ${e.message}")
                     }
 
@@ -402,47 +458,32 @@ class ClusterOverlayService : Service() {
                     windowManager = null
                     janelaAtual = null
                     displayIdAtual = -1
-                    despedidaAtiva = false
+                    donoDoOverlay?.encerrar()
+                    donoDoOverlay = null
                 }
             }
         }
     }
 
     private fun esconderOverlay() {
-        Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        Log.i(TAG, "🗑️ ESCONDER OVERLAY CHAMADO")
-        Log.i(TAG, "   Janela atual: $janelaAtual")
-        Log.i(TAG, "   Despedida ativa: $despedidaAtiva")
-        Log.i(TAG, "   Estado global: ${EstadoDaDespedida.estaAtiva()}")
-
-        // Stack trace para saber QUEM chamou
-        val stackTrace = Thread.currentThread().stackTrace
-        Log.i(TAG, "   Chamado por:")
-        for (i in 3..minOf(6, stackTrace.lastIndex)) {
-            Log.i(TAG, "      ${stackTrace[i]}")
-        }
-        Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-
-        // REGISTRA NO HISTÓRICO VISUAL!
-        if (despedidaAtiva) {
-            HistoricoDaDespedida.erro("Overlay REMOVIDO enquanto despedida estava ativa!")
+        val view = overlayView ?: return
+        Log.i(TAG, "🗑️ Removendo overlay $janelaAtual (despedida ativa: ${EstadoDaDespedida.estaAtiva()})")
+        if (EstadoDaDespedida.estaAtiva()) {
+            HistoricoDaDespedida.erro("Overlay $janelaAtual removido com a despedida ativa")
         }
 
         pararWatchdog()
-
-        overlayView?.let { view ->
-            try {
-                windowManager?.removeView(view)
-                Log.i(TAG, "✅ Overlay removido com sucesso")
-            } catch (e: Exception) {
-                Log.w(TAG, "⚠️ Erro ao remover overlay", e)
-            } finally {
-                overlayView = null
-                windowManager = null
-                janelaAtual = null
-                displayIdAtual = -1
-                despedidaAtiva = false
-            }
+        try {
+            windowManager?.removeView(view)
+        } catch (e: Exception) {
+            Log.w(TAG, "⚠️ Erro ao remover overlay", e)
+        } finally {
+            overlayView = null
+            windowManager = null
+            janelaAtual = null
+            displayIdAtual = -1
+            donoDoOverlay?.encerrar()
+            donoDoOverlay = null
         }
     }
 
@@ -456,13 +497,9 @@ class ClusterOverlayService : Service() {
         }
     }
 
-    private fun criarContextoDoDisplay(display: Display): Context {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            createDisplayContext(display)
-        } else {
-            this
-        }
-    }
+    // Antes do Android 11 isto devolvia o próprio serviço, ligado à tela da
+    // central: no carro (Android 9) o overlay nascia na tela errada.
+    private fun criarContextoDoDisplay(display: Display): Context = createDisplayContext(display)
 
     override fun onDestroy() {
         esconderOverlay()

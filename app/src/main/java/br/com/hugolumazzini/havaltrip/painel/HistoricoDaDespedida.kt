@@ -1,21 +1,37 @@
 package br.com.hugolumazzini.havaltrip.painel
 
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+import android.content.Context
+import androidx.activity.ComponentActivity
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+/** Anota no histórico o nascimento ou a morte de uma janela do painel, e em que tela ela estava. */
+fun ComponentActivity.registrarCicloDaJanela(o_que: String) {
+    @Suppress("DEPRECATION")
+    val tela = windowManager.defaultDisplay.displayId
+    val detalhes = buildList {
+        add("tela $tela")
+        if (isFinishing) add("finalizando")
+        if (EstadoDaDespedida.estaAtiva()) add("despedida ativa")
+    }.joinToString(", ")
+    HistoricoDaDespedida.info("🪟 ${javaClass.simpleName} $o_que ($detalhes)")
+}
 
 /**
- * Histórico de eventos da despedida para diagnóstico visual no app.
+ * A linha do tempo da despedida, para se ler no próprio app.
  *
- * Como não há como ver logs ADB no carro, este histórico pode ser
- * mostrado numa tela de diagnóstico dentro do próprio app.
+ * Fica em arquivo, e não só na memória: se o app cair no meio da despedida, o
+ * que aconteceu até ali continua lá depois, e a marca de "processo iniciado"
+ * mostra que houve a queda. Sem ver o `logcat` no carro, é isto que conta a
+ * história.
  */
 object HistoricoDaDespedida {
 
-    data class Evento(
-        val hora: String,
-        val tipo: TipoEvento,
-        val descricao: String
-    )
+    data class Evento(val quando: Long, val tipo: TipoEvento, val descricao: String) {
+        val hora: String get() = formato.format(Date(quando))
+    }
 
     enum class TipoEvento {
         ATIVACAO,
@@ -23,119 +39,94 @@ object HistoricoDaDespedida {
         TENTATIVA_REMOCAO,
         BLOQUEIO,
         PROJECAO,
-        ERRO
+        ERRO,
+        INFO,
     }
 
-    private val eventos = mutableListOf<Evento>()
-    private val formatter = DateTimeFormatter.ofPattern("HH:mm:ss")
-    private const val MAX_EVENTOS = 50
+    private const val MAX_EVENTOS = 300
+    private const val ESCRITAS_ATE_COMPACTAR = 100
 
-    /**
-     * Registra ativação da despedida
-     */
-    fun ativou(chamador: String = obterChamador()) {
-        adicionar(
-            TipoEvento.ATIVACAO,
-            "✅ Despedida ATIVADA por $chamador"
-        )
+    private val formato = SimpleDateFormat("dd/MM HH:mm:ss", Locale.forLanguageTag("pt-BR"))
+    private val eventos = ArrayList<Evento>()
+    private var arquivo: File? = null
+    private var escritas = 0
+
+    /** Liga o arquivo e carrega o que já havia. Pode ser chamada quantas vezes quiser. */
+    fun iniciar(context: Context) {
+        synchronized(eventos) {
+            if (arquivo != null) return
+            val f = File(context.applicationContext.filesDir, "despedida-historico.tsv")
+            arquivo = f
+            eventos.addAll(0, lerDoArquivo(f))
+            while (eventos.size > MAX_EVENTOS) eventos.removeAt(0)
+            reescrever(f)
+        }
+        info("🚀 Processo do app iniciado")
     }
 
-    /**
-     * Registra desativação da despedida
-     */
-    fun desativou(chamador: String = obterChamador()) {
-        adicionar(
-            TipoEvento.DESATIVACAO,
-            "❌ Despedida DESATIVADA por $chamador"
-        )
+    fun ativou(origem: String) = registrar(TipoEvento.ATIVACAO, "✅ Despedida ATIVADA ($origem)")
+
+    fun desativou(origem: String) = registrar(TipoEvento.DESATIVACAO, "❌ Despedida DESATIVADA ($origem)")
+
+    fun tentouRemover(janela: String) =
+        registrar(TipoEvento.TENTATIVA_REMOCAO, "⚠️ Pedido para remover $janela durante a despedida")
+
+    fun bloqueou(janela: String) =
+        registrar(TipoEvento.BLOQUEIO, "🛡️ Pedido de remoção de $janela BLOQUEADO (despedida ativa)")
+
+    fun projetou(detalhe: String) = registrar(TipoEvento.PROJECAO, "📽️ $detalhe")
+
+    fun erro(mensagem: String) = registrar(TipoEvento.ERRO, "💥 $mensagem")
+
+    fun info(mensagem: String) = registrar(TipoEvento.INFO, mensagem)
+
+    /** Do mais recente para o mais antigo, que é como a tela lê. */
+    fun obterEventos(): List<Evento> = synchronized(eventos) { eventos.reversed() }
+
+    /** Do mais antigo para o mais recente, para ir junto do relatório de logs. */
+    fun comoTexto(): String = synchronized(eventos) {
+        buildString {
+            appendLine("=== HISTÓRICO DA DESPEDIDA (${eventos.size} eventos) ===")
+            eventos.forEach { appendLine("${it.hora}  ${it.descricao}") }
+            appendLine("=== FIM DO HISTÓRICO ===")
+        }
     }
 
-    /**
-     * Registra tentativa de remoção de overlay
-     */
-    fun tentouRemover(janela: String, chamador: String = obterChamador()) {
-        adicionar(
-            TipoEvento.TENTATIVA_REMOCAO,
-            "⚠️ $chamador tentou remover $janela"
-        )
-    }
-
-    /**
-     * Registra bloqueio de remoção
-     */
-    fun bloqueou(janela: String, chamador: String = obterChamador()) {
-        adicionar(
-            TipoEvento.BLOQUEIO,
-            "🛡️ BLOQUEADO: $chamador NÃO removeu $janela (despedida ativa)"
-        )
-    }
-
-    /**
-     * Registra projeção da despedida
-     */
-    fun projetou() {
-        adicionar(
-            TipoEvento.PROJECAO,
-            "📽️ Despedida PROJETADA em tela cheia"
-        )
-    }
-
-    /**
-     * Registra erro
-     */
-    fun erro(mensagem: String) {
-        adicionar(
-            TipoEvento.ERRO,
-            "💥 ERRO: $mensagem"
-        )
-    }
-
-    /**
-     * Obtém todos os eventos (mais recente primeiro)
-     */
-    fun obterEventos(): List<Evento> {
-        return eventos.reversed()
-    }
-
-    /**
-     * Limpa histórico
-     */
     fun limpar() {
-        eventos.clear()
-        adicionar(TipoEvento.ATIVACAO, "🧹 Histórico limpo")
+        synchronized(eventos) {
+            eventos.clear()
+            arquivo?.let { reescrever(it) }
+        }
+        info("🧹 Histórico limpo")
     }
 
-    private fun adicionar(tipo: TipoEvento, descricao: String) {
-        val agora = LocalDateTime.now()
-        val evento = Evento(
-            hora = agora.format(formatter),
-            tipo = tipo,
-            descricao = descricao
-        )
-
+    private fun registrar(tipo: TipoEvento, descricao: String) {
+        val evento = Evento(System.currentTimeMillis(), tipo, descricao)
         synchronized(eventos) {
             eventos.add(evento)
-            // Mantém apenas os últimos N eventos
-            if (eventos.size > MAX_EVENTOS) {
-                eventos.removeAt(0)
-            }
+            if (eventos.size > MAX_EVENTOS) eventos.removeAt(0)
+            val f = arquivo ?: return
+            escritas++
+            if (escritas % ESCRITAS_ATE_COMPACTAR == 0) reescrever(f)
+            else runCatching { f.appendText(linha(evento)) }
         }
     }
 
-    /**
-     * Tenta descobrir quem chamou via stack trace
-     */
-    private fun obterChamador(): String {
-        val stack = Thread.currentThread().stackTrace
-        // Pula: getStackTrace, obterChamador, função que chamou obterChamador
-        val index = 3
-        return if (index < stack.size) {
-            val frame = stack[index]
-            val classe = frame.className.substringAfterLast('.')
-            val metodo = frame.methodName
-            "$classe.$metodo"
-        } else {
-            "desconhecido"
-        }
+    private fun linha(e: Evento): String =
+        "${e.quando}\t${e.tipo.name}\t${e.descricao.replace('\n', ' ').replace('\t', ' ')}\n"
+
+    private fun reescrever(f: File) {
+        runCatching { f.writeText(eventos.joinToString("") { linha(it) }) }
     }
+
+    private fun lerDoArquivo(f: File): List<Evento> = runCatching {
+        if (!f.exists()) return emptyList()
+        f.readLines().mapNotNull { l ->
+            val partes = l.split('\t', limit = 3)
+            if (partes.size < 3) return@mapNotNull null
+            val quando = partes[0].toLongOrNull() ?: return@mapNotNull null
+            val tipo = TipoEvento.entries.find { it.name == partes[1] } ?: TipoEvento.INFO
+            Evento(quando, tipo, partes[2])
+        }
+    }.getOrDefault(emptyList())
 }

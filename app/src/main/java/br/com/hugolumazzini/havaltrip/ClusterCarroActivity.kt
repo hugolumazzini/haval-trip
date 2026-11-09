@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
 import br.com.hugolumazzini.havaltrip.painel.fecharQuandoPedirem
+import br.com.hugolumazzini.havaltrip.painel.registrarCicloDaJanela
 import br.com.hugolumazzini.havaltrip.ui.ClusterCarroScreen
 import br.com.hugolumazzini.havaltrip.ui.theme.HavalTripTheme
 
@@ -29,7 +30,10 @@ class ClusterCarroActivity : ComponentActivity() {
         Cluster.atualizarPaleta()
         ServicoDeBordo.garantir(this)
         val espiando = intent.getBooleanExtra(ESPIANDO, false)
-        if (!espiando) fecharQuandoPedirem(JanelaDoPainel.CARRO)
+        if (!espiando) {
+            fecharQuandoPedirem(JanelaDoPainel.CARRO)
+            registrarCicloDaJanela("criada")
+        }
         setContent {
             HavalTripTheme {
                 ClusterCarroScreen(vm, espiando = espiando)
@@ -41,6 +45,7 @@ class ClusterCarroActivity : ComponentActivity() {
         // Para ClusterOverlayService quando Activity é destruída
         // MAS NÃO se despedida estiver ativa! Senão remove a despedida
         val espiando = intent.getBooleanExtra(ESPIANDO, false)
+        if (!espiando) registrarCicloDaJanela("destruída")
         if (!espiando && !br.com.hugolumazzini.havaltrip.painel.EstadoDaDespedida.estaAtiva()) {
             android.util.Log.d("ClusterCarroActivity", "🔌 onDestroy: removendo overlay (despedida NÃO ativa)")
             br.com.hugolumazzini.havaltrip.painel.ClusterOverlayService.recolher(

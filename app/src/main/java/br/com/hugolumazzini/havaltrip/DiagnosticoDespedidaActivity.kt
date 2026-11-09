@@ -3,6 +3,7 @@ package br.com.hugolumazzini.havaltrip
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import br.com.hugolumazzini.havaltrip.painel.HistoricoDaDespedida
 import br.com.hugolumazzini.havaltrip.ui.DiagnosticoDespedidaScreen
 import br.com.hugolumazzini.havaltrip.ui.theme.HavalTripTheme
 
@@ -16,6 +17,7 @@ class DiagnosticoDespedidaActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        HistoricoDaDespedida.iniciar(applicationContext)
         setContent {
             HavalTripTheme {
                 DiagnosticoDespedidaScreen()

@@ -166,7 +166,11 @@ fun DiagnosticoScreen(vm: TripViewModel) {
                                     val resultado = br.com.hugolumazzini.havaltrip.painel.ShizukuShell.rodar(
                                         "logcat -d -t 2000 --pid=\$(pidof br.com.hugolumazzini.havaltrip) 2>/dev/null || logcat -d -t 2000 | grep 'havaltrip\\|MotorDeBordo\\|ProjetorDoPainel\\|ClusterOverlayService\\|ShizukuTelemetry\\|TripViewModel\\|TripEngine\\|AndroidRuntime.*havaltrip'"
                                     )
-                                    logs = resultado ?: "Erro ao capturar logs (Shizuku não autorizado?)"
+                                    // O histórico da despedida vai na frente: é o que
+                                    // conta a história, e as últimas 2000 linhas do
+                                    // log do app o empurrariam para fora.
+                                    logs = br.com.hugolumazzini.havaltrip.painel.HistoricoDaDespedida.comoTexto() +
+                                        "\n" + (resultado ?: "Erro ao capturar logs (Shizuku não autorizado?)")
                                 } finally {
                                     capturandoLogs = false
                                 }

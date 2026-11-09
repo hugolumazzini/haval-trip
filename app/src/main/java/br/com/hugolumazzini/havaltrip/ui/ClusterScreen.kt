@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -47,6 +48,7 @@ import br.com.hugolumazzini.havaltrip.CorDoCluster
 import br.com.hugolumazzini.havaltrip.LugarNoPainel
 import br.com.hugolumazzini.havaltrip.RotuloDoCluster
 import br.com.hugolumazzini.havaltrip.TripViewModel
+import br.com.hugolumazzini.havaltrip.painel.HistoricoDaDespedida
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
 import br.com.hugolumazzini.havaltrip.painel.ProjetorDoPainel
 import br.com.hugolumazzini.havaltrip.domain.MedidaDoPainel
@@ -112,6 +114,19 @@ fun ClusterScreen(
     // instalar o app abriria a prévia e não veria nada.
     val viagem = Despedida.viagemQueAcabou(estado.trips) ?: trip
     val despedida = despedindo && (forcarDespedida || Despedida.valeMostrar(viagem))
+
+    // Para o histórico da despedida: quando esta janela passa a desenhá-la e
+    // quando ela sai de cena (inclusive se a janela inteira for destruída).
+    DisposableEffect(despedida, espiando) {
+        if (despedida && !espiando) {
+            HistoricoDaDespedida.info("🎬 Janela dos números desenhando a despedida")
+        }
+        onDispose {
+            if (despedida && !espiando) {
+                HistoricoDaDespedida.info("🎬 Janela dos números deixou de desenhar a despedida")
+            }
+        }
+    }
 
     // Se o resumo é de outra janela, esta some. Ver [Despedida.janelaDoResumo].
     // Na espiada não: lá o motorista pediu para ver esta tela, e devolver preto

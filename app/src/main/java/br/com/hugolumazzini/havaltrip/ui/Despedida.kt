@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +48,7 @@ import br.com.hugolumazzini.havaltrip.AjustesDoCluster
 import br.com.hugolumazzini.havaltrip.Cluster
 import br.com.hugolumazzini.havaltrip.ItemDoCluster
 import br.com.hugolumazzini.havaltrip.R
+import br.com.hugolumazzini.havaltrip.painel.EstadoDaDespedida
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo.Abertura
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
@@ -180,7 +182,12 @@ fun lembrarDespedida(ignicao: IgnitionState): Boolean {
         }
         anterior.value = ignicao
     }
-    return despedindo
+
+    // O que esta tela lembra morre com ela, e a janela do painel é refeita (e
+    // o app pode reabrir com o carro já desligado). O motor, que viu a chave
+    // cair, guarda o fato em [EstadoDaDespedida] — é ele que vale.
+    val registradaPeloMotor by EstadoDaDespedida.fluxo.collectAsState()
+    return despedindo || registradaPeloMotor
 }
 
 /**

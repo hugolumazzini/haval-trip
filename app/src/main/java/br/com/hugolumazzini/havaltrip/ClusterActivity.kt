@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
 import br.com.hugolumazzini.havaltrip.painel.fecharQuandoPedirem
+import br.com.hugolumazzini.havaltrip.painel.registrarCicloDaJanela
 import br.com.hugolumazzini.havaltrip.ui.ClusterScreen
 import br.com.hugolumazzini.havaltrip.ui.theme.HavalTripTheme
 
@@ -40,7 +41,10 @@ class ClusterActivity : ComponentActivity() {
         val espiando = intent.getBooleanExtra(ESPIANDO, false)
         // Espiando é a conferência aqui na central, com o botão Voltar à mão;
         // recolher é para a janela que está lá no painel, fora de alcance.
-        if (!espiando) fecharQuandoPedirem(JanelaDoPainel.NUMEROS)
+        if (!espiando) {
+            fecharQuandoPedirem(JanelaDoPainel.NUMEROS)
+            registrarCicloDaJanela("criada")
+        }
         val despedida = intent.getBooleanExtra(DESPEDIDA, false)
         setContent {
             HavalTripTheme {
@@ -57,6 +61,7 @@ class ClusterActivity : ComponentActivity() {
     override fun onDestroy() {
         // Para ClusterOverlayService quando Activity é destruída
         // MAS NÃO se despedida estiver ativa! Senão remove a despedida que acabou de aparecer
+        if (!espiando) registrarCicloDaJanela("destruída")
         if (!espiando && !br.com.hugolumazzini.havaltrip.painel.EstadoDaDespedida.estaAtiva()) {
             android.util.Log.d("ClusterActivity", "🔌 onDestroy: removendo overlay (despedida NÃO ativa)")
             br.com.hugolumazzini.havaltrip.painel.ClusterOverlayService.recolher(

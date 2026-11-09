@@ -301,11 +301,15 @@ class ClusterOverlayService : Service() {
                 if (despedida) {
                     addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
                         override fun onViewAttachedToWindow(v: View) {
-                            HistoricoDaDespedida.info("📽️ Overlay da despedida anexado à janela")
+                            if (EstadoDaDespedida.estaAtiva()) {
+                                HistoricoDaDespedida.info("📽️ Overlay da despedida anexado à janela")
+                            }
                         }
 
                         override fun onViewDetachedFromWindow(v: View) {
-                            HistoricoDaDespedida.info("📽️ Overlay da despedida desanexado da janela")
+                            if (EstadoDaDespedida.estaAtiva()) {
+                                HistoricoDaDespedida.info("📽️ Overlay da despedida desanexado da janela")
+                            }
                         }
                     })
                 }

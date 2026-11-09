@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import kotlin.math.ceil
 import androidx.compose.runtime.getValue
@@ -44,6 +45,7 @@ import br.com.hugolumazzini.havaltrip.TripViewModel
 import br.com.hugolumazzini.havaltrip.domain.PainelDoVeiculo
 import br.com.hugolumazzini.havaltrip.domain.Trip
 import br.com.hugolumazzini.havaltrip.domain.VehicleLive
+import br.com.hugolumazzini.havaltrip.painel.HistoricoDaDespedida
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
 import br.com.hugolumazzini.havaltrip.painel.ProjetorDoPainel
 import br.com.hugolumazzini.havaltrip.painel.PaginaDoCluster
@@ -157,6 +159,27 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
         Despedida.janelaDoResumo(ajustes) == JanelaDoPainel.MENU &&
         Despedida.valeMostrar(viagem)
     if (despedindo && !comResumo) return
+
+    // A despedida toma a janela inteira, como nas janelas dos números e do
+    // carro. A bola é um recorte do painel de dirigir; com o carro desligado
+    // não há painel atrás para preservar, e o resumo espremido no círculo era
+    // o que o motorista via como "só dentro da bola".
+    if (comResumo && viagem != null) {
+        DisposableEffect(Unit) {
+            HistoricoDaDespedida.info("🎬 Janela da bola (menu) desenhando a despedida em tela cheia")
+            onDispose {
+                HistoricoDaDespedida.info("🎬 Janela da bola (menu) deixou de desenhar a despedida")
+            }
+        }
+        DespedidaDaViagem(
+            viagem.metrics,
+            estado.live,
+            tinta(ajustes, paleta),
+            painel,
+            Modifier.fillMaxSize().background(Color(ajustes.fundoDoMenu.argb)),
+        )
+        return
+    }
 
     BoxWithConstraints(
         Modifier
@@ -300,19 +323,12 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (comResumo && viagem != null) {
-                    // Dentro do anel, no lugar das visões: o resumo é a
-                    // única coisa que fica no painel depois de desligar, e
-                    // aqui ele herda o recorte redondo que já está acertado.
-                    DespedidaDaViagem(viagem.metrics, estado.live, cor, painel)
-                } else {
-                    Conteudo(
-                        visao, visoes.size, indice, painel, estado.live, ajustes, cor,
-                        apertado = true,
-                        // Título e bolinhas vêm logo abaixo, fora do zoom.
-                        comMoldura = false,
-                    )
-                }
+                Conteudo(
+                    visao, visoes.size, indice, painel, estado.live, ajustes, cor,
+                    apertado = true,
+                    // Título e bolinhas vêm logo abaixo, fora do zoom.
+                    comMoldura = false,
+                )
             }
 
             // Fora da caixa do zoom, de propósito. Título e bolinhas são
@@ -320,26 +336,24 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
             // deles é a borda do círculo. Dentro do zoom, aumentar o número
             // engordava as bolinhas junto e empurrava o título para fora da
             // bola.
-            if (!comResumo) {
-                Bolinhas(
-                    visoes.size,
-                    indice,
-                    cor.cor,
-                    Modifier
-                        .align(Alignment.CenterEnd)
-                        .offset(x = -lado * MARGEM_DA_BOLA),
-                )
-                Text(
-                    visao.titulo,
-                    color = cor.cor.copy(alpha = 0.75f),
-                    fontSize = (lado.value * TITULO_NA_BOLA).coerceIn(9f, 26f).sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .offset(y = lado * MARGEM_DA_BOLA),
-                )
-            }
+            Bolinhas(
+                visoes.size,
+                indice,
+                cor.cor,
+                Modifier
+                    .align(Alignment.CenterEnd)
+                    .offset(x = -lado * MARGEM_DA_BOLA),
+            )
+            Text(
+                visao.titulo,
+                color = cor.cor.copy(alpha = 0.75f),
+                fontSize = (lado.value * TITULO_NA_BOLA).coerceIn(9f, 26f).sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = lado * MARGEM_DA_BOLA),
+            )
         }
     }
 }

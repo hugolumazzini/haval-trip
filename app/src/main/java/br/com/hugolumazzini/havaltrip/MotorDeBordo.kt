@@ -272,6 +272,16 @@ class MotorDeBordo private constructor(private val app: Application) {
                         acionarDespedida()
                     }
                 }
+                // Rede de segurança: a despedida fica por cima de tudo no painel
+                // e não tem toque. Se o aviso de "ligou" se perder e o carro sair
+                // andando, ela não pode ficar tapando o painel de quem dirige.
+                if (amostra.speedKmh > VELOCIDADE_QUE_ENCERRA_A_DESPEDIDA_KMH &&
+                    br.com.hugolumazzini.havaltrip.painel.EstadoDaDespedida.estaAtiva()
+                ) {
+                    br.com.hugolumazzini.havaltrip.painel.EstadoDaDespedida.desativar(
+                        "carro em movimento (${"%.0f".format(amostra.speedKmh)} km/h)",
+                    )
+                }
                 manager.processTelemetry(amostra)
             }
         }
@@ -402,6 +412,9 @@ class MotorDeBordo private constructor(private val app: Application) {
     }
 
     companion object {
+
+        /** Acima disto o carro não está estacionado, e a despedida sai do painel. */
+        private const val VELOCIDADE_QUE_ENCERRA_A_DESPEDIDA_KMH = 5.0
 
         @Volatile
         private var instancia: MotorDeBordo? = null

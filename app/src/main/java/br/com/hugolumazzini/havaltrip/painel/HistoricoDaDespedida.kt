@@ -7,16 +7,41 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Anota no histórico o nascimento ou a morte de uma janela do painel, e em que tela ela estava. */
-fun ComponentActivity.registrarCicloDaJanela(o_que: String) {
+/**
+ * Em que tela cada janela do painel está agora, contado pela própria janela.
+ *
+ * O número da tela do painel muda entre uma partida e outra da central (no
+ * mesmo dia o histórico registrou a janela da bola na tela 3 e depois na 1).
+ * Quem sabe onde a janela está de verdade é ela mesma, ao nascer.
+ */
+object TelaDasJanelas {
+    private val atual = java.util.concurrent.ConcurrentHashMap<JanelaDoPainel, Int>()
+
+    fun de(janela: JanelaDoPainel): Int? = atual[janela]
+
+    internal fun nasceu(janela: JanelaDoPainel, tela: Int) {
+        atual[janela] = tela
+    }
+
+    internal fun morreu(janela: JanelaDoPainel, tela: Int) {
+        atual.remove(janela, tela)
+    }
+}
+
+/**
+ * Anota no histórico o nascimento ou a morte de uma janela do painel, e em que
+ * tela ela estava, e guarda a tela em [TelaDasJanelas].
+ */
+fun ComponentActivity.registrarCicloDaJanela(janela: JanelaDoPainel, viva: Boolean) {
     @Suppress("DEPRECATION")
     val tela = windowManager.defaultDisplay.displayId
+    if (viva) TelaDasJanelas.nasceu(janela, tela) else TelaDasJanelas.morreu(janela, tela)
     val detalhes = buildList {
         add("tela $tela")
         if (isFinishing) add("finalizando")
         if (EstadoDaDespedida.estaAtiva()) add("despedida ativa")
     }.joinToString(", ")
-    HistoricoDaDespedida.info("🪟 ${javaClass.simpleName} $o_que ($detalhes)")
+    HistoricoDaDespedida.info("🪟 ${javaClass.simpleName} ${if (viva) "criada" else "destruída"} ($detalhes)")
 }
 
 /**

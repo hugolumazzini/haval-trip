@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -156,6 +157,9 @@ object Despedida {
     }
 }
 
+/** Verdadeiro quando a despedida deve aparecer já parada no quadro final, sem a cena. */
+val LocalDespedidaPronta = staticCompositionLocalOf { false }
+
 /**
  * Lembra se o carro foi desligado **enquanto esta tela estava viva**.
  *
@@ -226,7 +230,9 @@ internal fun DespedidaDaViagem(
     // [AjustesDoCluster.itensDaDespedida].
     val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
 
-    val alvo = remember { mutableFloatStateOf(0f) }
+    // Recolocada na frente de outra janela, ela já entra no quadro final.
+    val pronta = LocalDespedidaPronta.current
+    val alvo = remember { mutableFloatStateOf(if (pronta) 1f else 0f) }
     val cena by animateFloatAsState(
         targetValue = alvo.floatValue,
         animationSpec = tween(Despedida.CENA_MS, easing = LinearEasing),

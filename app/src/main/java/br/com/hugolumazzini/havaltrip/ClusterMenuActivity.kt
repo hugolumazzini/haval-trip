@@ -35,7 +35,7 @@ class ClusterMenuActivity : ComponentActivity() {
         val espiando = intent.getBooleanExtra(ESPIANDO, false)
         if (!espiando) {
             fecharQuandoPedirem(JanelaDoPainel.MENU)
-            registrarCicloDaJanela("criada")
+            registrarCicloDaJanela(JanelaDoPainel.MENU, viva = true)
         }
         setContent {
             HavalTripTheme {
@@ -68,7 +68,7 @@ class ClusterMenuActivity : ComponentActivity() {
         // Para ClusterOverlayService quando Activity é destruída
         // MAS NÃO se despedida estiver ativa! Senão remove a despedida
         val espiando = intent.getBooleanExtra(ESPIANDO, false)
-        if (!espiando) registrarCicloDaJanela("destruída")
+        if (!espiando) registrarCicloDaJanela(JanelaDoPainel.MENU, viva = false)
         if (!espiando && !br.com.hugolumazzini.havaltrip.painel.EstadoDaDespedida.estaAtiva()) {
             android.util.Log.d("ClusterMenuActivity", "🔌 onDestroy: removendo overlay (despedida NÃO ativa)")
             br.com.hugolumazzini.havaltrip.painel.ClusterOverlayService.recolher(

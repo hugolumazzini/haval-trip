@@ -320,8 +320,19 @@ class MotorDeBordo private constructor(private val app: Application) {
                 // Determina qual janela deve mostrar (mesma lógica da ClusterScreen)
                 val janela = br.com.hugolumazzini.havaltrip.ui.Despedida.janelaDoResumo(ajustes)
 
-                // Display 3 = cluster do H6
-                val displayId = 3
+                // A tela onde a janela do painel está agora; o número muda entre
+                // uma partida e outra da central. Sem a janela viva, a escolhida
+                // na Configuração; sem nenhuma, a 3, que é a do painel no H6.
+                val telaViva = br.com.hugolumazzini.havaltrip.painel.TelaDasJanelas.de(janela)
+                val telaEscolhida = Cluster.telasEscolhidas()[janela]
+                val displayId = telaViva ?: telaEscolhida ?: 3
+                br.com.hugolumazzini.havaltrip.painel.HistoricoDaDespedida.info(
+                    "📍 Despedida na tela $displayId (" + when {
+                        telaViva != null -> "onde a janela $janela está"
+                        telaEscolhida != null -> "escolhida na Configuração; a janela $janela não está aberta"
+                        else -> "padrão; nenhuma tela registrada para a janela $janela"
+                    } + ")",
+                )
 
                 Log.i("MotorDeBordo", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                 Log.i("MotorDeBordo", "👋 ACIONANDO DESPEDIDA")

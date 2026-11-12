@@ -28,6 +28,8 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import br.com.hugolumazzini.havaltrip.TripViewModel
+import br.com.hugolumazzini.havaltrip.domain.JanelaDoSistema
+import br.com.hugolumazzini.havaltrip.domain.JanelasDoSistema
 import br.com.hugolumazzini.havaltrip.domain.PilhasDoSistema
 import br.com.hugolumazzini.havaltrip.ui.ClusterCarroScreen
 import br.com.hugolumazzini.havaltrip.ui.ClusterMenuScreen
@@ -35,7 +37,9 @@ import br.com.hugolumazzini.havaltrip.ui.ClusterScreen
 import br.com.hugolumazzini.havaltrip.ui.theme.HavalTripTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -91,6 +95,18 @@ class ClusterOverlayService : Service() {
         private const val CMD_ESCONDER = "esconder"
         private const val CMD_DESPEDIDA = "despedida"
 
+        /** Como a nossa janela aparece no `dumpsys`: `Window{… u0 HavalTripDespedida}`. */
+        private const val TITULO = "HavalTripDespedida"
+
+        /**
+         * Quando o vigia confere a ordem, contando a partir da conferência
+         * anterior: aos 0,7 s, 2 s, 5 s, 10 s, 20 s, 40 s e 60 s da despedida.
+         */
+        private val ESPERAS_DO_VIGIA_MS = listOf(700L, 1_300L, 3_000L, 5_000L, 10_000L, 20_000L, 20_000L)
+
+        /** Mais que isso é briga com outro app que também se recoloca na frente. */
+        private const val MAX_RECOLOCACOES = 5
+
         /** Remove o overlay, a não ser que a despedida esteja ativa. */
         fun recolher(context: Context, janela: JanelaDoPainel) {
             val intent = Intent(context, ClusterOverlayService::class.java).apply {
@@ -122,6 +138,7 @@ class ClusterOverlayService : Service() {
     private var windowManager: WindowManager? = null
     private var overlayView: ComposeView? = null
     private var donoDoOverlay: DonoDoOverlay? = null
+    private var vigia: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -213,16 +230,6 @@ class ClusterOverlayService : Service() {
             if (daTela.isEmpty()) {
                 HistoricoDaDespedida.info("🧹 Nenhuma pilha na tela $displayId. Saída do comando: ${saida.take(300)}")
             }
-
-            // Janelas, e não só pilhas: apresentações e overlays de outros apps
-            // (o mapa do AutoPanel) não são pilhas e o `am stack` não as vê.
-            val janelas = ShizukuShell.rodar(
-                "dumpsys window windows | grep -B1 'mDisplayId=$displayId ' | grep -o 'Window{[^}]*}'",
-            )?.lines()?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
-            HistoricoDaDespedida.info(
-                "🔎 Janelas na tela $displayId (ordem do dumpsys): " +
-                    if (janelas.isEmpty()) "nenhuma lida" else janelas.joinToString(" | ").take(600),
-            )
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao limpar a tela $displayId", e)
             HistoricoDaDespedida.erro("Limpeza da tela $displayId falhou: ${e.message}")
@@ -288,10 +295,108 @@ class ClusterOverlayService : Service() {
 
             Log.i(TAG, "✅ Overlay criado: $janela no display $displayId")
             HistoricoDaDespedida.projetou("Overlay da despedida adicionado na tela $displayId ($janela)")
+            vigiarAFrente(displayId)
         } catch (e: Exception) {
             dono.encerrar()
             Log.e(TAG, "❌ Erro ao criar overlay", e)
             HistoricoDaDespedida.erro("Falha ao criar overlay: ${e.message}")
+        }
+    }
+
+    /**
+     * Confere, no primeiro minuto, se a janela de outro app ficou na frente da
+     * despedida, e a recoloca por cima quando ficou.
+     *
+     * Entre janelas do mesmo tipo fica na frente a colocada por último — no
+     * carro, a do mapa do AutoPanel chegava depois da nossa e a tapava. Não dá
+     * para impedir que ela seja recolocada; dá para conferir e voltar à frente.
+     * Contra uma janela de nível mais alto não há o que fazer, e o histórico diz.
+     */
+    private fun vigiarAFrente(displayId: Int) {
+        vigia?.cancel()
+        vigia = escopo.launch {
+            var recolocadas = 0
+            var primeira = true
+            for (espera in ESPERAS_DO_VIGIA_MS) {
+                delay(espera)
+                if (overlayView == null || !EstadoDaDespedida.estaAtiva()) return@launch
+
+                val janelas = withContext(Dispatchers.IO) { lerJanelas() }
+                if (janelas == null) {
+                    HistoricoDaDespedida.info("🔎 Não deu para ler as janelas da tela $displayId (o Shizuku não respondeu ao dumpsys)")
+                    return@launch
+                }
+                if (primeira) {
+                    primeira = false
+                    val daTela = janelas.filter { it.tela == displayId && it.visivel }
+                    HistoricoDaDespedida.info(
+                        "🔎 Janelas visíveis na tela $displayId, de cima para baixo: " +
+                            daTela.joinToString(" | ") { it.descrever() }.take(700),
+                    )
+                }
+
+                val naFrente = JanelasDoSistema.naFrenteDaNossa(janelas, displayId, TITULO, packageName)
+                if (naFrente == null) {
+                    HistoricoDaDespedida.info("🔎 A despedida não aparece na lista de janelas da tela $displayId")
+                    return@launch
+                }
+                if (naFrente.isEmpty()) continue
+
+                if (recolocadas >= MAX_RECOLOCACOES) {
+                    HistoricoDaDespedida.erro(
+                        "Desisti: ${naFrente.joinToString { it.dono }} voltou para a frente da despedida depois de $recolocadas recolocações",
+                    )
+                    return@launch
+                }
+                recolocadas++
+                HistoricoDaDespedida.info(
+                    "⬆️ Despedida estava atrás de ${naFrente.joinToString { it.descrever() }}; recolocando na frente ($recolocadas/$MAX_RECOLOCACOES)",
+                )
+                if (!trazerParaFrente()) return@launch
+
+                delay(500)
+                val depois = withContext(Dispatchers.IO) { lerJanelas() }
+                    ?.let { JanelasDoSistema.naFrenteDaNossa(it, displayId, TITULO, packageName) }
+                when {
+                    depois == null -> HistoricoDaDespedida.info("⬆️ Depois de recolocar: não deu para conferir a ordem")
+                    depois.isEmpty() -> HistoricoDaDespedida.info("✅ Depois de recolocar: a despedida está na frente de tudo")
+                    depois.map { it.id } == naFrente.map { it.id } -> {
+                        HistoricoDaDespedida.erro(
+                            "Mesmo recolocada, a despedida continua atrás de ${depois.joinToString { it.descrever() }}: janela de nível mais alto",
+                        )
+                        return@launch
+                    }
+                    else -> HistoricoDaDespedida.info(
+                        "⬆️ Depois de recolocar: passou à frente de parte; ainda atrás de ${depois.joinToString { it.descrever() }}",
+                    )
+                }
+            }
+        }
+    }
+
+    private fun lerJanelas(): List<JanelaDoSistema>? =
+        ShizukuShell.rodar("dumpsys window windows | grep -E '${JanelasDoSistema.FILTRO}'")
+            ?.let { JanelasDoSistema.listar(it) }
+            ?.takeIf { it.isNotEmpty() }
+
+    /** Tira e põe de novo a mesma janela: a recolocada vai para a frente das do seu nível. */
+    private fun trazerParaFrente(): Boolean {
+        val view = overlayView ?: return false
+        val wm = windowManager ?: return false
+        val params = view.layoutParams as? WindowManager.LayoutParams ?: return false
+        try {
+            wm.removeViewImmediate(view)
+        } catch (e: Exception) {
+            HistoricoDaDespedida.erro("Falha ao tirar a despedida para recolocar: ${e.message}")
+            return false
+        }
+        return try {
+            wm.addView(view, params)
+            true
+        } catch (e: Exception) {
+            HistoricoDaDespedida.erro("Falha ao recolocar a despedida: ${e.message}")
+            esquecerOverlay()
+            false
         }
     }
 
@@ -308,6 +413,7 @@ class ClusterOverlayService : Service() {
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.START
+            title = TITULO
 
             @Suppress("DEPRECATION")
             systemUiVisibility = (
@@ -340,13 +446,19 @@ class ClusterOverlayService : Service() {
         } catch (e: Exception) {
             Log.w(TAG, "⚠️ Erro ao remover overlay", e)
         } finally {
-            overlayView = null
-            windowManager = null
-            janelaAtual = null
-            displayIdAtual = -1
-            donoDoOverlay?.encerrar()
-            donoDoOverlay = null
+            esquecerOverlay()
         }
+    }
+
+    private fun esquecerOverlay() {
+        vigia?.cancel()
+        vigia = null
+        overlayView = null
+        windowManager = null
+        janelaAtual = null
+        displayIdAtual = -1
+        donoDoOverlay?.encerrar()
+        donoDoOverlay = null
     }
 
     private fun obterDisplay(displayId: Int): Display? {

@@ -264,7 +264,18 @@ class MotorDeBordo private constructor(private val app: Application) {
                         // DESATIVA despedida quando carro ligar de novo
                         br.com.hugolumazzini.havaltrip.painel.EstadoDaDespedida.desativar("ignição ligou")
                     } else {
-                        br.com.hugolumazzini.havaltrip.painel.HistoricoDaDespedida.info("🔑 Ignição desligou (fonte: $fonteAtual)")
+                        br.com.hugolumazzini.havaltrip.painel.HistoricoDaDespedida.info(
+                            "🔑 Ignição desligou (fonte: $fonteAtual; ${leiturasDeEnergia()})",
+                        )
+                        // O AutoPanel tira o mapa do painel ~1,5 s depois do desligar,
+                        // e só se essas chaves disserem "desligado". Registrar o que
+                        // elas valem logo depois é o que explica quando ele não tira.
+                        escopo.launch {
+                            delay(3_000)
+                            br.com.hugolumazzini.havaltrip.painel.HistoricoDaDespedida.info(
+                                "🔑 3 s depois do desligar: ${leiturasDeEnergia()}",
+                            )
+                        }
                         coletaDeEnergia.terminar()
                         // DESPEDIDA: quando o carro desligar, projeta o resumo em tela cheia
                         // usando ClusterOverlayService, que garante que cobre o painel inteiro
@@ -409,6 +420,15 @@ class MotorDeBordo private constructor(private val app: Application) {
     fun pedirTudoAoCarro() {
         HavalTelemetrySource.pedirTudo(app)
         if (_fonte.value == Fonte.SHIZUKU) escutar()
+    }
+
+    /** As chaves de energia como o carro as publicou, cruas. */
+    private fun leiturasDeEnergia(): String {
+        val atual = diario.atual.value
+        fun cru(chave: String) = atual[chave]?.valor ?: "—"
+        return "pronto=${cru("car.basic.driving_ready_state")}, " +
+            "motor=${cru("car.basic.engine_state")}, " +
+            "modo=${cru("car.basic.power_mode")}"
     }
 
     companion object {

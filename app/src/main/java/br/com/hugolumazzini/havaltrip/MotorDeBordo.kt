@@ -254,6 +254,9 @@ class MotorDeBordo private constructor(private val app: Application) {
                 if (amostra.ignition != anterior) {
                     Log.i("MotorDeBordo", "🔑 Mudança de ignição: $anterior → ${amostra.ignition}")
                     anterior = amostra.ignition
+                    // Antes de avisar as telas: a janela do painel começa a cena
+                    // assim que vê a ignição mudar, e precisa achar o relógio certo.
+                    marcarRelogioDaCena(amostra.ignition)
                     manager.handleIgnitionChange(amostra.ignition)
                     // A coleta de energia começa e termina com a chave, sem
                     // ninguém apertar nada. Ela mesma se cala se estiver
@@ -392,6 +395,7 @@ class MotorDeBordo private constructor(private val app: Application) {
         if (_fonte.value != Fonte.SIMULADOR) return
         val novo = if (state.value.live.ignition == IgnitionState.ON) IgnitionState.OFF else IgnitionState.ON
         simulador.ignicao = novo
+        marcarRelogioDaCena(novo)
         manager.handleIgnitionChange(novo)
         // Também inicia/termina a coleta de energia quando a ignição muda
         if (novo == IgnitionState.ON) {
@@ -431,6 +435,11 @@ class MotorDeBordo private constructor(private val app: Application) {
     fun pedirTudoAoCarro() {
         HavalTelemetrySource.pedirTudo(app)
         if (_fonte.value == Fonte.SHIZUKU) escutar()
+    }
+
+    private fun marcarRelogioDaCena(ignicao: IgnitionState) {
+        if (ignicao == IgnitionState.ON) br.com.hugolumazzini.havaltrip.painel.EstadoDaDespedida.carroLigou()
+        else br.com.hugolumazzini.havaltrip.painel.EstadoDaDespedida.carroDesligou()
     }
 
     /** As chaves de energia como o carro as publicou, cruas. */

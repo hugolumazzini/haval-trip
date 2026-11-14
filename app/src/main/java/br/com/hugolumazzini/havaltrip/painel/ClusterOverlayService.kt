@@ -14,8 +14,8 @@ import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
 import android.view.Display
+import android.view.ViewTreeObserver
 import android.view.WindowManager
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -35,7 +35,6 @@ import br.com.hugolumazzini.havaltrip.domain.PilhasDoSistema
 import br.com.hugolumazzini.havaltrip.ui.ClusterCarroScreen
 import br.com.hugolumazzini.havaltrip.ui.ClusterMenuScreen
 import br.com.hugolumazzini.havaltrip.ui.ClusterScreen
-import br.com.hugolumazzini.havaltrip.ui.LocalDespedidaPronta
 import br.com.hugolumazzini.havaltrip.ui.theme.HavalTripTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -76,16 +75,14 @@ private class DonoDaDespedida : LifecycleOwner, SavedStateRegistryOwner, ViewMod
  * 121000. O mapa do AutoPanel é uma apresentação, e nenhuma sobreposição passa
  * por cima dele; outra apresentação, colocada depois, passa.
  *
- * @param pronta mostra a cena já no quadro final. É o que se usa ao recolocá-la
- *   na frente: sem isso a animação recomeça, e quem olha o painel vê a
- *   despedida "piscar e rodar de novo".
+ * A cena só começa a andar quando esta apresentação vai desenhar o primeiro
+ * quadro, e não recomeça quando ela é recolocada ([EstadoDaDespedida.inicioDaCena]).
  */
 private class ApresentacaoDaDespedida(
     contexto: Context,
     display: Display,
     private val janela: JanelaDoPainel,
     private val vm: TripViewModel,
-    private val pronta: Boolean,
     private val titulo: String,
 ) : Presentation(contexto, display) {
 
@@ -115,15 +112,23 @@ private class ApresentacaoDaDespedida(
                 setViewTreeSavedStateRegistryOwner(dono)
                 setViewTreeViewModelStoreOwner(dono)
                 setContent {
-                    CompositionLocalProvider(LocalDespedidaPronta provides pronta) {
-                        HavalTripTheme {
-                            when (janela) {
-                                JanelaDoPainel.NUMEROS -> ClusterScreen(vm = vm, espiando = false)
-                                JanelaDoPainel.CARRO -> ClusterCarroScreen(vm = vm, espiando = false)
-                                JanelaDoPainel.MENU -> ClusterMenuScreen(vm = vm, espiando = false)
-                            }
+                    HavalTripTheme {
+                        when (janela) {
+                            JanelaDoPainel.NUMEROS -> ClusterScreen(vm = vm, espiando = false)
+                            JanelaDoPainel.CARRO -> ClusterCarroScreen(vm = vm, espiando = false)
+                            JanelaDoPainel.MENU -> ClusterMenuScreen(vm = vm, espiando = false)
                         }
                     }
+                }
+            },
+        )
+        // Pronta para o primeiro quadro: só então a cena começa a andar.
+        window?.decorView?.viewTreeObserver?.addOnPreDrawListener(
+            object : ViewTreeObserver.OnPreDrawListener {
+                override fun onPreDraw(): Boolean {
+                    window?.decorView?.viewTreeObserver?.removeOnPreDrawListener(this)
+                    EstadoDaDespedida.comecarCena()
+                    return true
                 }
             },
         )
@@ -239,7 +244,7 @@ class ClusterOverlayService : Service() {
     private fun mostrarDespedida(janela: JanelaDoPainel, displayId: Int) {
         if (!EstadoDaDespedida.estaAtiva()) return
         if (apresentacao != null && janelaAtual == janela && displayIdAtual == displayId) return
-        if (mostrar(janela, displayId, pronta = false)) vigiarAFrente(displayId)
+        if (mostrar(janela, displayId, recolocando = false)) vigiarAFrente(displayId)
         // Depois de mostrar, e não antes: cada décimo de segundo gasto em shell
         // antes é imagem que o painel pode congelar sem a despedida.
         escopo.launch(Dispatchers.IO) { removerOutrosAppsDoDisplay(displayId) }
@@ -249,23 +254,25 @@ class ClusterOverlayService : Service() {
      * Mostra uma apresentação nova e só então retira a anterior, se houver.
      * Nessa ordem a tela nunca fica um quadro sem a despedida.
      */
-    private fun mostrar(janela: JanelaDoPainel, displayId: Int, pronta: Boolean): Boolean {
+    private fun mostrar(janela: JanelaDoPainel, displayId: Int, recolocando: Boolean): Boolean {
         val display = obterDisplay(displayId)
         if (display == null) {
             Log.w(TAG, "Tela $displayId não encontrada")
             HistoricoDaDespedida.erro("Tela $displayId não encontrada pelo app: a despedida fica só na janela do painel")
+            EstadoDaDespedida.comecarCena()
             return false
         }
         if (!::tripViewModel.isInitialized) {
             tripViewModel = TripViewModel(applicationContext as Application)
         }
 
-        val nova = ApresentacaoDaDespedida(this, display, janela, tripViewModel, pronta, TITULO)
+        val nova = ApresentacaoDaDespedida(this, display, janela, tripViewModel, TITULO)
         try {
             nova.show()
         } catch (e: Exception) {
             Log.e(TAG, "❌ Erro ao mostrar a despedida", e)
             HistoricoDaDespedida.erro("Falha ao mostrar a despedida na tela $displayId: ${e.message}")
+            EstadoDaDespedida.comecarCena()
             return false
         }
 
@@ -275,7 +282,7 @@ class ClusterOverlayService : Service() {
         displayIdAtual = displayId
         anterior?.let { runCatching { it.dismiss() } }
 
-        if (!pronta) {
+        if (!recolocando) {
             Log.i(TAG, "✅ Despedida mostrada: $janela na tela $displayId")
             HistoricoDaDespedida.projetou("Despedida mostrada como apresentação na tela $displayId ($janela)")
         }
@@ -332,7 +339,7 @@ class ClusterOverlayService : Service() {
                     "⬆️ Despedida estava atrás de ${naFrente.joinToString { it.descrever() }}; recolocando na frente ($recolocadas/$MAX_RECOLOCACOES)",
                 )
                 val janela = janelaAtual ?: return@launch
-                if (!mostrar(janela, displayId, pronta = true)) return@launch
+                if (!mostrar(janela, displayId, recolocando = true)) return@launch
 
                 delay(500)
                 val depois = withContext(Dispatchers.IO) { lerJanelas() }

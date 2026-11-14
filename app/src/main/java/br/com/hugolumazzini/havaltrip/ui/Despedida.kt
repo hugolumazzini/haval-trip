@@ -1,8 +1,9 @@
 package br.com.hugolumazzini.havaltrip.ui
 
+import android.os.SystemClock
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -25,11 +26,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -157,9 +156,6 @@ object Despedida {
     }
 }
 
-/** Verdadeiro quando a despedida deve aparecer já parada no quadro final, sem a cena. */
-val LocalDespedidaPronta = staticCompositionLocalOf { false }
-
 /**
  * Lembra se o carro foi desligado **enquanto esta tela estava viva**.
  *
@@ -230,15 +226,22 @@ internal fun DespedidaDaViagem(
     // [AjustesDoCluster.itensDaDespedida].
     val ajustes by Cluster.ajustes.collectAsStateWithLifecycle()
 
-    // Recolocada na frente de outra janela, ela já entra no quadro final.
-    val pronta = LocalDespedidaPronta.current
-    val alvo = remember { mutableFloatStateOf(if (pronta) 1f else 0f) }
-    val cena by animateFloatAsState(
-        targetValue = alvo.floatValue,
-        animationSpec = tween(Despedida.CENA_MS, easing = LinearEasing),
-        label = "cena",
-    )
-    LaunchedEffect(Unit) { alvo.floatValue = 1f }
+    // Todas as janelas contam a cena do mesmo instante, e não do momento em que
+    // nasceram: quem chega depois continua do mesmo quadro. Enquanto o carro
+    // acabou de desligar e a apresentação não entrou, fica no primeiro quadro.
+    // Ver [EstadoDaDespedida.inicioDaCena]. Sem carro desligado (a conferência na
+    // Configuração), começa na hora.
+    val inicio by EstadoDaDespedida.inicioDaCena.collectAsState()
+    val relogio = remember { Animatable(0f) }
+    LaunchedEffect(inicio) {
+        val comeco = inicio
+            ?: if (EstadoDaDespedida.cenaEsperando) return@LaunchedEffect else SystemClock.uptimeMillis()
+        val jaPassou = ((SystemClock.uptimeMillis() - comeco).toFloat() / Despedida.CENA_MS).coerceIn(0f, 1f)
+        relogio.snapTo(jaPassou)
+        val falta = ((1f - jaPassou) * Despedida.CENA_MS).toInt()
+        if (falta > 0) relogio.animateTo(1f, tween(falta, easing = LinearEasing))
+    }
+    val cena = relogio.value
 
     BoxWithConstraints(modifier.fillMaxSize().padding(6.dp)) {
         val comCarro = maxWidth >= Despedida.CABE_O_CARRO_LARGURA &&

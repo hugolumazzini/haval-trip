@@ -281,13 +281,12 @@ data class Empurrao(val x: Int = 0, val y: Int = 0) {
          * Era 240 quando existiam nove cantos prontos: o empurrão só corrigia o
          * fio a partir do canto mais próximo. Agora a âncora é sempre o centro e
          * a seta é o único jeito de mover, então o limite tem de cobrir a
-         * distância do centro até a borda — a janela do painel tem cerca de
-         * 960 x 360 dp, ou seja, 480 dp na horizontal. 600 sobra de propósito nos
-         * dois eixos (a conta é a mesma para uma janela maior noutra tela), e
-         * continua fechado para uma preferência gravada errada não jogar o bloco
-         * para fora da tela sem o motorista ter como trazê-lo de volta.
+         * distância da âncora até qualquer borda. No H6 a janela do painel tem
+         * 1920 x 720 dp (lá 1 dp = 1 px), e a bola parte do centro do círculo, em
+         * x≈1638: com o antigo 600 ela não chegava à metade esquerda. 2000 cobre a
+         * tela inteira a partir de qualquer âncora; um "Desfazer" traz de volta.
          */
-        const val LIMITE = 600
+        const val LIMITE = 2000
     }
 }
 
@@ -484,7 +483,15 @@ data class AjustesDoCluster(
     val paginaDoCarro: Int? = null,
     val telaDoMenu: Int? = null,
     val paginaDoMenu: Int? = null,
-    val empurraoDoMenu: Empurrao = Empurrao(),
+    /**
+     * Onde a bola cai no painel, a partir do centro medido em [BolaDoPainel].
+     *
+     * O padrão e os da bola abaixo saem da régua no H6, numa janela de
+     * 1920x720 px: bola em x=1396 y=195, 473x473; carrinho com 0,712 da bola de
+     * largura; coluna de dados com 301 px de largura. Na tela do painel 1 dp
+     * vale 1 px, e cada passo das setas é um [Empurrao.PASSO].
+     */
+    val empurraoDoMenu: Empurrao = Empurrao(-6, -6),
     /**
      * Onde o conteúdo cai **dentro** da bola, separado de onde a bola cai no
      * painel.
@@ -496,7 +503,7 @@ data class AjustesDoCluster(
      * para baixo — e aí a bola é que ficava errada.
      */
     val empurraoDentroDoMenu: Empurrao = Empurrao(),
-    val zoomDoMenu: Zoom = Zoom(),
+    val zoomDoMenu: Zoom = Zoom(130),
     /**
      * A posição e o tamanho do **carro** dentro da bola.
      *
@@ -505,20 +512,16 @@ data class AjustesDoCluster(
      * alta, e o tamanho que deixa um encaixado deixa o outro sobrando ou
      * cortado. Com um ajuste só, acertar o carro desacertava os números —
      * era o que acontecia no painel.
-     *
-     * Valores ajustados baseados em testes reais no cluster (fração +0.712 x +0.619).
      */
-    val empurraoDoCarroNaBola: Empurrao = Empurrao(67, 37),
-    val zoomDoCarroNaBola: Zoom = Zoom(),
+    val empurraoDoCarroNaBola: Empurrao = Empurrao(-12, 0),
+    val zoomDoCarroNaBola: Zoom = Zoom(115),
     /**
      * Offset das pressões dos pneus dentro da bola do carro.
      *
      * Ajuste fino para posicionar exatamente onde os números de pressão e
      * temperatura aparecem em relação ao desenho do carro na bola.
-     *
-     * Valores ajustados baseados em testes reais no cluster (fração +0.636 x +0.590).
      */
-    val offsetPressoesNaBola: Empurrao = Empurrao(43, 29),
+    val offsetPressoesNaBola: Empurrao = Empurrao(-47, 23),
     val afastamentoNaBola: Zoom = Zoom(),
     val formatoDoCarro: FormatoDoCarro = FormatoDoCarro.REDONDO,
     val afastamentoDoCarroSolto: Int = 100,
@@ -548,11 +551,11 @@ data class AjustesDoCluster(
      * resolve aqui. Fazer as duas coisas com um botão só obrigaria a escolher
      * qual das duas se estraga.
      *
-     * 100% é a coluna ocupando toda a altura do conteúdo, que é o que a bola
-     * sempre fez; abaixo disso ela se fecha em torno do centro. Acima de 100
-     * não vai: o que sobraria para fora da caixa é o que a bola corta.
+     * 100% é a coluna ocupando toda a altura do conteúdo; abaixo disso ela se
+     * fecha em torno do centro. Acima de 100 não vai: é a altura inteira da
+     * caixa, e quem quer mais espaço cresce a caixa no tamanho dos dados.
      */
-    val afastamentoDoMenu: Zoom = Zoom(),
+    val afastamentoDoMenu: Zoom = Zoom(76),
     /**
      * O que fica atrás da bola.
      *
@@ -634,6 +637,9 @@ data class AjustesDoCluster(
  */
 object Cluster {
 
+    /** Os valores de fábrica: é para eles que os "Desfazer" da bola voltam. */
+    private val fabrica = AjustesDoCluster()
+
     private const val ARQUIVO = "cluster"
     private const val TRIP = "tripId"
     private const val ITENS = "itens"
@@ -676,6 +682,12 @@ object Cluster {
     private const val AFASTAMENTO_CARRO_NA_BOLA = "afastamentoDoCarroNaBola"
     private const val AFASTAMENTO_CARRO_MENU = "afastamentoDoCarroNoMenu"
     private const val ZOOM_PRESSOES_BOLA = "zoomPressoesNaBola"
+    /**
+     * O empurrão do carrinho na bola era aplicado duas vezes; quem o gravou nessa
+     * época o via andar o dobro. Dobrar o valor gravado uma vez mantém o desenho
+     * onde ele estava.
+     */
+    private const val CARRO_BOLA_EMPURRAO_SIMPLES = "carroNaBolaEmpurraoSimples"
     @Deprecated("Substituído por ZOOM_PRESSOES_BOLA")
     private const val TAMANHO_CARRO_MENU = "tamanhoDoCarroNoMenu"
     private const val HABILITAR_NUMEROS = "habilitarNumerosNoPainel"
@@ -779,7 +791,19 @@ object Cluster {
     fun iniciar(context: Context) {
         if (::prefs.isInitialized) return
         prefs = context.applicationContext.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE)
+        migrarEmpurraoDoCarroNaBola()
         _ajustes.value = ler()
+    }
+
+    private fun migrarEmpurraoDoCarroNaBola() {
+        if (prefs.getBoolean(CARRO_BOLA_EMPURRAO_SIMPLES, false)) return
+        val editor = prefs.edit().putBoolean(CARRO_BOLA_EMPURRAO_SIMPLES, true)
+        if (prefs.contains(EMPURRAO_CARRO_BOLA_X) || prefs.contains(EMPURRAO_CARRO_BOLA_Y)) {
+            editor
+                .putInt(EMPURRAO_CARRO_BOLA_X, prefs.getInt(EMPURRAO_CARRO_BOLA_X, 0) * 2)
+                .putInt(EMPURRAO_CARRO_BOLA_Y, prefs.getInt(EMPURRAO_CARRO_BOLA_Y, 0) * 2)
+        }
+        editor.apply()
     }
 
     private fun ler(): AjustesDoCluster {
@@ -831,25 +855,36 @@ object Cluster {
             telaDoMenu = prefs.getInt(TELA_MENU, SEM_TELA).takeIf { it != SEM_TELA },
             paginaDoMenu = prefs.getInt(PAGINA_MENU, QUALQUER_PAGINA)
                 .takeIf { it != QUALQUER_PAGINA },
-            empurraoDoMenu = Empurrao()
-                .mais(prefs.getInt(EMPURRAO_MENU_X, 0), prefs.getInt(EMPURRAO_MENU_Y, 0)),
-            empurraoDentroDoMenu = Empurrao().mais(
-                prefs.getInt(EMPURRAO_DENTRO_MENU_X, 0),
-                prefs.getInt(EMPURRAO_DENTRO_MENU_Y, 0),
+            // Os padrões vêm de [padrao], e não de números escritos aqui: com
+            // números à mão, mudar o padrão da classe não mudava nada (foi o
+            // que aconteceu com o ajuste do carrinho e das pressões).
+            empurraoDoMenu = Empurrao().mais(
+                prefs.getInt(EMPURRAO_MENU_X, padrao.empurraoDoMenu.x),
+                prefs.getInt(EMPURRAO_MENU_Y, padrao.empurraoDoMenu.y),
             ),
-            zoomDoMenu = Zoom(0).mais(prefs.getInt(ZOOM_MENU, Zoom.PADRAO)),
+            empurraoDentroDoMenu = Empurrao().mais(
+                prefs.getInt(EMPURRAO_DENTRO_MENU_X, padrao.empurraoDentroDoMenu.x),
+                prefs.getInt(EMPURRAO_DENTRO_MENU_Y, padrao.empurraoDentroDoMenu.y),
+            ),
+            zoomDoMenu = Zoom(0).mais(prefs.getInt(ZOOM_MENU, padrao.zoomDoMenu.porcento)),
             empurraoDoCarroNaBola = Empurrao().mais(
-                prefs.getInt(EMPURRAO_CARRO_BOLA_X, prefs.getInt(EMPURRAO_DENTRO_MENU_X, 0)),
-                prefs.getInt(EMPURRAO_CARRO_BOLA_Y, prefs.getInt(EMPURRAO_DENTRO_MENU_Y, 0)),
+                prefs.getInt(
+                    EMPURRAO_CARRO_BOLA_X,
+                    prefs.getInt(EMPURRAO_DENTRO_MENU_X, padrao.empurraoDoCarroNaBola.x),
+                ),
+                prefs.getInt(
+                    EMPURRAO_CARRO_BOLA_Y,
+                    prefs.getInt(EMPURRAO_DENTRO_MENU_Y, padrao.empurraoDoCarroNaBola.y),
+                ),
             ),
             // Herda o que o ajuste único valia: quem já tinha o carrinho no
             // ponto no painel não pode ver o desenho pular de lugar por causa
             // de uma separação que ele não pediu.
             zoomDoCarroNaBola = Zoom(0)
-                .mais(prefs.getInt(ZOOM_CARRO_BOLA, prefs.getInt(ZOOM_MENU, Zoom.PADRAO))),
+                .mais(prefs.getInt(ZOOM_CARRO_BOLA, prefs.getInt(ZOOM_MENU, padrao.zoomDoCarroNaBola.porcento))),
             offsetPressoesNaBola = Empurrao().mais(
-                prefs.getInt(OFFSET_PRESSOES_BOLA_X, -47),
-                prefs.getInt(OFFSET_PRESSOES_BOLA_Y, 23),
+                prefs.getInt(OFFSET_PRESSOES_BOLA_X, padrao.offsetPressoesNaBola.x),
+                prefs.getInt(OFFSET_PRESSOES_BOLA_Y, padrao.offsetPressoesNaBola.y),
             ),
             fundoDoMenu = prefs.getString(FUNDO_MENU, null)
                 ?.let { nome -> FundoDoCluster.entries.find { it.name == nome } }
@@ -1044,8 +1079,8 @@ object Cluster {
         ),
     )
 
-    /** Volta ao espalhamento de fábrica: a coluna ocupando a altura toda. */
-    fun afastamentoNatural() = gravar(_ajustes.value.copy(afastamentoDoMenu = Zoom()))
+    /** Volta ao espalhamento de fábrica. */
+    fun afastamentoNatural() = gravar(_ajustes.value.copy(afastamentoDoMenu = fabrica.afastamentoDoMenu))
 
     fun afastarNaBola(delta: Int) = gravar(
         _ajustes.value.copy(
@@ -1093,10 +1128,9 @@ object Cluster {
 
     fun ampliarPressoesNaBola(delta: Int) = gravar(
         _ajustes.value.copy(
-            zoomPressoesNaBola = Zoom(
-                (_ajustes.value.zoomPressoesNaBola.util + delta)
-                    .coerceIn(Zoom.MINIMO, Zoom.MAXIMO),
-            ),
+            // `mais`, e não `util + delta`: o `util` corta em 100, e o botão de
+            // aumentar travava em 105.
+            zoomPressoesNaBola = _ajustes.value.zoomPressoesNaBola.mais(delta),
         ),
     )
 
@@ -1186,12 +1220,11 @@ object Cluster {
      * existe na tela.
      */
     fun ampliarNaBola(alvo: AlvoNaBola, delta: Int) {
-        val faixa = faixaDoZoomNaBola[alvo] ?: Zoom.MINIMO..Zoom.MAXIMO
         val atual = when (alvo) {
             AlvoNaBola.DADOS -> _ajustes.value.zoomDoMenu
             AlvoNaBola.CARRO -> _ajustes.value.zoomDoCarroNaBola
         }
-        val novo = Zoom(0).mais((atual.porcento.coerceIn(faixa) + delta).coerceIn(faixa))
+        val novo = atual.mais(delta)
         gravar(
             when (alvo) {
                 AlvoNaBola.DADOS -> _ajustes.value.copy(zoomDoMenu = novo)
@@ -1215,41 +1248,25 @@ object Cluster {
     /** Devolve um dos conteúdos ao centro da bola. */
     fun centralizarNaBola(alvo: AlvoNaBola) = gravar(
         when (alvo) {
-            AlvoNaBola.DADOS -> _ajustes.value.copy(empurraoDentroDoMenu = Empurrao())
-            AlvoNaBola.CARRO -> _ajustes.value.copy(empurraoDoCarroNaBola = Empurrao())
+            AlvoNaBola.DADOS -> _ajustes.value.copy(empurraoDentroDoMenu = fabrica.empurraoDentroDoMenu)
+            AlvoNaBola.CARRO -> _ajustes.value.copy(empurraoDoCarroNaBola = fabrica.empurraoDoCarroNaBola)
         },
     )
 
     /** Devolve um dos conteúdos ao tamanho de partida. */
     fun tamanhoNaturalNaBola(alvo: AlvoNaBola) = gravar(
         when (alvo) {
-            AlvoNaBola.DADOS -> _ajustes.value.copy(zoomDoMenu = Zoom())
-            AlvoNaBola.CARRO -> _ajustes.value.copy(zoomDoCarroNaBola = Zoom())
+            AlvoNaBola.DADOS -> _ajustes.value.copy(zoomDoMenu = fabrica.zoomDoMenu)
+            AlvoNaBola.CARRO -> _ajustes.value.copy(zoomDoCarroNaBola = fabrica.zoomDoCarroNaBola)
         },
     )
-
-    /**
-     * Até onde o estica da bola ainda muda alguma coisa.
-     *
-     * Quem sabe disto é a própria bola, não os ajustes: o teto depende do que
-     * está dentro dela — carrinho, três dados em coluna, seis em duas — e de
-     * quanto de círculo aquela peça pode ocupar. Por isso a janela mede e conta
-     * aqui, como já faz com a posição. Não é gravado: é leitura do que está na
-     * tela agora, e a próxima visão manda a dela.
-     */
-    private var faixaDoZoomNaBola = mapOf<AlvoNaBola, IntRange>()
-
-    fun anotarFaixaDoZoomNaBola(alvo: AlvoNaBola, piso: Int, teto: Int) {
-        if (piso > teto) return
-        faixaDoZoomNaBola = faixaDoZoomNaBola + (alvo to piso..teto)
-    }
 
     /** Volta a janela ao tamanho escolhido, sem estica. */
     fun tamanhoNatural(janela: JanelaDoPainel) = gravar(
         when (janela) {
             JanelaDoPainel.NUMEROS -> _ajustes.value.copy(zoomDosNumeros = Zoom())
             JanelaDoPainel.CARRO -> _ajustes.value.copy(zoomDoCarro = Zoom())
-            JanelaDoPainel.MENU -> _ajustes.value.copy(zoomDoMenu = Zoom())
+            JanelaDoPainel.MENU -> _ajustes.value.copy(zoomDoMenu = fabrica.zoomDoMenu)
         },
     )
 
@@ -1258,7 +1275,7 @@ object Cluster {
         when (janela) {
             JanelaDoPainel.NUMEROS -> _ajustes.value.copy(empurraoDosNumeros = Empurrao())
             JanelaDoPainel.CARRO -> _ajustes.value.copy(empurraoDoCarro = Empurrao())
-            JanelaDoPainel.MENU -> _ajustes.value.copy(empurraoDoMenu = Empurrao())
+            JanelaDoPainel.MENU -> _ajustes.value.copy(empurraoDoMenu = fabrica.empurraoDoMenu)
         },
     )
 

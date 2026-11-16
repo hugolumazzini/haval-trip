@@ -119,6 +119,8 @@ fun Diagrama(
     aproximacao: Float = APROXIMACAO,
     offsetX: Int = 0,
     offsetY: Int = 0,
+    /** O "Tamanho das pressões" da bola: multiplica o corpo dos números. */
+    escalaDasPressoes: Float = 1f,
 ) {
     val pneus = painel.pneus.associateBy { it.roda }
 
@@ -128,7 +130,7 @@ fun Diagrama(
         // painel, que tem um terço da altura — e ali ficava ilegível a um braço de
         // distância. Preso à altura, ele acompanha inclusive o botão de + e − do
         // ajuste fino, que é o que o motorista tem na mão para resolver isso.
-        val corpo = (maxHeight.value * PRESSAO_NA_ALTURA).coerceIn(13f, 34f).sp
+        val corpo = ((maxHeight.value * PRESSAO_NA_ALTURA).coerceIn(13f, 34f) * escalaDasPressoes).sp
 
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {

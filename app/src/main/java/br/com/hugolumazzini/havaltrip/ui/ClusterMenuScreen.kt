@@ -14,12 +14,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import kotlin.math.ceil
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -275,51 +275,21 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
                 if (alvo == AlvoNaBola.CARRO) ajustes.empurraoDoCarroNaBola
                 else ajustes.empurraoDentroDoMenu
             val zoom = if (alvo == AlvoNaBola.CARRO) ajustes.zoomDoCarroNaBola else ajustes.zoomDoMenu
-            // Três limites, e não dois: a coluna única não é a mesma peça
-            // que as duas colunas. O teto dos dados foi medido com seis, que é
-            // o caso mais apertado; aplicá-lo também a três travava o estica
-            // muito antes de o bloco encostar na borda — sobrava círculo e o
-            // botão de crescer não crescia mais nada.
-            val limite = when {
-                visao is Visao.Carro -> CARRINHO_NA_BOLA
-                deitado -> DADOS_NA_BOLA
-                ajustes.rotuloDoMenu == RotuloDoCluster.TEXTO -> DADOS_EM_COLUNA_COM_TEXTO
-                else -> DADOS_EM_COLUNA
-            }
-            // O tamanho de partida desta peça, antes do estica.
-            val baseLargura = (if (deitado) ALTURA_UTIL else LARGURA_UTIL) * SOBRA
-            val baseAltura = (if (deitado) LARGURA_UTIL else ALTURA_UTIL) * SOBRA
-            // E o quanto de estica ainda cabe nela. Ver [Cluster.anotarFaixaDoZoomDoMenu].
-            LaunchedEffect(alvo, limite, baseLargura, baseAltura) {
-                Cluster.anotarFaixaDoZoomNaBola(
-                    alvo,
-                    piso = emPorcento(limite.minimoLargura, limite.minimoAltura, baseLargura, baseAltura),
-                    teto = emPorcento(limite.maximoLargura, limite.maximoAltura, baseLargura, baseAltura),
-                )
-            }
             Box(
                 Modifier
                     // Dentro da bola, e não na tela: é o conteúdo que anda,
                     // a bola fica onde o painel a desenha.
                     .offset(x = empurraoDentro.x.dp, y = empurraoDentro.y.dp)
-                    // Frações do círculo, e não da tapa: a caixa de fora já
-                    // é o círculo. A [SOBRA] guarda a borda para a moldura.
-                    // O teto de 1 é o próprio círculo — `fillMax` não aceita
-                    // mais que a caixa, e nada maior caberia mesmo.
-                    // Frações do círculo, e não da tapa: a caixa de fora já
-                    // é o círculo. A [SOBRA] guarda a borda para a moldura.
-                    // Os limites são medidos na régua, no painel, e são o
-                    // que impede o estica de virar desenho cortado: ver
-                    // [CARRINHO_NA_BOLA] e [DADOS_NA_BOLA].
-                    .fillMaxWidth(
-                        ((if (deitado) ALTURA_UTIL else LARGURA_UTIL) * SOBRA *
-                            zoom.fator)
-                            .coerceIn(limite.minimoLargura, limite.maximoLargura),
-                    )
-                    .fillMaxHeight(
-                        ((if (deitado) LARGURA_UTIL else ALTURA_UTIL) * SOBRA *
-                            zoom.fator)
-                            .coerceIn(limite.minimoAltura, limite.maximoAltura),
+                    // Frações do círculo; a [SOBRA] guarda a borda para a
+                    // moldura. Sem teto: havia tetos medidos para o conteúdo
+                    // não passar da curva, e no painel o botão de aumentar
+                    // parava de crescer no meio da faixa. Agora o estica vai
+                    // de ponta a ponta, e o conteúdo pode passar do círculo se
+                    // o motorista quiser — `required`, porque `fillMax` não
+                    // passa do tamanho da caixa de fora.
+                    .requiredSize(
+                        width = lado * (if (deitado) ALTURA_UTIL else LARGURA_UTIL) * SOBRA * zoom.fator,
+                        height = lado * (if (deitado) LARGURA_UTIL else ALTURA_UTIL) * SOBRA * zoom.fator,
                     ),
                 contentAlignment = Alignment.Center,
             ) {
@@ -428,11 +398,10 @@ private fun Conteudo(
                             Modifier
                                 .fillMaxWidth()
                                 .aspectRatio(LARGURA_POR_ALTURA)
+                                // Sem empurrão aqui: na bola quem move o carrinho
+                                // é a caixa de fora. Os dois juntos o moviam em
+                                // dobro, e a régua só contava metade.
                                 .medindoPeca("carrinho")
-                                .offset(
-                                    x = ajustes.empurraoDoCarroNaBola.x.dp,
-                                    y = ajustes.empurraoDoCarroNaBola.y.dp
-                                )
                         } else {
                             Modifier
                                 .fillMaxHeight(ajustes.zoomDoCarroNaBola.fator.coerceIn(0.2f, 1f))
@@ -444,9 +413,12 @@ private fun Conteudo(
                         },
                         legenda = false,
                         // CORREÇÃO: usa afastamentoNaBola (específico) em vez de afastamentoDoCarroNaBola
-                        aproximacao = (ajustes.afastamentoNaBola.util / 100f).coerceIn(0.5f, 1.2f),
+                        // Sem o piso de 0,5 que havia aqui: abaixo de 50% o
+                        // botão de aproximar mudava o número e nada na tela.
+                        aproximacao = ajustes.afastamentoNaBola.util / 100f,
                         offsetX = ajustes.offsetPressoesNaBola.x,
                         offsetY = ajustes.offsetPressoesNaBola.y,
+                        escalaDasPressoes = if (apertado) ajustes.zoomPressoesNaBola.fator else 1f,
                     )
 
                     is Visao.DeTrip -> Painel(
@@ -520,78 +492,6 @@ private const val TITULO_NA_BOLA = 0.063f
  * cada número a encolher para caber na fatia de um quarto da altura.
  */
 private const val MUITOS_ITENS = 3
-
-/**
- * Que zoom faz a peça chegar a uma dada fração do círculo.
- *
- * O maior dos dois lados, e não o menor: enquanto um lado ainda pode crescer, o
- * botão ainda faz alguma coisa — parar no primeiro que trava roubaria estica
- * que existe.
- */
-private fun emPorcento(largura: Float, altura: Float, baseLargura: Float, baseAltura: Float): Int =
-    ceil(maxOf(largura / baseLargura, altura / baseAltura) * 100f)
-        .toInt()
-        .coerceIn(Zoom.MINIMO, Zoom.MAXIMO)
-
-/**
- * Até onde uma peça pode crescer dentro do círculo, em fração do diâmetro.
- *
- * Os números saíram da régua, no painel: o motorista esticou até o desenho
- * encostar na borda e até ele ficar pequeno demais, e as duas leituras viraram
- * estas constantes. É por isso que são limites e não um tamanho fixo — o estica
- * continua valendo, só não passa mais do que cabe.
- */
-private data class LimiteNaBola(
-    val maximoLargura: Float,
-    val maximoAltura: Float,
-    // Só o carrinho tem piso, e por um motivo: ele é um desenho, e abaixo de um
-    // certo tamanho vira mancha. Número encolhido ainda é número, então nos
-    // dados não há piso nenhum — encolher é escolha legítima do motorista, e um
-    // mínimo inventado aqui só brigaria com o botão de tamanho.
-    val minimoLargura: Float = 0f,
-    val minimoAltura: Float = 0f,
-)
-
-/**
- * O carrinho: de 0,62 a 0,90 do diâmetro de largura.
- *
- * Quem manda é a largura — o desenho é mais largo que alto, e é ela que encosta
- * no círculo primeiro. A altura acompanha pela proporção do desenho, então os
- * limites dela são frouxos de propósito: apertá-los deformaria o carro.
- */
-private val CARRINHO_NA_BOLA = LimiteNaBola(
-    maximoLargura = 0.898f,
-    maximoAltura = 0.780f,
-    minimoLargura = 0.620f,
-    minimoAltura = 0.539f,
-)
-
-/**
- * Duas colunas de dados, de quatro a seis: até 0,82 de largura e 0,67 de altura.
- *
- * Medido no painel com seis dados e com o rótulo escrito, que é o caso mais
- * apertado que existe.
- */
-private val DADOS_NA_BOLA = LimiteNaBola(0.820f, 0.671f)
-
-/**
- * Coluna única, até três dados, com a palavra escrita em cima do número.
- *
- * Mais baixo que o caso do ícone, e não mais alto, porque a palavra rouba a
- * linha de cima de cada dado: o bloco chega à borda com o número menor. Os dois
- * casos foram medidos separados justamente por isso — um teto só serviria a um
- * deles e sobraria ou faltaria círculo no outro.
- */
-private val DADOS_EM_COLUNA_COM_TEXTO = LimiteNaBola(0.620f, 0.759f)
-
-/**
- * Coluna única, até três dados, sem a palavra: ícone ao lado ou só o número.
- *
- * Os dois andam juntos porque o ícone mora na mesma linha do número — nenhum
- * dos dois gasta a linha de cima —, e a medida do painel deu a mesma para os
- * dois.
- */
-private val DADOS_EM_COLUNA = LimiteNaBola(0.671f, 0.820f)
 
 /** Quanto de largura as bolinhas comem na direita, e o conteúdo não usa. */
 private val FAIXA_DAS_BOLINHAS = 20.dp

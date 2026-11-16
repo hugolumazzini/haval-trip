@@ -101,6 +101,9 @@ import br.com.hugolumazzini.havaltrip.ui.theme.EstiloRotulo
  */
 private val PARADAS = listOf(0, 1, 2, 5, 10, 15, 20, 30, 45, 60, 90, 120, 150, 180)
 
+/** Os valores de fábrica, para os "Desfazer" da bola saberem para onde voltam. */
+private val FABRICA = AjustesDoCluster()
+
 /** O rótulo de cada parada, na linguagem de quem está lendo o painel. */
 fun rotuloDoTempo(minutos: Int): String = when {
     minutos == 0 -> "na hora"
@@ -1300,6 +1303,8 @@ private fun SetasDePosicao(
     empurrao: Empurrao,
     empurrar: (Int, Int) -> Unit,
     desfazer: () -> Unit,
+    /** Para onde o "Desfazer" volta. */
+    padrao: Empurrao = Empurrao(),
 ) {
     Text(titulo, style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
     Spacer(Modifier.height(4.dp))
@@ -1317,7 +1322,7 @@ private fun SetasDePosicao(
         Seta("◀", "esquerda pouco") { empurrar(-Empurrao.PASSO, 0) }
         Seta("▶", "direita pouco") { empurrar(Empurrao.PASSO, 0) }
         Seta("▶▶", "direita muito") { empurrar(Empurrao.SALTO, 0) }
-        BotaoAcao("Desfazer", onClick = desfazer, habilitado = !empurrao.centrado)
+        BotaoAcao("Desfazer", onClick = desfazer, habilitado = empurrao != padrao)
     }
     Spacer(Modifier.height(6.dp))
     // O número aparece sempre, inclusive zerado: sem ele não há como saber se o
@@ -1325,7 +1330,8 @@ private fun SetasDePosicao(
     Text(
         if (empurrao.centrado) "No lugar, sem empurrão."
         else "Empurrado ${rumo(empurrao.x, "para a direita", "para a esquerda")} e " +
-            "${rumo(empurrao.y, "para baixo", "para cima")}.",
+            "${rumo(empurrao.y, "para baixo", "para cima")}" +
+            if (empurrao == padrao) " (padrão)." else ".",
         style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
@@ -1409,6 +1415,8 @@ private fun SetasDeTamanho(
     zoom: Zoom,
     ampliar: (Int) -> Unit,
     desfazer: () -> Unit,
+    /** Para onde o "Desfazer" volta. */
+    padrao: Zoom = Zoom(),
 ) {
     Text(titulo, style = MaterialTheme.typography.titleMedium, color = Cores.TextoCorrido)
     Spacer(Modifier.height(4.dp))
@@ -1422,11 +1430,12 @@ private fun SetasDeTamanho(
         Seta("−", "um pouco menor") { ampliar(-Zoom.PASSO) }
         Seta("+", "um pouco maior") { ampliar(Zoom.PASSO) }
         Seta("++", "bem maior") { ampliar(Zoom.SALTO) }
-        BotaoAcao("Desfazer", onClick = desfazer, habilitado = !zoom.natural)
+        BotaoAcao("Desfazer", onClick = desfazer, habilitado = zoom != padrao)
     }
     Spacer(Modifier.height(6.dp))
     Text(
-        if (zoom.natural) "No tamanho escolhido." else "${zoom.porcento}% do tamanho escolhido.",
+        if (zoom.natural) "No tamanho escolhido."
+        else "${zoom.porcento}% do tamanho escolhido" + if (zoom == padrao) " (padrão)." else ".",
         style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,
     )
@@ -1458,6 +1467,7 @@ private fun AjusteFinoDaBola(ajustes: AjustesDoCluster) {
         empurrao = ajustes.empurraoDoMenu,
         empurrar = { dx, dy -> Cluster.empurrar(JanelaDoPainel.MENU, dx, dy) },
         desfazer = { Cluster.centralizar(JanelaDoPainel.MENU) },
+        padrao = FABRICA.empurraoDoMenu,
     )
 
     Spacer(Modifier.height(24.dp))
@@ -1481,6 +1491,7 @@ private fun AjusteFinoDaBola(ajustes: AjustesDoCluster) {
         empurrao = ajustes.empurraoDoCarroNaBola,
         empurrar = { dx, dy -> Cluster.empurrarNaBola(AlvoNaBola.CARRO, dx, dy) },
         desfazer = { Cluster.centralizarNaBola(AlvoNaBola.CARRO) },
+        padrao = FABRICA.empurraoDoCarroNaBola,
     )
 
     Spacer(Modifier.height(14.dp))
@@ -1494,6 +1505,7 @@ private fun AjusteFinoDaBola(ajustes: AjustesDoCluster) {
         zoom = ajustes.zoomDoCarroNaBola,
         ampliar = { delta -> Cluster.ampliarNaBola(AlvoNaBola.CARRO, delta) },
         desfazer = { Cluster.tamanhoNaturalNaBola(AlvoNaBola.CARRO) },
+        padrao = FABRICA.zoomDoCarroNaBola,
     )
 
     Spacer(Modifier.height(18.dp))
@@ -1541,7 +1553,7 @@ private fun AjusteFinoDaBola(ajustes: AjustesDoCluster) {
         if (ajustes.afastamentoNaBola.natural) {
             "Afastamento padrão."
         } else {
-            "${ajustes.afastamentoNaBola.porcento}% do raio."
+            "${ajustes.afastamentoNaBola.util}% do raio."
         },
         style = MaterialTheme.typography.bodySmall,
         color = Cores.TextoApoio,
@@ -1581,6 +1593,7 @@ private fun AjusteFinoDaBola(ajustes: AjustesDoCluster) {
         empurrao = ajustes.empurraoDentroDoMenu,
         empurrar = { dx, dy -> Cluster.empurrarNaBola(AlvoNaBola.DADOS, dx, dy) },
         desfazer = { Cluster.centralizarNaBola(AlvoNaBola.DADOS) },
+        padrao = FABRICA.empurraoDentroDoMenu,
     )
 
     Spacer(Modifier.height(14.dp))
@@ -1594,6 +1607,7 @@ private fun AjusteFinoDaBola(ajustes: AjustesDoCluster) {
         zoom = ajustes.zoomDoMenu,
         ampliar = { delta -> Cluster.ampliarNaBola(AlvoNaBola.DADOS, delta) },
         desfazer = { Cluster.tamanhoNaturalNaBola(AlvoNaBola.DADOS) },
+        padrao = FABRICA.zoomDoMenu,
     )
 
     Spacer(Modifier.height(14.dp))
@@ -1613,7 +1627,7 @@ private fun AjusteFinoDaBola(ajustes: AjustesDoCluster) {
         BotaoAcao(
             "Desfazer",
             onClick = { Cluster.afastamentoNatural() },
-            habilitado = !ajustes.afastamentoDoMenu.natural,
+            habilitado = ajustes.afastamentoDoMenu != FABRICA.afastamentoDoMenu,
         )
     }
     Spacer(Modifier.height(6.dp))
@@ -1621,7 +1635,8 @@ private fun AjusteFinoDaBola(ajustes: AjustesDoCluster) {
         if (ajustes.afastamentoDoMenu.natural) {
             "Espalhados pela altura toda."
         } else {
-            "${ajustes.afastamentoDoMenu.porcento.coerceAtMost(100)}% da altura."
+            "${ajustes.afastamentoDoMenu.util}% da altura" +
+                if (ajustes.afastamentoDoMenu == FABRICA.afastamentoDoMenu) " (padrão)." else "."
         },
         style = MaterialTheme.typography.bodyMedium,
         color = Cores.TextoApoio,

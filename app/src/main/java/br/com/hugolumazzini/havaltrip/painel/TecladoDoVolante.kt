@@ -6,7 +6,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.KeyEvent
 import androidx.core.content.ContextCompat
@@ -27,6 +30,17 @@ enum class TeclaDoVolante {
     BAIXO,
     ENTRA,
     VOLTA,
+
+    /**
+     * Os toques longos. A central não manda o "segurar" como uma tecla demorada:
+     * manda um código próprio, então cada um é uma tecla separada para nós.
+     * O OK não tem código próprio para isso nesta central: o [SEGURA_ENTRA] é
+     * medido por nós. Ver [TecladoDoVolante.SEGURAR_OK_MS].
+     */
+    SEGURA_CIMA,
+    SEGURA_BAIXO,
+    SEGURA_VOLTA,
+    SEGURA_ENTRA,
     ;
 
     companion object {
@@ -37,12 +51,21 @@ enum class TeclaDoVolante {
          * teclado do volante do H6, e só se descobrem observando o serviço de
          * teclas. Os que não estão aqui — os botões de mídia, o de voz — não
          * nos interessam e são ignorados.
+         *
+         * O Cima fica no 1024 mesmo com o diagnóstico mostrando 1026 ao
+         * apertá-lo (medição de 18/11/2026): com 1024 ele navega no carro, e o
+         * diagnóstico só guarda o último aviso do toque. O 1026 é, ao que tudo
+         * indica, o soltar — que este código ignora quando já viu a descida.
+         * Os toques longos vieram da mesma medição.
          */
         fun de(codigo: Int): TeclaDoVolante? = when (codigo) {
             1024 -> CIMA
             1025 -> BAIXO
             1028 -> ENTRA
             1030 -> VOLTA
+            1033 -> SEGURA_CIMA
+            1034 -> SEGURA_BAIXO
+            1039 -> SEGURA_VOLTA
             else -> null
         }
     }
@@ -144,12 +167,81 @@ object TecladoDoVolante {
             _quantasChegaram.value++
             Log.w(TAG, "tecla do volante: código ${evento.keyCode}, ação ${evento.action}")
 
+            if (evento.keyCode == CODIGO_OK) {
+                tratarOk(evento)
+                return
+            }
             if (evento.action == KeyEvent.ACTION_DOWN) {
                 viDescida = true
             } else if (viDescida || evento.action != KeyEvent.ACTION_UP) {
                 return
             }
             TeclaDoVolante.de(evento.keyCode)?.let { _teclas.tryEmit(it) }
+        }
+    }
+
+    /**
+     * Quanto tempo o OK precisa ficar apertado para virar [TeclaDoVolante.SEGURA_ENTRA].
+     *
+     * A central manda códigos próprios para segurar as setas e o voltar, mas não
+     * para o OK. O jeito é medir: o OK desce, e se ainda não subiu passado este
+     * tempo, é toque longo. Menos que isso pegaria um toque comum mais lento;
+     * mais que isso faria o motorista achar que não funcionou e soltar antes.
+     */
+    const val SEGURAR_OK_MS = 800L
+
+    private const val CODIGO_OK = 1028
+
+    private val principal = Handler(Looper.getMainLooper())
+
+    /** Quando o OK desceu, se ele estiver apertado agora. */
+    private var okDesceuEm: Long? = null
+
+    /** Se este aperto do OK já virou toque longo — o soltar dele não conta mais. */
+    private var okJaFoiLongo = false
+
+    private val okSegurado = Runnable {
+        if (okDesceuEm != null && !okJaFoiLongo) {
+            okJaFoiLongo = true
+            _teclas.tryEmit(TeclaDoVolante.SEGURA_ENTRA)
+        }
+    }
+
+    /**
+     * O OK é o único que decide no **soltar**, e não no descer.
+     *
+     * Só no soltar se sabe se foi um toque curto ou o começo de um longo. O
+     * longo, esse sim, dispara sozinho no meio do aperto, sem esperar soltar —
+     * senão a pergunta só apareceria quando o motorista desistisse de segurar.
+     *
+     * Se esta central só mandar o soltar, não há o que medir: todo OK vale
+     * como curto, que é o que ele sempre foi.
+     */
+    private fun tratarOk(evento: KeyEvent) {
+        principal.post {
+            when (evento.action) {
+                KeyEvent.ACTION_DOWN -> {
+                    // A repetição automática de quem segura chega como mais
+                    // descidas: só a primeira abre o aperto.
+                    if (okDesceuEm != null) return@post
+                    okDesceuEm = SystemClock.uptimeMillis()
+                    okJaFoiLongo = false
+                    principal.postDelayed(okSegurado, SEGURAR_OK_MS)
+                }
+                KeyEvent.ACTION_UP -> {
+                    principal.removeCallbacks(okSegurado)
+                    val desceu = okDesceuEm
+                    okDesceuEm = null
+                    when {
+                        okJaFoiLongo -> Unit
+                        desceu != null &&
+                            SystemClock.uptimeMillis() - desceu >= SEGURAR_OK_MS ->
+                            _teclas.tryEmit(TeclaDoVolante.SEGURA_ENTRA)
+                        else -> _teclas.tryEmit(TeclaDoVolante.ENTRA)
+                    }
+                    okJaFoiLongo = false
+                }
+            }
         }
     }
 

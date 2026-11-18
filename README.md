@@ -42,10 +42,12 @@ numa faixa discreta em cima. Detalhes e histórico ficam a um toque.
 
 ## Rodando
 
-Exportar o JDK antes (o do Android Studio serve):
+Não precisa do Android Studio. Basta um JDK 17 ou mais novo e o Android SDK
+(o caminho fica em `local.properties`). Com o JDK do Homebrew:
 
 ```sh
-export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+brew install openjdk@21
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
 ```
 
 ```sh

@@ -2,7 +2,9 @@ package br.com.hugolumazzini.havaltrip.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -17,12 +19,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -51,6 +57,7 @@ import br.com.hugolumazzini.havaltrip.painel.ProjetorDoPainel
 import br.com.hugolumazzini.havaltrip.painel.PaginaDoCluster
 import br.com.hugolumazzini.havaltrip.painel.TeclaDoVolante
 import br.com.hugolumazzini.havaltrip.painel.TecladoDoVolante
+import kotlinx.coroutines.delay
 
 /**
  * Uma visão da página do painel: uma tela cheia de cada vez.
@@ -126,14 +133,72 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
     // guardado; sem isto a página ficaria em branco até alguém girar o volante.
     val indice = atual.coerceIn(0, visoes.lastIndex)
 
+    // A pergunta "fechar a viagem?" aberta pelo OK segurado: de qual Trip, e
+    // se o realce está no Sim. Pelo id, e não pela Trip: a Trip muda a cada
+    // amostra de telemetria e a guardada aqui envelheceria na hora.
+    var fechando by remember { mutableStateOf<String?>(null) }
+    var noSim by remember { mutableStateOf(false) }
+    var aviso by remember { mutableStateOf<String?>(null) }
+    val visoesAgora by rememberUpdatedState(visoes)
+
+    // Sem resposta, a pergunta some. Esquecida aberta, ela prenderia as setas
+    // do volante e o motorista não conseguiria mais trocar de visão.
+    LaunchedEffect(fechando, noSim) {
+        if (fechando == null) return@LaunchedEffect
+        delay(PERGUNTA_ABERTA_MS)
+        fechando = null
+    }
+    LaunchedEffect(aviso) {
+        if (aviso == null) return@LaunchedEffect
+        delay(AVISO_MS)
+        aviso = null
+    }
+
     // Só ouve a cruzinha quando esta página está na frente. Sem isso, o
     // motorista navegaria no menu do painel — mídia, telefone — e ao voltar
     // encontraria a nossa página noutra visão, sem ter pedido.
     // Também na espiada: é por aqui que a simulação de volante pelo `adb`
     // chega, e sem ela não haveria como conferir a página fora do carro.
-    LaunchedEffect(naPaginaCerta, visoes.size) {
-        if (!naPaginaCerta) return@LaunchedEffect
+    LaunchedEffect(naPaginaCerta || espiando, visoes.size) {
+        if (!naPaginaCerta && !espiando) {
+            // Ninguém responde a uma pergunta numa página que não está na frente.
+            fechando = null
+            return@LaunchedEffect
+        }
         TecladoDoVolante.teclas.collect { tecla ->
+            val pergunta = fechando
+            if (pergunta != null) {
+                when (tecla) {
+                    TeclaDoVolante.CIMA, TeclaDoVolante.BAIXO -> noSim = !noSim
+                    TeclaDoVolante.ENTRA -> {
+                        fechando = null
+                        if (noSim) {
+                            vm.arquivar(pergunta)
+                            aviso = "Viagem guardada\nno histórico"
+                        }
+                    }
+                    TeclaDoVolante.VOLTA, TeclaDoVolante.SEGURA_VOLTA -> fechando = null
+                    else -> Unit
+                }
+                return@collect
+            }
+            if (tecla == TeclaDoVolante.SEGURA_ENTRA) {
+                val visao = visoesAgora.getOrNull(atual.coerceIn(0, visoesAgora.lastIndex))
+                when {
+                    visao !is Visao.DeTrip -> aviso = "Escolha uma Trip\npara fechar"
+                    // O mesmo critério do botão "Fechar viagem" da central,
+                    // que fica apagado enquanto a Trip não andou.
+                    visao.trip.metrics.distanceKm <= 0.0 -> aviso = "Esta Trip\nainda não andou"
+                    else -> {
+                        aviso = null
+                        // Começa no Não: um OK a mais, sem querer, não pode
+                        // ser o que fecha a viagem.
+                        noSim = false
+                        fechando = visao.trip.id
+                    }
+                }
+                return@collect
+            }
             // Circular: a lista é curta e chegar no fim sem poder continuar,
             // num carro, é o tipo de coisa que faz o motorista apertar três
             // vezes olhando para o painel em vez de para a estrada.
@@ -324,7 +389,83 @@ fun ClusterMenuScreen(vm: TripViewModel, espiando: Boolean = false) {
                     .align(Alignment.TopCenter)
                     .offset(y = lado * MARGEM_DA_BOLA),
             )
+
+            // Por cima de tudo, dentro do círculo: a pergunta e o aviso tapam a
+            // visão de propósito, para não haver dúvida de que o volante agora
+            // responde a eles e não troca de visão.
+            val nomeDaTrip = fechando?.let { id ->
+                visoes.firstNotNullOfOrNull { (it as? Visao.DeTrip)?.trip?.takeIf { t -> t.id == id } }?.label
+            }
+            if (nomeDaTrip != null) {
+                PerguntaNaBola(nomeDaTrip, noSim, lado.value, cor.cor, Color(ajustes.fundoDoMenu.argb))
+            } else {
+                aviso?.let { AvisoNaBola(it, lado.value, cor.cor, Color(ajustes.fundoDoMenu.argb)) }
+            }
         }
+    }
+}
+
+/** Quanto tempo a pergunta espera uma resposta antes de sumir sozinha. */
+private const val PERGUNTA_ABERTA_MS = 10_000L
+
+/** Quanto tempo um aviso curto fica na bola. */
+private const val AVISO_MS = 3_000L
+
+/**
+ * "Fechar a viagem?" com Não e Sim, um embaixo do outro, para as setas de
+ * cima e de baixo escolherem — é a mesma direção que elas já têm no painel.
+ */
+@Composable
+private fun PerguntaNaBola(nome: String, noSim: Boolean, lado: Float, cor: Color, fundo: Color) {
+    val letra = (lado * 0.075f).coerceIn(10f, 28f)
+    Column(
+        Modifier.fillMaxSize().background(fundo, CircleShape),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text("Fechar a viagem?", color = cor, fontSize = letra.sp, fontWeight = FontWeight.Medium)
+        Text(
+            nome.uppercase(),
+            color = cor.copy(alpha = 0.75f),
+            fontSize = (letra * 0.8f).sp,
+            maxLines = 1,
+        )
+        Spacer(Modifier.height((lado * 0.05f).dp))
+        OpcaoNaBola("Não", escolhida = !noSim, letra, cor, fundo)
+        Spacer(Modifier.height((lado * 0.025f).dp))
+        OpcaoNaBola("Sim", escolhida = noSim, letra, cor, fundo)
+    }
+}
+
+/** Uma opção: a escolhida vem em bloco cheio, para se ver de relance. */
+@Composable
+private fun OpcaoNaBola(texto: String, escolhida: Boolean, letra: Float, cor: Color, fundo: Color) {
+    Text(
+        texto,
+        color = if (escolhida) fundo else cor.copy(alpha = 0.6f),
+        fontSize = letra.sp,
+        fontWeight = if (escolhida) FontWeight.Bold else FontWeight.Normal,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (escolhida) cor else Color.Transparent)
+            .border(1.dp, cor.copy(alpha = if (escolhida) 1f else 0.4f), RoundedCornerShape(50))
+            .padding(horizontal = (letra * 1.4f).dp, vertical = (letra * 0.3f).dp),
+    )
+}
+
+@Composable
+private fun AvisoNaBola(texto: String, lado: Float, cor: Color, fundo: Color) {
+    Box(
+        Modifier.fillMaxSize().background(fundo, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            texto,
+            color = cor,
+            fontSize = (lado * 0.07f).coerceIn(10f, 26f).sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

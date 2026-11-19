@@ -140,20 +140,8 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|keyboardHidden|screenLayout|density|uiMode"
             android:theme="@style/Theme.HavalTrip.Cluster" />
 
-        <!--
-            DEBUG: Simula o cluster na tela principal do emulador.
-            Permite testar a despedida e outros comportamentos do cluster
-            sem precisar do display físico.
-            Uso: adb shell am start -n br.com.hugolumazzini.havaltrip/.ClusterDebugActivity
-        -->
-        <activity
-            android:name=".ClusterDebugActivity"
-            android:exported="true"
-            android:label="Debug Cluster"
-            android:excludeFromRecents="true"
-            android:screenOrientation="landscape"
-            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|uiMode"
-            android:theme="@style/Theme.HavalTrip.Cluster" />
+        <!-- A ClusterDebugActivity é declarada só no build de debug:
+             src/debug/AndroidManifest.xml. -->
 
         <!--
             DIAGNÓSTICO: Tela para debugar despedida sem precisar de ADB.

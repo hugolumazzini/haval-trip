@@ -11,6 +11,7 @@ import br.com.hugolumazzini.havaltrip.engine.TripState
 import br.com.hugolumazzini.havaltrip.painel.JanelaDoPainel
 import br.com.hugolumazzini.havaltrip.painel.ProjetorDoPainel
 import br.com.hugolumazzini.havaltrip.storage.FileTripStorage
+import br.com.hugolumazzini.havaltrip.storage.GravacaoEmSegundoPlano
 import br.com.hugolumazzini.havaltrip.telemetry.BancadaDeTestes
 import br.com.hugolumazzini.havaltrip.telemetry.ColetaDeEnergia
 import br.com.hugolumazzini.havaltrip.telemetry.DiarioDeCampo
@@ -58,8 +59,11 @@ class MotorDeBordo private constructor(private val app: Application) {
      */
     private val escopo = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
+    // A gravação vai para uma thread própria: ver [GravacaoEmSegundoPlano].
     private val manager = TripManager(
-        storage = FileTripStorage(File(app.filesDir, "trip")),
+        storage = GravacaoEmSegundoPlano(FileTripStorage(File(app.filesDir, "trip"))) {
+            Log.e("MotorDeBordo", "Falha ao gravar as trips", it)
+        },
     )
 
     /** Tudo que chegou cru do carro, para a tela de diagnóstico e o relatório. */
@@ -175,9 +179,16 @@ class MotorDeBordo private constructor(private val app: Application) {
                 Log.i("MotorDeBordo", "⚠️ Shizuku NÃO disponível - usando SHISUKU como fallback")
                 Fonte.SHISUKU
             }
+            // Nunca o simulador por conta própria num APK de verdade: ele
+            // "dirige" a até 110 km/h, e o que ele dirige entra nas Trips e no
+            // histórico como se fosse o carro. Sem fonte disponível, fica a
+            // linha direta esperando o Shizuku — sem dado nenhum até ele subir,
+            // que é o que de fato se sabe. No emulador, o simulador continua
+            // sendo o padrão, para haver o que ver.
             else -> {
-                Log.i("MotorDeBordo", "⚠️ Nem Shizuku nem SHISUKU disponíveis - usando SIMULADOR")
-                Fonte.SIMULADOR
+                val nova = if (BuildConfig.DEBUG) Fonte.SIMULADOR else Fonte.SHIZUKU
+                Log.i("MotorDeBordo", "⚠️ Nem Shizuku nem SHISUKU disponíveis - esperando em $nova")
+                nova
             }
         }
 
@@ -197,14 +208,17 @@ class MotorDeBordo private constructor(private val app: Application) {
         val autorizado = ShizukuTelemetrySource.autorizado()
 
         // Se Shizuku ficou disponível E não estamos usando ele, TROCA!
-        if (disponivel && fonteAtual != Fonte.SHIZUKU) {
+        // Só com autorização: sem ela a linha direta não lê nada, e trocar uma
+        // fonte que funciona por uma que não lê deixaria a viagem sem contar.
+        // E não por cima do HavalShisuku escolhido à mão no Diagnóstico.
+        if (disponivel && autorizado && fonteAtual != Fonte.SHIZUKU && !shisukuEscolhidoAMao) {
             Log.w("MotorDeBordo", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             Log.w("MotorDeBordo", "⚡ SHIZUKU FICOU DISPONÍVEL!")
             Log.w("MotorDeBordo", "   Fonte atual: $fonteAtual")
             Log.w("MotorDeBordo", "   Autorizado: $autorizado")
             Log.w("MotorDeBordo", "   Trocando para SHIZUKU...")
             Log.w("MotorDeBordo", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-            usarFonte(Fonte.SHIZUKU)
+            usarFonte(Fonte.SHIZUKU, aMao = false)
         }
 
         // Se Shizuku morreu e estamos usando ele, volta para fallback
@@ -213,10 +227,14 @@ class MotorDeBordo private constructor(private val app: Application) {
             Log.e("MotorDeBordo", "💀 SHIZUKU PAROU DE RESPONDER!")
             Log.e("MotorDeBordo", "   Voltando para fallback...")
             Log.e("MotorDeBordo", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-            val fallback = if (shisukuInstalado) Fonte.SHISUKU else Fonte.SIMULADOR
-            usarFonte(fallback)
+            // Sem o HavalShisuku, a linha direta continua esperando o Shizuku
+            // voltar. O simulador aqui gravaria quilômetros inventados.
+            if (shisukuInstalado) usarFonte(Fonte.SHISUKU, aMao = false)
         }
     }
+
+    /** Se o HavalShisuku foi escolhido no Diagnóstico: o vigia não passa por cima. */
+    private var shisukuEscolhidoAMao = false
 
     private fun escutar() {
         escuta?.cancel()
@@ -313,6 +331,10 @@ class MotorDeBordo private constructor(private val app: Application) {
         escopo.launch {
             // Aguarda um pouco para garantir que o estado está estável
             delay(500)
+            // A chave pode ter voltado nesse meio segundo (partida logo depois
+            // de desligar, ou a ignição oscilando). O resumo cobriria o painel
+            // com o carro ligado, sem toque para tirá-lo.
+            if (manager.state.value.live.ignition != IgnitionState.OFF) return@launch
 
             val ajustes = Cluster.ajustes.value
             val trips = manager.state.value.trips
@@ -367,7 +389,8 @@ class MotorDeBordo private constructor(private val app: Application) {
         }
     }
 
-    fun usarFonte(nova: Fonte) {
+    fun usarFonte(nova: Fonte, aMao: Boolean = true) {
+        if (aMao) shisukuEscolhidoAMao = nova == Fonte.SHISUKU
         if (_fonte.value == nova) {
             Log.d("MotorDeBordo", "   Fonte já é $nova, nada a fazer")
             return

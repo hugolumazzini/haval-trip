@@ -6,6 +6,8 @@ import android.util.Log
 import br.com.hugolumazzini.havaltrip.domain.TelemetrySample
 import com.beantechs.intelligentvehiclecontrol.IIntelligentVehicleControlService
 import com.beantechs.intelligentvehiclecontrol.sdk.IListener
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -13,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import rikka.shizuku.Shizuku
@@ -141,7 +144,7 @@ class ShizukuTelemetrySource(
             if (codigo == PEDIDO_DE_PERMISSAO) {
                 Log.d(TAG, "🔑 Resposta de autorização: ${if (resultado == PackageManager.PERMISSION_GRANTED) "CONCEDIDA" else "NEGADA"}")
                 if (resultado == PackageManager.PERMISSION_GRANTED) {
-                    conectar()
+                    launch { conectar() }
                 } else {
                     _situacao.value = Situacao.PrecisaAutorizar
                 }
@@ -154,14 +157,16 @@ class ShizukuTelemetrySource(
         // um segundo antes de ele ficar pronto e não tentaria de novo.
         val aoChegarBinder = Shizuku.OnBinderReceivedListener {
             Log.d(TAG, "📡 Binder do Shizuku chegou")
-            garantirPermissaoEConectar(::conectar)
+            launch { garantirPermissaoEConectar(::conectar) }
         }
         Shizuku.addBinderReceivedListenerSticky(aoChegarBinder)
 
         val aoMorrerBinder = Shizuku.OnBinderDeadListener {
             Log.w(TAG, "💀 Binder do Shizuku morreu!")
-            desconectar()
-            _situacao.value = Situacao.SemShizuku
+            launch {
+                desconectar()
+                _situacao.value = Situacao.SemShizuku
+            }
         }
         Shizuku.addBinderDeadListener(aoMorrerBinder)
 
@@ -249,7 +254,13 @@ class ShizukuTelemetrySource(
 
                 estado.publicarFita()
                 // Enquanto nada tiver chegado, não há amostra a dar: ver [EstadoDoCarro.mudo].
-                if (!estado.mudo()) {
+                // E sem dado fresco também não: o cache guarda a última
+                // velocidade lida, e montar amostra dele com a conexão caída
+                // somaria quilômetros que ninguém andou, segundo a segundo,
+                // até a central desligar.
+                val fresco = _situacao.value is Situacao.Conectado &&
+                    agora - maxOf(ultimaLeituraMs, ultimoCallbackMs) <= DADO_FRESCO_MS
+                if (fresco && !estado.mudo()) {
                     trySend(estado.montarAmostra())
                 }
             }
@@ -263,6 +274,11 @@ class ShizukuTelemetrySource(
             Shizuku.removeBinderDeadListener(aoMorrerBinder)
         }
     }
+        // Fora da thread principal: cada leitura é uma chamada síncrona que
+        // atravessa o Shizuku até o serviço do carro, e um serviço lento
+        // travaria a tela e as janelas do painel. Uma thread só, para tudo o
+        // que esta fonte faz continuar acontecendo em ordem, como na principal.
+        .flowOn(UMA_THREAD_DE_IO)
 
     /** Pede a autorização se ainda não houver, e conecta assim que tiver. */
     private fun garantirPermissaoEConectar(conectar: () -> Boolean) {
@@ -271,7 +287,9 @@ class ShizukuTelemetrySource(
                 Log.d(TAG, "📡 Shizuku não disponível")
                 _situacao.value = Situacao.SemShizuku
             }
-            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED -> {
+            // [autorizado] e não a checagem direta: o binder pode morrer entre o
+            // ping acima e esta linha, e a exceção sairia daqui sem ninguém tratar.
+            autorizado() -> {
                 Log.d(TAG, "✅ Já temos autorização, conectando...")
                 conectar()
             }
@@ -320,6 +338,12 @@ class ShizukuTelemetrySource(
 
         /** Se fetchDatas falha por mais de 10s, serviço está morto. */
         private const val FALHA_LEITURA_MS = 10_000L
+
+        /** Até quanto tempo depois da última leitura o cache ainda vale como o carro de agora. */
+        private const val DADO_FRESCO_MS = 5_000L
+
+        @OptIn(ExperimentalCoroutinesApi::class)
+        private val UMA_THREAD_DE_IO = Dispatchers.IO.limitedParallelism(1)
 
         /** Intervalo para considerar "sem callbacks" (30s é normal com carro parado). */
         private const val INTERVALO_SEM_CALLBACK_MS = 30_000L

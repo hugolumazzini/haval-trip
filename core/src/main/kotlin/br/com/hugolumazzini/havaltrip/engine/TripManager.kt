@@ -210,7 +210,10 @@ class TripManager(
         evKm: Double? = null,
     ) = alterar(tripId) { trip ->
         trip.copy(
-            metrics = trip.metrics.copy(
+            // Do zero, e só a energia da coleta entra. Copiar as métricas
+            // antigas para encaixar o kWh (v0.9.25 a v1.0.38) fazia o "Zerar"
+            // manter distância, litros e tempo.
+            metrics = TripMetrics(
                 kwhOut = kwhOut ?: kwhIntegrado,
                 kwhIn = kwhIn,
                 evKm = evKm,
@@ -371,11 +374,14 @@ class TripManager(
      * Amostra fora de ordem (relógio do carro voltando) é descartada: aceitar
      * Δt negativo faria as métricas andarem para trás.
      */
-    fun processTelemetry(sample: TelemetrySample) {
+    fun processTelemetry(bruta: TelemetrySample) {
         val anterior = lastSampleMs
-        if (anterior != null && sample.timestampMs < anterior) return
+        if (anterior != null && bruta.timestampMs < anterior) return
 
-        avaliarHiato(sample)
+        val odometroValido = aceitarOdometro(bruta.odometerTotalKm)
+        val sample = sanear(bruta, odometroValido)
+
+        avaliarHiato(sample, odometroValido)
 
         if (sample.ignition != ignition) {
             handleIgnitionChange(sample.ignition, sample.timestampMs)
@@ -383,8 +389,10 @@ class TripManager(
 
         val deltaS = engine.deltaSeconds(anterior, sample.timestampMs)
         lastSampleMs = sample.timestampMs
-        odometerTotalKm = maxOf(odometerTotalKm, sample.odometerTotalKm)
-        odometerKnown = true
+        if (odometroValido) {
+            odometerTotalKm = maxOf(odometerTotalKm, sample.odometerTotalKm)
+            odometerKnown = true
+        }
 
         if (ignition == IgnitionState.ON) {
             // Contador escondido não recebe amostra: ele congela onde parou.
@@ -398,9 +406,9 @@ class TripManager(
                     metrics = engine.accumulate(trip.metrics, sample, deltaS),
                     // Trip iniciada antes da primeira amostra fixa aqui a
                     // quilometragem de partida — só na primeira vez.
-                    odometerStartKm = trip.odometerStartKm ?: sample.odometerTotalKm,
+                    odometerStartKm = trip.odometerStartKm ?: odometroConhecido(),
                     startedAtMs = trip.startedAtMs ?: sample.timestampMs,
-                    odometerLastKm = sample.odometerTotalKm,
+                    odometerLastKm = odometroConhecido() ?: trip.odometerLastKm,
                 )
             }.toMutableList()
 
@@ -448,7 +456,10 @@ class TripManager(
         }.toMutableList()
 
         if (state == IgnitionState.OFF) {
-            ignitionOffSinceMs = atMs
+            // Um início de parada já conhecido (o do hiato, quando o app voltou
+            // depois de um corte de energia) vale mais que o instante em que o
+            // app viu a chave fora: a parada começou antes disso.
+            ignitionOffSinceMs = ignitionOffSinceMs ?: atMs
             lastSampleMs = null
             live = live.copy(ignition = state, speedKmh = 0.0, instantFuelConsumptionKml = null)
             salvarAgora(atMs)
@@ -491,8 +502,13 @@ class TripManager(
      * pior erro possível. Se o hodômetro está no mesmo lugar depois de todo esse
      * tempo, o carro estava parado, e é a mesma situação que a chave fora.
      */
-    private fun avaliarHiato(sample: TelemetrySample) {
+    private fun avaliarHiato(sample: TelemetrySample, odometroValido: Boolean) {
         val desde = hiatoDesdeMs ?: return
+        // A decisão compara o hodômetro de agora com o de antes do buraco. Sem
+        // um hodômetro de verdade — a chave dele ainda não chegou depois do
+        // reinício, ou chegou um valor absurdo —, um 0 pareceria "o carro não
+        // andou" e zeraria uma viagem em andamento. Espera o próximo.
+        if (!odometroValido) return
 
         val chegada = primeiraAmostraDepoisDoHiatoMs ?: sample.timestampMs.also {
             primeiraAmostraDepoisDoHiatoMs = it
@@ -544,7 +560,10 @@ class TripManager(
         // instante — então é isso que o resto do código passa a enxergar.
         ignitionOffSinceMs = desde
         aplicarZeragemAutomatica(sample.timestampMs)
-        ignitionOffSinceMs = null
+        // Com a chave ainda fora, a parada continua e o início dela é o do
+        // buraco: apagá-lo faria a zeragem da manhã seguinte não acontecer, e
+        // a viagem de ontem emendaria com a de hoje.
+        if (sample.ignition == IgnitionState.ON) ignitionOffSinceMs = null
     }
 
     /** Fecha a investigação do hiato: ela acontece uma vez só por volta. */
@@ -613,7 +632,11 @@ class TripManager(
     )
 
     private fun salvarAgora(atMs: Long) {
-        storage.save(snapshot(atMs))
+        // Falhar ao gravar não pode derrubar a contagem: o estado continua na
+        // memória e a próxima gravação tenta de novo. Uma exceção aqui subiria
+        // pela leitura da telemetria e mataria o app a cada amostra.
+        runCatching { storage.save(snapshot(atMs)) }
+            .onFailure { falhasAoGravar++; ultimaFalhaAoGravar = it }
         policy.mark(distanciaAcumulada(), atMs)
         sinalizarVida(atMs, forcado = true)
     }
@@ -659,6 +682,72 @@ class TripManager(
         // religar podem ter passado horas, e esse buraco não é tempo de viagem.
         lastSampleMs = null
         live = VehicleLive(odometerTotalKm = salvo.odometerTotalKm, ignition = salvo.ignition)
+    }
+
+    /** Quantas gravações falharam desde que o app abriu. Para o diagnóstico. */
+    var falhasAoGravar: Int = 0
+        private set
+
+    /** O erro da última gravação que falhou, se houver. */
+    var ultimaFalhaAoGravar: Throwable? = null
+        private set
+
+    private var odometroRecusadoKm: Double? = null
+    private var vezesRecusado = 0
+
+    /**
+     * Se o hodômetro desta amostra pode ser levado a sério.
+     *
+     * O carro manda 0 enquanto a chave ainda não chegou, e às vezes um valor
+     * de "não sei" (0xFFFFFF). Aceitar qualquer um deles prenderia o hodômetro
+     * no maior valor já visto — a catraca só sobe — e daria a decisão do hiato
+     * a um número inventado. Um salto para trás ou grande demais é recusado.
+     *
+     * Mas um hodômetro gravado errado por uma versão antiga não pode recusar o
+     * certo para sempre: quando o mesmo valor "impossível" se repete algumas
+     * amostras seguidas, é ele o verdadeiro, e passa a ser a referência.
+     */
+    private fun aceitarOdometro(km: Double): Boolean {
+        if (!km.isFinite() || km <= 0.0 || km > ODOMETRO_MAXIMO_KM) return false
+        val coerente = !odometerKnown ||
+            (km >= odometerTotalKm - ODOMETRO_RECUO_TOLERADO_KM &&
+                km <= odometerTotalKm + ODOMETRO_SALTO_MAXIMO_KM)
+        if (coerente) {
+            odometroRecusadoKm = null
+            vezesRecusado = 0
+            return true
+        }
+        val anterior = odometroRecusadoKm
+        vezesRecusado = if (anterior != null && kotlin.math.abs(km - anterior) <= 1.0) vezesRecusado + 1 else 1
+        odometroRecusadoKm = km
+        if (vezesRecusado < RECUSAS_PARA_REANCORAR) return false
+        // Reancora: o valor antigo é que estava errado.
+        odometerTotalKm = km
+        odometroRecusadoKm = null
+        vezesRecusado = 0
+        return true
+    }
+
+    /**
+     * A amostra com cada número dentro do que um carro consegue medir.
+     *
+     * Um "NaN" que viesse do carro contaminaria as métricas para sempre e
+     * tornaria a gravação impossível; uma velocidade de 0xFFFF somaria
+     * centenas de quilômetros num segundo.
+     */
+    private fun sanear(s: TelemetrySample, odometroValido: Boolean): TelemetrySample {
+        fun Double.ouZero(teto: Double = Double.MAX_VALUE) =
+            if (isFinite() && this >= 0.0 && this <= teto) this else 0.0
+        fun Double?.finito() = this?.takeIf { it.isFinite() }
+        return s.copy(
+            speedKmh = s.speedKmh.ouZero(VELOCIDADE_MAXIMA_KMH),
+            fuelRateLph = s.fuelRateLph.ouZero(VAZAO_MAXIMA_LPH),
+            fuelLevelL = s.fuelLevelL.ouZero(),
+            odometerTotalKm = if (odometroValido) s.odometerTotalKm else odometerTotalKm,
+            autonomyKmFromCar = s.autonomyKmFromCar.finito(),
+            batteryVoltageV = s.batteryVoltageV.finito(),
+            batteryCurrentA = s.batteryCurrentA.finito(),
+        )
     }
 
     /** Hodômetro atual, ou `null` enquanto nenhuma amostra tiver chegado. */
@@ -756,6 +845,21 @@ class TripManager(
 
         /** O identificador da Viagem atual, a que zera sozinha. */
         const val ID_AUTOMATICA = "AUTO"
+
+        /** Acima disso é um valor de "não sei", não um hodômetro. */
+        const val ODOMETRO_MAXIMO_KM = 2_000_000.0
+
+        /** Quanto o hodômetro pode voltar entre amostras sem ser recusado (arredondamento). */
+        const val ODOMETRO_RECUO_TOLERADO_KM = 1.0
+
+        /** O maior salto aceito entre duas amostras: um dia inteiro de estrada com o app fora. */
+        const val ODOMETRO_SALTO_MAXIMO_KM = 2_000.0
+
+        /** Quantas vezes seguidas o mesmo hodômetro recusado precisa vir para virar a referência. */
+        const val RECUSAS_PARA_REANCORAR = 5
+
+        const val VELOCIDADE_MAXIMA_KMH = 300.0
+        const val VAZAO_MAXIMA_LPH = 200.0
 
         /** Os contadores que o painel mostra por padrão. */
         val DEFAULT_TRIPS = listOf(

@@ -175,13 +175,25 @@ class ClusterOverlayService : Service() {
         /** Mais que isso é briga com outro app que também se recoloca na frente. */
         private const val MAX_RECOLOCACOES = 5
 
+        /**
+         * Sem o serviço de bordo em primeiro plano (o sistema pode recusá-lo no
+         * Android 12+), o app conta como em segundo plano e `startService`
+         * lança exceção — que derrubaria o app justamente ao desligar o carro
+         * ou ao fechar uma janela do painel. Perder um recolher ou uma
+         * despedida é menos grave que perder o processo.
+         */
+        private fun iniciar(context: Context, intent: Intent) {
+            runCatching { context.startService(intent) }
+                .onFailure { Log.w(TAG, "não deu para falar com o serviço do painel", it) }
+        }
+
         /** Retira a despedida, a não ser que ela esteja ativa. */
         fun recolher(context: Context, janela: JanelaDoPainel) {
             val intent = Intent(context, ClusterOverlayService::class.java).apply {
                 putExtra(EXTRA_COMANDO, CMD_ESCONDER)
                 putExtra(EXTRA_JANELA, janela.name)
             }
-            context.startService(intent)
+            iniciar(context, intent)
         }
 
         /** Mostra a despedida por cima de tudo na [displayId] e limpa a tela de outros apps. */
@@ -192,7 +204,7 @@ class ClusterOverlayService : Service() {
                 putExtra(EXTRA_JANELA, janela.name)
                 putExtra(EXTRA_DISPLAY_ID, displayId)
             }
-            context.startService(intent)
+            iniciar(context, intent)
         }
     }
 

@@ -8,6 +8,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Retrato completo do módulo num instante. É a unidade de gravação: ou o
@@ -119,13 +122,31 @@ class FileTripStorage(private val directory: File) : TripStorage {
     private val temporario = File(directory, "$NOME.tmp")
     private val copia = File(directory, "$NOME.bak")
 
+    // Sem `prettyPrint`: ninguém lê este arquivo a olho, e a formatação o
+    // deixava um terço maior — um terço a mais escrito na flash a cada
+    // gravação. `coerceInputValues` faz um valor de enum desconhecido (de uma
+    // versão mais nova, por exemplo) cair no padrão em vez de invalidar o
+    // arquivo inteiro; e um NaN que escape do saneamento grava em vez de
+    // impedir toda gravação dali em diante.
     private val json = Json {
-        prettyPrint = true
         ignoreUnknownKeys = true
         encodeDefaults = true
+        coerceInputValues = true
+        allowSpecialFloatingPointValues = true
     }
 
-    override fun load(): TripSnapshot? = ler(arquivo) ?: ler(copia)
+    override fun load(): TripSnapshot? {
+        ler(arquivo)?.let { return it }
+        ler(copia)?.let { return it }
+        // Nenhum dos dois serve, mas algum existe com conteúdo. Começar do zero
+        // por cima deles apagaria na próxima gravação tudo o que talvez ainda
+        // dê para recuperar à mão; guardados à parte, nada se perde.
+        val carimbo = System.currentTimeMillis()
+        listOf(arquivo, copia)
+            .filter { it.exists() && it.length() > 0L }
+            .forEach { it.renameTo(File(directory, "${it.name}.corrompido-$carimbo")) }
+        return null
+    }
 
     private fun ler(alvo: File): TripSnapshot? = runCatching {
         if (!alvo.exists() || alvo.length() == 0L) return null
@@ -177,6 +198,52 @@ class FileTripStorage(private val directory: File) : TripStorage {
     companion object {
         const val NOME = "trips.json"
         const val VIVO = "vivo.txt"
+    }
+}
+
+/**
+ * Grava numa thread própria, fora de quem chama.
+ *
+ * Gravar é escrever o histórico inteiro e esperar a flash confirmar (`sync`):
+ * de dez a duzentos milissegundos numa central. Na thread principal, isso
+ * congelava a tela e as janelas projetadas no painel a cada quilômetro.
+ *
+ * Só a gravação mais recente importa: se duas chegam enquanto uma está sendo
+ * escrita, a do meio é descartada, porque a última já contém tudo o que ela
+ * tinha. O snapshot é imutável, então entregá-lo a outra thread é seguro.
+ */
+class GravacaoEmSegundoPlano(
+    private val base: TripStorage,
+    private val aoFalhar: (Throwable) -> Unit = {},
+) : TripStorage {
+
+    private val executor = Executors.newSingleThreadExecutor { tarefa ->
+        Thread(tarefa, "gravacao-das-trips").apply { isDaemon = true }
+    }
+    private val pendente = AtomicReference<TripSnapshot?>(null)
+
+    override fun load(): TripSnapshot? = base.load()
+
+    override fun save(snapshot: TripSnapshot) {
+        // Só agenda se não havia nada esperando: a tarefa já agendada vai
+        // pegar este snapshot, que é o mais novo.
+        if (pendente.getAndSet(snapshot) == null) executor.execute(::gravarPendente)
+    }
+
+    private fun gravarPendente() {
+        val snapshot = pendente.getAndSet(null) ?: return
+        runCatching { base.save(snapshot) }.onFailure(aoFalhar)
+    }
+
+    override fun marcarVivo(atMs: Long) {
+        executor.execute { runCatching { base.marcarVivo(atMs) } }
+    }
+
+    override fun ultimoSinalDeVidaMs(): Long? = base.ultimoSinalDeVidaMs()
+
+    /** Espera o que já foi pedido chegar ao disco. Para testes e para sair. */
+    fun aguardar(limiteMs: Long = 2_000L) {
+        runCatching { executor.submit {}.get(limiteMs, TimeUnit.MILLISECONDS) }
     }
 }
 

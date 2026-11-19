@@ -1,5 +1,10 @@
 package br.com.hugolumazzini.havaltrip.ui
 
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
@@ -150,7 +155,12 @@ fun Diagrama(
                 Column(
                     Modifier
                         .fillMaxHeight(0.80f)
-                        .fillMaxWidth(aproximacao)
+                        // O `fillMaxWidth` só vai até 100%: acima disso o Compose
+                        // sempre cortou em 100% calado, e os padrões medidos no
+                        // carro (v1.0.36) foram tirados com esse corte valendo.
+                        // Explícito aqui para o lint e para quem ler; fazer valer
+                        // acima de 100% mudaria o desenho de quem já ajustou.
+                        .fillMaxWidth(aproximacao.coerceIn(0f, 1f))
                         .offset(x = offsetX.dp, y = offsetY.dp),
                     verticalArrangement = Arrangement.SpaceBetween,
                 ) {
@@ -429,26 +439,24 @@ private fun Luzes(
 
     if (!desenhaLuzes && painel.combustivelBaixo != true) return
 
-    // Uma piscada só para os quatro cantos: com relógios separados, o
+    // Uma piscada só para os quatro cantos: com um relógio por seta, o
     // pisca-alerta acenderia as setas em contratempo, e no carro elas acendem
     // juntas.
-    val relogio = rememberInfiniteTransition(label = "seta")
-    val acesa by relogio.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            // `keyframes` com dois degraus, e não um `tween`: a seta do carro
-            // liga e desliga, não some devagar. Um esmaecimento suave seria
-            // outra coisa acontecendo na tela.
-            animation = keyframes {
-                durationMillis = PISCADA_MS * 2
-                1f at 0
-                1f at PISCADA_MS - 1
-                0f at PISCADA_MS
-            },
-        ),
-        label = "piscada",
-    )
+    //
+    // Um degrau de meio segundo, e só com alguma seta ligada. Antes era uma
+    // animação infinita criada sempre que qualquer luz tivesse sido lida —
+    // no carro, o tempo todo —, redesenhando o carrinho a 60 quadros por
+    // segundo no painel. E a seta do carro liga e desliga; não esmaece.
+    val piscando = luzes.esquerdaAcesa || luzes.direitaAcesa
+    var ligada by remember { mutableStateOf(true) }
+    LaunchedEffect(piscando) {
+        ligada = true
+        while (piscando) {
+            delay(PISCADA_MS.toLong())
+            ligada = !ligada
+        }
+    }
+    val acesa = if (ligada) 1f else 0f
 
     Canvas(modifier) {
         // A mesma conta do `ContentScale.Crop` refeita à mão, como em [Cintos]:

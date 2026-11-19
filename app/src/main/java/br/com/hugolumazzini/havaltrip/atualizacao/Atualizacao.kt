@@ -5,9 +5,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageInfo
 import android.content.pm.PackageInstaller
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
@@ -50,8 +53,19 @@ object Atualizacao {
 
     private const val ACAO_INSTALACAO = "br.com.hugolumazzini.havaltrip.INSTALACAO"
 
+    /** As flags de uma intent, menos as que concedem acesso a arquivos. */
+    private const val SEM_CONCESSOES = (
+        Intent.FLAG_GRANT_READ_URI_PERMISSION or
+            Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+            Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or
+            Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
+        ).inv()
+
+    // `latest`, e não a lista: a lista começa pela release mais nova de
+    // qualquer tipo, inclusive uma pre-release de teste, e o carro não deve
+    // instalar teste sozinho.
     private const val RELEASES =
-        "https://api.github.com/repos/hugolumazzini/haval-trip/releases"
+        "https://api.github.com/repos/hugolumazzini/haval-trip/releases/latest"
 
     /** O que está instalado agora, lido do sistema e não de uma constante. */
     fun versaoInstalada(context: Context): Pair<String, Long> {
@@ -69,22 +83,19 @@ object Atualizacao {
     suspend fun consultar(context: Context): VersaoPublicada = withContext(Dispatchers.IO) {
         val texto = baixarTexto(RELEASES)
 
-        // A API retorna um array de releases
-        val releasesArray = try {
-            org.json.JSONArray(texto)
-        } catch (e: Exception) {
-            // Se falhar ao parsear como array, tenta como objeto
-            val obj = JSONObject(texto)
-            if (obj.has("message")) throw IllegalStateException(obj.optString("message"))
-            throw e
+        // `releases/latest` devolve um objeto só; a lista fica aceita para não
+        // quebrar se o endereço voltar a ser o da lista.
+        val release: JSONObject = when (texto.trimStart().firstOrNull()) {
+            '[' -> org.json.JSONArray(texto).let {
+                if (it.length() == 0) throw IllegalStateException("nenhuma release encontrada no repositório")
+                it.getJSONObject(0)
+            }
+            else -> JSONObject(texto).also {
+                if (!it.has("tag_name") && it.has("message")) {
+                    throw IllegalStateException(it.optString("message"))
+                }
+            }
         }
-
-        if (releasesArray.length() == 0) {
-            throw IllegalStateException("nenhuma release encontrada no repositório")
-        }
-
-        // Pega a primeira release (mais recente)
-        val release = releasesArray.getJSONObject(0)
 
         val tag = release.optString("tag_name")
             .removePrefix("v")
@@ -193,7 +204,67 @@ object Atualizacao {
                 throw IllegalStateException("o arquivo baixado não confere com o publicado")
             }
         }
+        runCatching { conferirApk(context, destino) }.onFailure {
+            destino.delete()
+            throw it
+        }
         destino
+    }
+
+    /**
+     * Confere o APK baixado contra o app instalado, sem depender do que a
+     * release diz sobre ele.
+     *
+     * O SHA-256 publicado vem da mesma release que serve o APK: protege contra
+     * download corrompido, não contra uma release adulterada. Aqui a conferência
+     * é no próprio arquivo — o pacote é este app, a versão é mais nova e o
+     * certificado é o mesmo do instalado. O instalador do Android já recusa
+     * certificado diferente; conferir antes dá uma mensagem clara em vez de
+     * uma falha genérica dele, e não depende da ROM da central fazer certo.
+     */
+    private fun conferirApk(context: Context, apk: File) {
+        val pm = context.packageManager
+        @Suppress("DEPRECATION")
+        val flags = PackageManager.GET_SIGNATURES or
+            (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) PackageManager.GET_SIGNING_CERTIFICATES else 0)
+        val baixado = pm.getPackageArchiveInfo(apk.path, flags)
+            ?: throw IllegalStateException("o arquivo baixado não é um APK válido")
+        if (baixado.packageName != context.packageName) {
+            throw IllegalStateException("o APK baixado é de outro app (${baixado.packageName})")
+        }
+        val (_, instalado) = versaoInstalada(context)
+        if (codigo(baixado) <= instalado) {
+            throw IllegalStateException("o APK baixado não é mais novo que o instalado")
+        }
+        val certificadosDoInstalado = certificados(pm.getPackageInfo(context.packageName, flags))
+        val certificadosDoBaixado = certificados(baixado)
+        // Só recusa quando dá para ler os dois e eles não batem. Uma ROM que
+        // não devolve o certificado de um arquivo não pode travar a
+        // atualização: nesse caso quem confere é o próprio instalador.
+        if (certificadosDoInstalado.isNotEmpty() && certificadosDoBaixado.isNotEmpty() &&
+            certificadosDoInstalado.intersect(certificadosDoBaixado).isEmpty()
+        ) {
+            throw IllegalStateException("o APK baixado não foi assinado pela mesma chave")
+        }
+    }
+
+    private fun codigo(info: PackageInfo): Long =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode
+        else @Suppress("DEPRECATION") info.versionCode.toLong()
+
+    /** As impressões digitais dos certificados, de qualquer API que as tenha. */
+    private fun certificados(info: PackageInfo): Set<String> {
+        val novas = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            info.signingInfo?.let {
+                if (it.hasMultipleSigners()) it.apkContentsSigners else it.signingCertificateHistory
+            }
+        } else null
+        @Suppress("DEPRECATION")
+        val assinaturas = novas?.takeIf { it.isNotEmpty() } ?: info.signatures ?: return emptySet()
+        return assinaturas.map { assinatura ->
+            MessageDigest.getInstance("SHA-256").digest(assinatura.toByteArray())
+                .joinToString("") { "%02x".format(it) }
+        }.toSet()
     }
 
     /**
@@ -265,8 +336,16 @@ object Atualizacao {
                             @Suppress("DEPRECATION")
                             intent.getParcelableExtra(Intent.EXTRA_INTENT)
                         }
-                        tela?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        tela?.let { app.startActivity(it) }
+                        // Só a tela de confirmação do instalador do sistema, e sem
+                        // levar junto permissão de arquivo nenhuma: uma tela de
+                        // dentro deste app, ou uma concessão de acesso ao APK, não
+                        // tem por que vir por aqui.
+                        val destino = tela?.resolveActivity(app.packageManager)?.packageName
+                        if (tela != null && destino != null && destino != app.packageName) {
+                            tela.flags = tela.flags and SEM_CONCESSOES
+                            tela.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            app.startActivity(tela)
+                        }
                     }
                     // Sucesso mata este processo junto com a versão antiga;
                     // qualquer outro desfecho ainda tem o diálogo clássico.
@@ -278,13 +357,16 @@ object Atualizacao {
                 }
             }
         }
-        val filtro = IntentFilter(ACAO_INSTALACAO)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            app.registerReceiver(ouvinte, filtro, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            app.registerReceiver(ouvinte, filtro)
-        }
+        // Fechado para os outros apps também abaixo do Android 13: sem isso, no
+        // Android 9 da central, qualquer app podia mandar este aviso e fazer o
+        // Haval Trip abrir a tela que quisesse. A resposta do instalador chega
+        // pelo nosso PendingIntent, com a nossa identidade, e passa.
+        ContextCompat.registerReceiver(
+            app,
+            ouvinte,
+            IntentFilter(ACAO_INSTALACAO),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
     }
 
     private fun porDialogo(context: Context, apk: File) {

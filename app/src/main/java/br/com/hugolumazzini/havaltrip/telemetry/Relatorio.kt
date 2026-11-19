@@ -57,7 +57,7 @@ object Relatorio {
     ): String {
         // Sem isto, os últimos instantes antes do toque no botão ficariam de
         // fora: a fita da tela só alcança a viva de meio em meio segundo.
-        diario.publicarFita()
+        diario.publicarFita(mesmoSemNinguemOlhando = true)
 
         val sb = StringBuilder()
         sb.appendLine("=== HAVAL TRIP — diagnóstico de telemetria ===")

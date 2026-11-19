@@ -11,3 +11,6 @@ captures/
 *.jks
 *.keystore
 keystore.properties
+
+# Segredos locais (senha da keystore): nunca no git
+.env

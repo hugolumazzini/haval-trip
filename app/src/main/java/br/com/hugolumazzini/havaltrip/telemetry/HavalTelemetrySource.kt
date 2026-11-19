@@ -61,7 +61,16 @@ class HavalTelemetrySource(
                 estado.publicarFita()
                 // Enquanto nada tiver chegado, não há amostra a dar: ver
                 // [EstadoDoCarro.mudo].
-                if (!estado.mudo()) trySend(estado.montarAmostra())
+                if (estado.mudo()) continue
+                val amostra = estado.montarAmostra()
+                // O Shisuku só avisa o que muda, e com o carro andando alguma
+                // coisa muda a todo segundo (o consumo instantâneo, no mínimo).
+                // Velocidade acima de zero sem nada mudando há tanto tempo é a
+                // ponte que morreu com o carro andando: o cache repetiria a
+                // última velocidade e somaria quilômetros fantasmas.
+                val parado = System.currentTimeMillis() - estado.ultimaMudancaMs > SEM_MUDANCA_MS
+                if (amostra.speedKmh > 0.0 && parado) continue
+                trySend(amostra)
             }
         }
 
@@ -69,6 +78,8 @@ class HavalTelemetrySource(
     }
 
     companion object {
+        /** Sem nenhuma mudança por tanto tempo com velocidade acima de zero, a ponte morreu. */
+        private const val SEM_MUDANCA_MS = 30_000L
         const val PREFIXO = "android.intent.haval."
 
         /** Pacote do HavalShisuku, de quem dependem todos os broadcasts. */
@@ -349,6 +360,12 @@ class HavalTelemetrySource(
  */
 class DiarioDeCampo(private val limiteDaFita: Int = LIMITE_PADRAO_DA_FITA) {
 
+    /** O valor de agora, escrito por threads diferentes (binder e leitura periódica). */
+    private val leituras = java.util.concurrent.ConcurrentHashMap<String, Leitura>()
+
+    @Volatile
+    private var ultimaPublicacaoDoAtualMs = 0L
+
     private val _atual = MutableStateFlow<Map<String, Leitura>>(emptyMap())
     val atual: StateFlow<Map<String, Leitura>> = _atual.asStateFlow()
 
@@ -376,15 +393,23 @@ class DiarioDeCampo(private val limiteDaFita: Int = LIMITE_PADRAO_DA_FITA) {
 
     fun registrar(chave: String, valor: String) {
         val agora = System.currentTimeMillis()
-        val anterior = _atual.value[chave]
         // O contador conta tudo, inclusive as repetições: é ele que responde
         // "essa chave está viva?" na tela de diagnóstico. Uma chave relida mil
         // vezes com o mesmo valor é diferente de uma que nunca chegou.
-        _atual.value = _atual.value + (chave to Leitura(
-            valor = valor,
-            emMs = agora,
-            vezes = (anterior?.vezes ?: 0) + 1,
-        ))
+        val anterior = leituras[chave]
+        leituras[chave] = Leitura(valor = valor, emMs = agora, vezes = (anterior?.vezes ?: 0) + 1)
+
+        // Publicar copia o mapa inteiro e faz o painel do veículo ser lido de
+        // novo. Com a linha direta relendo as 49 chaves a cada segundo, eram 49
+        // cópias por segundo para quase nada ter mudado. Agora: uma mudança de
+        // valor publica na hora (é o que o painel precisa ver); a releitura
+        // igual só atualiza o contador, e o contador chega à tela de tempos em
+        // tempos.
+        val mudou = anterior?.valor != valor
+        if (mudou || agora - ultimaPublicacaoDoAtualMs >= INTERVALO_DE_PUBLICACAO_DO_ATUAL_MS) {
+            ultimaPublicacaoDoAtualMs = agora
+            _atual.value = HashMap(leituras)
+        }
 
         // A fita, ao contrário, só quer mudança. Releitura com o valor igual
         // não conta nada de novo sobre o carro e come o espaço de um evento que
@@ -416,7 +441,12 @@ class DiarioDeCampo(private val limiteDaFita: Int = LIMITE_PADRAO_DA_FITA) {
      * antes do toque no botão ficariam de fora por até meio segundo — e é
      * justamente o fim da coleta que costuma interessar.
      */
-    fun publicarFita() {
+    fun publicarFita(mesmoSemNinguemOlhando: Boolean = false) {
+        // As fontes chamam isto a cada segundo. Copiar dez mil eventos sem
+        // nenhuma tela de diagnóstico aberta era lixo para o coletor o tempo
+        // todo com o carro ligado. Quem precisa da fita agora (o relatório)
+        // pede com `mesmoSemNinguemOlhando`.
+        if (!mesmoSemNinguemOlhando && _fita.subscriptionCount.value == 0) return
         _fita.value = synchronized(fitaViva) { fitaViva.toList() }
     }
 
@@ -424,6 +454,9 @@ class DiarioDeCampo(private val limiteDaFita: Int = LIMITE_PADRAO_DA_FITA) {
     data class Evento(val emMs: Long, val chave: String, val valor: String)
 
     companion object {
+        /** De quanto em quanto tempo o contador de releituras chega à tela. */
+        private const val INTERVALO_DE_PUBLICACAO_DO_ATUAL_MS = 2_000L
+
         /**
          * Teto da fita, em eventos. Como só mudanças entram, dez mil cobrem um
          * bom trecho de trânsito andando e horas com o carro parado — o

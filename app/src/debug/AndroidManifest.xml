@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Só no build de debug. Esta tela troca a fonte de telemetria pelo simulador
+    e alterna a ignição simulada; exportada num APK de verdade, qualquer app da
+    central conseguiria abri-la e misturar dados inventados nas Trips reais.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!--
+            DEBUG: Simula o cluster na tela principal do emulador.
+            Permite testar a despedida e outros comportamentos do cluster
+            sem precisar do display físico.
+            Uso: adb shell am start -n br.com.hugolumazzini.havaltrip/.ClusterDebugActivity
+        -->
+        <activity
+            android:name=".ClusterDebugActivity"
+            android:exported="true"
+            android:label="Debug Cluster"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|uiMode"
+            android:theme="@style/Theme.HavalTrip.Cluster" />
+    </application>
+</manifest>
